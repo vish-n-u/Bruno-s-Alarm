@@ -1,0 +1,280 @@
+<title>Bruno's Alarm Privacy Policy</title>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,400;9..144,500;9..144,600&family=IBM+Plex+Sans:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500&display=swap');
+
+  :root {
+    --bg: #faf8f4;
+    --surface: #ffffff;
+    --text: #201d19;
+    --muted: #6f6a62;
+    --border: #e6e1d8;
+    --accent: #b3690f;
+    --accent-soft: #fbeee0;
+    --accent-text: #7a4a0c;
+  }
+
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) {
+      --bg: #0f1115;
+      --surface: #171a21;
+      --text: #f2f0ea;
+      --muted: #9aa0ab;
+      --border: #2a2e38;
+      --accent: #f5a524;
+      --accent-soft: rgba(245, 165, 36, 0.12);
+      --accent-text: #f5a524;
+    }
+  }
+
+  :root[data-theme="dark"] {
+    --bg: #0f1115;
+    --surface: #171a21;
+    --text: #f2f0ea;
+    --muted: #9aa0ab;
+    --border: #2a2e38;
+    --accent: #f5a524;
+    --accent-soft: rgba(245, 165, 36, 0.12);
+    --accent-text: #f5a524;
+  }
+
+  * { box-sizing: border-box; }
+
+  body {
+    background: var(--bg);
+    color: var(--text);
+    font-family: "IBM Plex Sans", -apple-system, BlinkMacSystemFont, sans-serif;
+    font-size: 17px;
+    line-height: 1.65;
+    -webkit-font-smoothing: antialiased;
+  }
+
+  main {
+    max-width: 680px;
+    margin: 0 auto;
+    padding: 3rem 1.5rem 5rem;
+  }
+
+  header {
+    display: flex;
+    align-items: center;
+    gap: 0.9rem;
+    margin-bottom: 2.5rem;
+    padding-bottom: 1.75rem;
+    border-bottom: 1px solid var(--border);
+  }
+
+  @media (max-width: 420px) {
+    header {
+      flex-direction: column;
+      align-items: flex-start;
+      gap: 0.5rem;
+    }
+  }
+
+  .mark {
+    font-size: 2.2rem;
+    line-height: 1;
+  }
+
+  .header-text h1 {
+    font-family: "Fraunces", Georgia, serif;
+    font-optical-sizing: auto;
+    font-weight: 600;
+    font-size: 1.5rem;
+    margin: 0 0 0.15rem;
+    text-wrap: balance;
+  }
+
+  .header-text .meta {
+    font-family: "IBM Plex Mono", ui-monospace, monospace;
+    font-size: 0.8rem;
+    color: var(--muted);
+    letter-spacing: 0.01em;
+  }
+
+  h2 {
+    font-family: "Fraunces", Georgia, serif;
+    font-optical-sizing: auto;
+    font-weight: 600;
+    font-size: 1.3rem;
+    margin: 2.75rem 0 0.9rem;
+    text-wrap: balance;
+    display: flex;
+    align-items: baseline;
+    gap: 0.6rem;
+  }
+
+  h2 .num {
+    font-family: "IBM Plex Mono", ui-monospace, monospace;
+    font-size: 0.85rem;
+    font-weight: 500;
+    color: var(--accent-text);
+  }
+
+  p { margin: 0 0 1rem; }
+  ul { margin: 0 0 1rem; padding-left: 1.3rem; }
+  li { margin-bottom: 0.5rem; }
+
+  .lede {
+    color: var(--muted);
+    font-size: 1.05rem;
+  }
+
+  .summary {
+    background: var(--accent-soft);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    padding: 1.25rem 1.4rem;
+    margin: 2rem 0;
+  }
+
+  .summary .label {
+    font-family: "IBM Plex Mono", ui-monospace, monospace;
+    font-size: 0.72rem;
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+    color: var(--accent-text);
+    margin-bottom: 0.5rem;
+  }
+
+  .summary p:last-child { margin-bottom: 0; }
+
+  .perm-list {
+    list-style: none;
+    padding: 0;
+    margin: 0 0 1rem;
+    display: flex;
+    flex-direction: column;
+    gap: 0.9rem;
+  }
+
+  .perm-list li {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 0.9rem 1.1rem;
+    margin: 0;
+  }
+
+  .perm-name {
+    font-family: "IBM Plex Mono", ui-monospace, monospace;
+    font-size: 0.82rem;
+    color: var(--accent-text);
+    display: block;
+    margin-bottom: 0.3rem;
+    word-break: break-word;
+  }
+
+  .perm-why {
+    color: var(--muted);
+    font-size: 0.95rem;
+  }
+
+  a { color: var(--accent-text); }
+
+  footer {
+    margin-top: 3.5rem;
+    padding-top: 1.5rem;
+    border-top: 1px solid var(--border);
+    color: var(--muted);
+    font-size: 0.85rem;
+  }
+
+  code {
+    font-family: "IBM Plex Mono", ui-monospace, monospace;
+    background: var(--accent-soft);
+    padding: 0.1rem 0.35rem;
+    border-radius: 4px;
+    font-size: 0.88em;
+  }
+</style>
+
+<main>
+  <header>
+    <div class="mark">🐕</div>
+    <div class="header-text">
+      <h1>Bruno's Alarm — Privacy Policy</h1>
+      <div class="meta">Effective September 6, 2026 · com.brunosalarm.app</div>
+    </div>
+  </header>
+
+  <p class="lede">
+    Bruno's Alarm wakes you up with a real dog's twice-daily howl. This page explains,
+    plainly, what the app does and doesn't do with your data.
+  </p>
+
+  <div class="summary">
+    <div class="label">The short version</div>
+    <p>
+      There are no accounts, no analytics, no ads, and no server this app talks to. Every
+      alarm you schedule is stored only on your own phone. The one exception is the video
+      panel, which embeds YouTube — see Section 4.
+    </p>
+  </div>
+
+  <h2><span class="num">1</span> Information we collect</h2>
+  <p>
+    None. Bruno's Alarm has no user accounts, no sign-up, and no first-party backend server.
+    We don't know who you are, and we have no way to find out.
+  </p>
+
+  <h2><span class="num">2</span> What's stored on your device</h2>
+  <p>Everything the app needs lives entirely on your phone, never transmitted anywhere:</p>
+  <ul>
+    <li>Your scheduled alarm times, held by Android's own <code>AlarmManager</code>.</li>
+    <li>Whether you've completed the app's one-time onboarding screen (a single yes/no flag, saved locally via Android's standard app storage).</li>
+  </ul>
+  <p>Uninstalling the app removes all of it. Nothing survives anywhere else.</p>
+
+  <h2><span class="num">3</span> Permissions this app requests, and why</h2>
+  <p>Android requires apps to declare each permission up front. Here's what Bruno's Alarm asks for and the exact reason:</p>
+  <ul class="perm-list">
+    <li>
+      <span class="perm-name">POST_NOTIFICATIONS</span>
+      <span class="perm-why">Lets the app show you anything at all — required on Android 13+ for any notification, including the alarm itself.</span>
+    </li>
+    <li>
+      <span class="perm-name">SCHEDULE_EXACT_ALARM</span>
+      <span class="perm-why">Lets Bruno's alarm fire at the exact scheduled second, the same permission every alarm-clock app uses.</span>
+    </li>
+    <li>
+      <span class="perm-name">USE_FULL_SCREEN_INTENT</span>
+      <span class="perm-why">Lets the alarm screen wake your phone and show over the lock screen when it goes off — otherwise it would just be a quiet notification.</span>
+    </li>
+    <li>
+      <span class="perm-name">RECEIVE_BOOT_COMPLETED</span>
+      <span class="perm-why">Lets your alarms survive a phone restart, so a reboot overnight doesn't silently cancel tomorrow's wake-up.</span>
+    </li>
+  </ul>
+
+  <h2><span class="num">4</span> YouTube embedded video</h2>
+  <p>
+    The app's video panel plays Bruno's clips through YouTube's standard embedded player.
+    When that player loads, Google may collect data according to its own
+    <a href="https://policies.google.com/privacy" target="_blank" rel="noopener">Privacy Policy</a>,
+    the same as on any website that embeds a YouTube video. Bruno's Alarm has no access to
+    and receives none of that data — it's a direct relationship between your device and
+    Google.
+  </p>
+
+  <h2><span class="num">5</span> Children's privacy</h2>
+  <p>
+    Bruno's Alarm isn't directed at children and doesn't knowingly collect information from
+    anyone, of any age — see Section 1.
+  </p>
+
+  <h2><span class="num">6</span> Changes to this policy</h2>
+  <p>
+    If this policy changes, the date at the top of this page will change with it. Continuing
+    to use the app after an update means you accept the revised policy.
+  </p>
+
+  <h2><span class="num">7</span> Contact</h2>
+  <p>
+    Questions about this policy or the app: <a href="mailto:vishnuna26@gmail.com">vishnuna26@gmail.com</a>.
+  </p>
+
+  <footer>
+    Bruno's Alarm is an independent app, not affiliated with or endorsed by YouTube or Google.
+  </footer>
+</main>

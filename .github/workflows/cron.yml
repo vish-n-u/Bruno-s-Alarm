@@ -1,0 +1,24 @@
+name: Bruno's Alarm cron
+
+# Vercel's free (Hobby) Cron Jobs tier is capped at one invocation per day per job, which
+# can't express "check every 5 minutes" — so this runs the checks from a GitHub Actions
+# schedule instead. GitHub's scheduled workflows aren't guaranteed to fire at the exact
+# minute (they can be delayed under load), which is fine here: /api/cron/sync-youtube
+# checks the time itself rather than trusting the trigger to be precise.
+on:
+  schedule:
+    - cron: "*/5 * * * *"
+  workflow_dispatch: {}
+
+jobs:
+  ping:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Sync YouTube status
+        run: |
+          curl -sf -X POST "${{ secrets.APP_URL }}/api/cron/sync-youtube" \
+            -H "Authorization: Bearer ${{ secrets.CRON_SECRET }}"
+      - name: Send due notifications
+        run: |
+          curl -sf -X POST "${{ secrets.APP_URL }}/api/cron/notify" \
+            -H "Authorization: Bearer ${{ secrets.CRON_SECRET }}"

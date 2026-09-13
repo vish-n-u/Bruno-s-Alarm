@@ -1,0 +1,46 @@
+{
+  "expo": {
+    "name": "Bruno's Alarm",
+    "slug": "brunos-alarm",
+    "version": "1.0.0",
+    "orientation": "portrait",
+    "icon": "./assets/icon.png",
+    "userInterfaceStyle": "automatic",
+    "backgroundColor": "#0f1a14",
+    "ios": {
+      "supportsTablet": true,
+      "bundleIdentifier": "com.brunosalarm.app"
+    },
+    "android": {
+      "package": "com.brunosalarm.app",
+      "adaptiveIcon": {
+        "backgroundColor": "#0f1115",
+        "foregroundImage": "./assets/android-icon-foreground.png",
+        "backgroundImage": "./assets/android-icon-background.png"
+      },
+      "predictiveBackGestureEnabled": false,
+      "permissions": [
+        "SCHEDULE_EXACT_ALARM",
+        "RECEIVE_BOOT_COMPLETED",
+        "POST_NOTIFICATIONS",
+        "USE_FULL_SCREEN_INTENT"
+      ]
+    },
+    "web": {
+      "favicon": "./assets/favicon.png"
+    },
+    "plugins": [
+      [
+        "expo-notifications",
+        {
+          "color": "#f5a524"
+        }
+      ],
+      "./plugins/withLockScreenAlarmActivity",
+      "./plugins/withIPv4GradleFix",
+      "./plugins/withAlarmSound",
+      "expo-video",
+      "expo-font"
+    ]
+  }
+}

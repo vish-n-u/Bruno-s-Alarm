@@ -1,0 +1,31 @@
+<title>Bruno's Alarm Video Embed</title>
+<style>
+  * { margin: 0; padding: 0; }
+  html, body { background: #000; height: 100%; overflow: hidden; }
+  iframe { position: fixed; top: 0; left: 0; width: 100%; height: 100%; border: 0; }
+</style>
+<div id="root"></div>
+<script>
+  // Purpose-built relay page: the mobile app's in-app WebView can't play a YouTube embed
+  // it constructs locally (fails with "Error 152-4" — YouTube's embed check rejects a
+  // native WebView's synthetic HTML, even with a spoofed baseUrl/Referer). Loading the
+  // *same* iframe from an actual hosted HTTPS page fixes it, so this page's only job is to
+  // exist at a real URL and render one iframe from its videoId/autoplay query params.
+  const params = new URLSearchParams(location.search);
+  const videoId = params.get("videoId");
+  const autoplay = params.get("autoplay") === "1";
+  const query = autoplay ? "autoplay=1&mute=1&playsinline=1" : "playsinline=1";
+
+  if (videoId) {
+    const iframe = document.createElement("iframe");
+    iframe.src = `https://www.youtube.com/embed/${videoId}?${query}`;
+    iframe.allow = "autoplay; encrypted-media";
+    iframe.allowFullscreen = true;
+    document.getElementById("root").appendChild(iframe);
+  } else {
+    document.body.style.color = "#9aa0ab";
+    document.body.style.font = "14px sans-serif";
+    document.body.style.padding = "16px";
+    document.body.textContent = "No videoId provided.";
+  }
+</script>

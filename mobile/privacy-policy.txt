@@ -1,0 +1,63 @@
+BRUNO'S ALARM — PRIVACY POLICY
+Effective September 6, 2026
+Package: com.brunosalarm.app
+
+Bruno's Alarm wakes you up with a real dog's twice-daily howl. This page explains,
+plainly, what the app does and doesn't do with your data.
+
+THE SHORT VERSION
+There are no accounts, no analytics, no ads, and no server this app talks to. Every
+alarm you schedule is stored only on your own phone. The one exception is the video
+panel, which embeds YouTube — see Section 4.
+
+1. INFORMATION WE COLLECT
+None. Bruno's Alarm has no user accounts, no sign-up, and no first-party backend
+server. We don't know who you are, and we have no way to find out.
+
+2. WHAT'S STORED ON YOUR DEVICE
+Everything the app needs lives entirely on your phone, never transmitted anywhere:
+- Your scheduled alarm times, held by Android's own AlarmManager.
+- Whether you've completed the app's one-time onboarding screen (a single yes/no
+  flag, saved locally via Android's standard app storage).
+Uninstalling the app removes all of it. Nothing survives anywhere else.
+
+3. PERMISSIONS THIS APP REQUESTS, AND WHY
+Android requires apps to declare each permission up front. Here's what Bruno's
+Alarm asks for and the exact reason:
+
+- POST_NOTIFICATIONS
+  Lets the app show you anything at all — required on Android 13+ for any
+  notification, including the alarm itself.
+
+- SCHEDULE_EXACT_ALARM
+  Lets Bruno's alarm fire at the exact scheduled second, the same permission
+  every alarm-clock app uses.
+
+- USE_FULL_SCREEN_INTENT
+  Lets the alarm screen wake your phone and show over the lock screen when it
+  goes off — otherwise it would just be a quiet notification.
+
+- RECEIVE_BOOT_COMPLETED
+  Lets your alarms survive a phone restart, so a reboot overnight doesn't
+  silently cancel tomorrow's wake-up.
+
+4. YOUTUBE EMBEDDED VIDEO
+The app's video panel plays Bruno's clips through YouTube's standard embedded
+player. When that player loads, Google may collect data according to its own
+Privacy Policy (https://policies.google.com/privacy), the same as on any website
+that embeds a YouTube video. Bruno's Alarm has no access to and receives none of
+that data — it's a direct relationship between your device and Google.
+
+5. CHILDREN'S PRIVACY
+Bruno's Alarm isn't directed at children and doesn't knowingly collect
+information from anyone, of any age — see Section 1.
+
+6. CHANGES TO THIS POLICY
+If this policy changes, the date at the top of this page will change with it.
+Continuing to use the app after an update means you accept the revised policy.
+
+7. CONTACT
+Questions about this policy or the app: vishnuna26@gmail.com
+
+Bruno's Alarm is an independent app, not affiliated with or endorsed by YouTube
+or Google.

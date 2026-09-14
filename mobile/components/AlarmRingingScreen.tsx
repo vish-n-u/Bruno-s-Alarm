@@ -11,6 +11,13 @@ export default function AlarmRingingScreen({ alarmId }: { alarmId: string }) {
   // wake time that likely doesn't line up with an actual live session — say so honestly
   // rather than implying Bruno is howling right this second.
   const isRealSession = alarmId.startsWith("bruno-session-");
+  // Android alarm ids end in the scheduled timestamp (bruno-session-<ms> / bruno-custom-
+  // <ms>) — pull it out to show the exact scheduled time in the same mono "departure
+  // board" language used on Home, rather than just a generic title.
+  const scheduledAt = Number(alarmId.slice(alarmId.lastIndexOf("-") + 1));
+  const timeLabel = Number.isFinite(scheduledAt) && scheduledAt > 0
+    ? new Date(scheduledAt).toLocaleString(undefined, { hour: "numeric", minute: "2-digit" })
+    : null;
 
   return (
     <View style={styles.root}>
@@ -22,6 +29,7 @@ export default function AlarmRingingScreen({ alarmId }: { alarmId: string }) {
         />
         <Text style={styles.title}>{isRealSession ? "Bruno is howling!" : "Your Bruno alarm"}</Text>
       </View>
+      {timeLabel && <Text style={styles.timeLabel}>{timeLabel}</Text>}
 
       <View style={styles.videoWrap}>
         <VideoPanel allowUnmute={false} />
@@ -59,6 +67,13 @@ function createStyles(colors: ThemeColors) {
       fontFamily: fonts.display,
       fontSize: 22,
       textAlign: "center",
+    },
+    timeLabel: {
+      color: colors.live,
+      fontFamily: fonts.monoBold,
+      fontSize: 15,
+      textAlign: "center",
+      marginTop: -spacing.sm,
     },
     videoWrap: {
       marginVertical: spacing.sm,

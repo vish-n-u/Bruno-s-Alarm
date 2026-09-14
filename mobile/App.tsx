@@ -1,13 +1,11 @@
 import { useEffect, useState } from "react";
 import { StyleSheet, useColorScheme } from "react-native";
 import { StatusBar } from "expo-status-bar";
+import * as SplashScreen from "expo-splash-screen";
 import { useFonts } from "expo-font";
-import {
-  BricolageGrotesque_500Medium,
-  BricolageGrotesque_600SemiBold,
-  BricolageGrotesque_700Bold,
-} from "@expo-google-fonts/bricolage-grotesque";
-import { SpaceMono_400Regular, SpaceMono_700Bold } from "@expo-google-fonts/space-mono";
+import { Anton_400Regular } from "@expo-google-fonts/anton";
+import { CourierPrime_400Regular, CourierPrime_700Bold } from "@expo-google-fonts/courier-prime";
+import { Caveat_600SemiBold } from "@expo-google-fonts/caveat";
 import { NavigationContainer, DarkTheme, DefaultTheme } from "@react-navigation/native";
 import { createNativeStackNavigator, type NativeStackScreenProps } from "@react-navigation/native-stack";
 import { SafeAreaProvider } from "react-native-safe-area-context";
@@ -18,6 +16,7 @@ import SettingsScreen from "./screens/SettingsScreen";
 import CustomAlarmScreen from "./screens/CustomAlarmScreen";
 import { hasOnboarded, markOnboarded } from "./lib/onboarding";
 import { onAlarmRinging } from "./lib/notifications";
+import { registerBackgroundAlarmSoundRefresh } from "./lib/backgroundRefresh";
 import { useThemeColors } from "./lib/theme";
 
 type Screen = "checking" | "onboarding" | "home";
@@ -30,6 +29,12 @@ export type RootStackParamList = {
 };
 
 const Stack = createNativeStackNavigator<RootStackParamList>();
+
+// expo-splash-screen keeps the native splash up until hideAsync() is explicitly called from
+// JS — it does not auto-dismiss on its own. Call preventAutoHideAsync() as early as possible
+// (module scope, before the first render) so there's no gap where it could hide itself
+// before fonts/state are actually ready.
+SplashScreen.preventAutoHideAsync().catch(() => {});
 
 // Renders the same Onboarding flow shown on first launch, but "Done"/"Skip" just pops
 // back to Settings instead of marking real onboarding state — lets it be checked any time
@@ -44,11 +49,10 @@ export default function App() {
   const colors = useThemeColors();
   const scheme = useColorScheme();
   const [fontsLoaded] = useFonts({
-    BricolageGrotesque_700Bold,
-    BricolageGrotesque_600SemiBold,
-    BricolageGrotesque_500Medium,
-    SpaceMono_400Regular,
-    SpaceMono_700Bold,
+    Anton_400Regular,
+    CourierPrime_400Regular,
+    CourierPrime_700Bold,
+    Caveat_600SemiBold,
   });
 
   useEffect(() => {
@@ -62,12 +66,25 @@ export default function App() {
     return () => subscription?.remove();
   }, []);
 
+  useEffect(() => {
+    registerBackgroundAlarmSoundRefresh();
+  }, []);
+
+  // Only dismiss the splash once there's real content ready to replace it with — fonts
+  // loaded and past the "checking" state — so there's no flash of a blank/unstyled screen
+  // underneath.
+  useEffect(() => {
+    if (fontsLoaded && screen !== "checking") {
+      SplashScreen.hideAsync().catch(() => {});
+    }
+  }, [fontsLoaded, screen]);
+
   async function completeOnboarding() {
     await markOnboarded();
     setScreen("home");
   }
 
-  if (!fontsLoaded) return null;
+  if (!fontsLoaded || screen === "checking") return null;
 
   const navigationTheme = {
     ...(scheme === "light" ? DefaultTheme : DarkTheme),

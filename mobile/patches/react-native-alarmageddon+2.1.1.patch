@@ -1,0 +1,229 @@
+diff --git a/node_modules/react-native-alarmageddon/android/src/main/java/com/rnalarmmodule/AlarmModule.kt b/node_modules/react-native-alarmageddon/android/src/main/java/com/rnalarmmodule/AlarmModule.kt
+index 84502ce..7ba8789 100644
+--- a/node_modules/react-native-alarmageddon/android/src/main/java/com/rnalarmmodule/AlarmModule.kt
++++ b/node_modules/react-native-alarmageddon/android/src/main/java/com/rnalarmmodule/AlarmModule.kt
+@@ -67,6 +67,7 @@ class AlarmModule(reactContext: ReactApplicationContext) : ReactContextBaseJavaM
+             val body = alarm.optString("body", "")
+             val snoozeEnabled = alarm.optBoolean("snoozeEnabled", true)
+             val snoozeInterval = alarm.optInt("snoozeInterval", 5)
++            val soundPath: String? = if (alarm.has("soundPath")) alarm.optString("soundPath") else null
+ 
+             val intent = Intent(reactApplicationContext, AlarmReceiver::class.java).apply {
+                 action = AlarmReceiver.ACTION_SNOOZE
+@@ -76,6 +77,7 @@ class AlarmModule(reactContext: ReactApplicationContext) : ReactContextBaseJavaM
+                 putExtra("snoozeMinutes", minutes)
+                 putExtra("snoozeEnabled", snoozeEnabled)
+                 putExtra("snoozeInterval", snoozeInterval)
++                if (soundPath != null) putExtra("soundPath", soundPath)
+             }
+             reactApplicationContext.sendBroadcast(intent)
+             promise.resolve(null)
+@@ -104,6 +106,7 @@ class AlarmModule(reactContext: ReactApplicationContext) : ReactContextBaseJavaM
+             val body = alarm.getString("body") ?: ""
+             val snoozeEnabled = if (alarm.hasKey("snoozeEnabled")) alarm.getBoolean("snoozeEnabled") else true
+             val snoozeInterval = if (alarm.hasKey("snoozeInterval")) alarm.getInt("snoozeInterval") else 5
++            val soundPath = if (alarm.hasKey("soundPath")) alarm.getString("soundPath") else null
+ 
+             val sdf = SimpleDateFormat(DATE_PATTERN, Locale.getDefault())
+             val date = sdf.parse(datetimeISO) ?: throw Exception("Invalid date format")
+@@ -121,6 +124,7 @@ class AlarmModule(reactContext: ReactApplicationContext) : ReactContextBaseJavaM
+                 putExtra("body", body)
+                 putExtra("snoozeEnabled", snoozeEnabled)
+                 putExtra("snoozeInterval", snoozeInterval)
++                if (soundPath != null) putExtra("soundPath", soundPath)
+             }
+ 
+             val pendingIntent = PendingIntent.getBroadcast(
+@@ -137,7 +141,7 @@ class AlarmModule(reactContext: ReactApplicationContext) : ReactContextBaseJavaM
+                 alarmManager.setExact(AlarmManager.RTC_WAKEUP, triggerAt, pendingIntent)
+             }
+ 
+-            saveAlarm(id, datetimeISO, title, body, snoozeEnabled, snoozeInterval)
++            saveAlarm(id, datetimeISO, title, body, snoozeEnabled, snoozeInterval, soundPath)
+             Log.d(TAG, "Scheduled alarm id=$id at=$datetimeISO")
+             promise.resolve(null)
+         } catch (e: Exception) {
+@@ -186,6 +190,7 @@ class AlarmModule(reactContext: ReactApplicationContext) : ReactContextBaseJavaM
+             map.putString("body", obj.optString("body"))
+             map.putBoolean("snoozeEnabled", obj.optBoolean("snoozeEnabled", true))
+             map.putInt("snoozeInterval", obj.optInt("snoozeInterval", 5))
++            if (obj.has("soundPath")) map.putString("soundPath", obj.optString("soundPath"))
+             arr.pushMap(map)
+         }
+         promise.resolve(arr)
+@@ -232,7 +237,7 @@ class AlarmModule(reactContext: ReactApplicationContext) : ReactContextBaseJavaM
+         // Required for NativeEventEmitter
+     }
+ 
+-    private fun saveAlarm(id: String, datetimeISO: String, title: String, body: String, snoozeEnabled: Boolean = true, snoozeInterval: Int = 5) {
++    private fun saveAlarm(id: String, datetimeISO: String, title: String, body: String, snoozeEnabled: Boolean = true, snoozeInterval: Int = 5, soundPath: String? = null) {
+         val obj = JSONObject()
+             .put("id", id)
+             .put("datetimeISO", datetimeISO)
+@@ -240,6 +245,7 @@ class AlarmModule(reactContext: ReactApplicationContext) : ReactContextBaseJavaM
+             .put("body", body)
+             .put("snoozeEnabled", snoozeEnabled)
+             .put("snoozeInterval", snoozeInterval)
++        if (soundPath != null) obj.put("soundPath", soundPath)
+         val prefs = reactApplicationContext.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
+         prefs.edit().putString(id, obj.toString()).apply()
+     }
+diff --git a/node_modules/react-native-alarmageddon/android/src/main/java/com/rnalarmmodule/AlarmReceiver.kt b/node_modules/react-native-alarmageddon/android/src/main/java/com/rnalarmmodule/AlarmReceiver.kt
+index 8eb109e..cbea586 100644
+--- a/node_modules/react-native-alarmageddon/android/src/main/java/com/rnalarmmodule/AlarmReceiver.kt
++++ b/node_modules/react-native-alarmageddon/android/src/main/java/com/rnalarmmodule/AlarmReceiver.kt
+@@ -64,13 +64,14 @@ class AlarmReceiver : BroadcastReceiver() {
+         val body = intent.getStringExtra("body") ?: ""
+         val snoozeEnabled = intent.getBooleanExtra("snoozeEnabled", true)
+         val snoozeInterval = intent.getIntExtra("snoozeInterval", SNOOZE_MINUTES)
++        val soundPath = intent.getStringExtra("soundPath")
+         activeAlarmId = id
+ 
+         emitActiveAlarmId(activeAlarmId)
+ 
+         acquireWakeLock(context)
+         setupAudio(context)
+-        playAlarm(context, id)
++        playAlarm(context, id, soundPath)
+         showNotificationWithActions(context, id, title, body, snoozeEnabled, snoozeInterval)
+     }
+ 
+@@ -126,7 +127,7 @@ class AlarmReceiver : BroadcastReceiver() {
+         }
+     }
+ 
+-    private fun playAlarm(context: Context, id: String) {
++    private fun playAlarm(context: Context, id: String, soundPath: String? = null) {
+         player?.let {
+             try {
+                 if (it.isPlaying) it.stop()
+@@ -136,7 +137,7 @@ class AlarmReceiver : BroadcastReceiver() {
+         }
+ 
+         player = MediaPlayer().apply {
+-            try {
++            fun setDefaultSource() {
+                 // Try to use custom alarm sound from host app's res/raw folder
+                 val resId = context.resources.getIdentifier(RAW_RES, "raw", context.packageName)
+                 if (resId != 0) {
+@@ -150,22 +151,63 @@ class AlarmReceiver : BroadcastReceiver() {
+                         ?: android.media.RingtoneManager.getDefaultUri(android.media.RingtoneManager.TYPE_NOTIFICATION)
+                     setDataSource(context, alarmUri)
+                 }
++            }
+ 
+-                setAudioAttributes(
+-                    AudioAttributes.Builder()
+-                        .setUsage(AudioAttributes.USAGE_ALARM)
+-                        .setContentType(AudioAttributes.CONTENT_TYPE_SONIFICATION)
+-                        .build()
+-                )
+-                @Suppress("DEPRECATION")
+-                setAudioStreamType(AudioManager.STREAM_ALARM)
+-                isLooping = true
+-                prepare()
+-                start()
+-                Log.d(TAG, "Alarm sound started for id=$id")
+-            } catch (e: Exception) {
+-                Log.e(TAG, "Failed to play alarm sound: ${e.message}")
+-                e.printStackTrace()
++            // A custom sound (e.g. downloaded from the latest live recording) is only ever
++            // an enhancement — if it's missing, corrupt, or unplayable for any reason, we
++            // fall all the way back to the bundled default rather than risk total silence.
++            var prepared = false
++            if (soundPath != null && java.io.File(soundPath).exists()) {
++                try {
++                    setDataSource(soundPath)
++                    setAudioAttributes(
++                        AudioAttributes.Builder()
++                            .setUsage(AudioAttributes.USAGE_ALARM)
++                            .setContentType(AudioAttributes.CONTENT_TYPE_SONIFICATION)
++                            .build()
++                    )
++                    @Suppress("DEPRECATION")
++                    setAudioStreamType(AudioManager.STREAM_ALARM)
++                    isLooping = true
++                    prepare()
++                    prepared = true
++                    Log.d(TAG, "Using custom alarm sound: $soundPath")
++                } catch (e: Exception) {
++                    Log.e(TAG, "Custom alarm sound failed (${e.message}), falling back to default")
++                    try {
++                        reset()
++                    } catch (_: Exception) {
++                    }
++                }
++            }
++
++            if (!prepared) {
++                try {
++                    setDefaultSource()
++                    setAudioAttributes(
++                        AudioAttributes.Builder()
++                            .setUsage(AudioAttributes.USAGE_ALARM)
++                            .setContentType(AudioAttributes.CONTENT_TYPE_SONIFICATION)
++                            .build()
++                    )
++                    @Suppress("DEPRECATION")
++                    setAudioStreamType(AudioManager.STREAM_ALARM)
++                    isLooping = true
++                    prepare()
++                    prepared = true
++                } catch (e: Exception) {
++                    Log.e(TAG, "Failed to prepare fallback alarm sound: ${e.message}")
++                    e.printStackTrace()
++                }
++            }
++
++            if (prepared) {
++                try {
++                    start()
++                    Log.d(TAG, "Alarm sound started for id=$id")
++                } catch (e: Exception) {
++                    Log.e(TAG, "Failed to start alarm sound: ${e.message}")
++                }
+             }
+         }
+ 
+@@ -310,11 +352,13 @@ class AlarmReceiver : BroadcastReceiver() {
+         val title = originalIntent.getStringExtra("title") ?: "Alarm"
+         val body = originalIntent.getStringExtra("body") ?: ""
+         val minutes = originalIntent.getIntExtra("snoozeMinutes", SNOOZE_MINUTES)
++        val soundPath = originalIntent.getStringExtra("soundPath")
+ 
+         val snoozeIntent = Intent(context, AlarmReceiver::class.java).apply {
+             putExtra("id", id)
+             putExtra("title", title)
+             putExtra("body", body)
++            if (soundPath != null) putExtra("soundPath", soundPath)
+         }
+ 
+         val pendingIntent = PendingIntent.getBroadcast(
+diff --git a/node_modules/react-native-alarmageddon/lib/index.d.ts b/node_modules/react-native-alarmageddon/lib/index.d.ts
+index 1e70192..cd83aa3 100644
+--- a/node_modules/react-native-alarmageddon/lib/index.d.ts
++++ b/node_modules/react-native-alarmageddon/lib/index.d.ts
+@@ -14,6 +14,9 @@ export type AlarmParams = {
+     snoozeEnabled?: boolean;
+     /** Interval in minutes for snoozing */
+     snoozeInterval?: number;
++    /** Absolute local file path to a custom alarm sound. Falls back to the bundled default
++     * sound if omitted, or if the file can't be played for any reason. */
++    soundPath?: string;
+ };
+ /**
+  * Result of permission request
+diff --git a/node_modules/react-native-alarmageddon/src/index.ts b/node_modules/react-native-alarmageddon/src/index.ts
+index 185db19..b65d6ca 100644
+--- a/node_modules/react-native-alarmageddon/src/index.ts
++++ b/node_modules/react-native-alarmageddon/src/index.ts
+@@ -21,6 +21,9 @@ export type AlarmParams = {
+   snoozeEnabled?: boolean;
+   /** Interval in minutes for snoozing */
+   snoozeInterval?: number;
++  /** Absolute local file path to a custom alarm sound. Falls back to the bundled default
++   * sound if omitted, or if the file can't be played for any reason. */
++  soundPath?: string;
+ };
+ 
+ /**

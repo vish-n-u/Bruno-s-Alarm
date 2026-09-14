@@ -19,12 +19,11 @@ const LIVE_SOURCE: VideoSource =
 // The recorded replay — a plain R2 (or any direct) URL, same fallback chain.
 const VOD_SOURCE: VideoSource = process.env.EXPO_PUBLIC_VOD_VIDEO_URL || SAMPLE_VIDEO;
 
-// Starts muted (autoplay shouldn't blast sound the moment the video loads), with a
-// tap-to-unmute control — same pattern most apps use for autoplaying video. On the
-// alarm-ringing screen, pass allowUnmute={false}: the actual alarm sound there comes from
-// the native alarm itself (see plugins/withAlarmSound.js), which loops continuously via
-// react-native-alarmageddon's own MediaPlayer until Stop/Snooze — unmuting the video too
-// would just overlap/echo against it for the entire ringing duration.
+// Only rendered on the alarm-ringing screen now (Home doesn't show video at all). Starts
+// muted (autoplay shouldn't blast sound the moment the alarm fires) — allowUnmute={false}
+// there because the actual alarm sound comes from the native alarm itself (see
+// plugins/withAlarmSound.js), which loops continuously via react-native-alarmageddon's own
+// MediaPlayer until Stop/Snooze — unmuting the video too would just overlap/echo against it.
 export default function VideoPanel({ allowUnmute = true }: { allowUnmute?: boolean }) {
   const [live, setLive] = useState(isLiveWindow());
   const [muted, setMuted] = useState(true);

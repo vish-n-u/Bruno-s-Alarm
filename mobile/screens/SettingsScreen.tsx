@@ -1,5 +1,6 @@
 import { useCallback, useState } from "react";
 import { Alert, Linking, Platform, Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
+import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { Ionicons } from "@expo/vector-icons";
 import { useFocusEffect } from "@react-navigation/native";
 import type { NativeStackScreenProps } from "@react-navigation/native-stack";
@@ -17,6 +18,7 @@ import {
   type ScheduledAlarmSummary,
 } from "../lib/notifications";
 import { getCustomAlarm, type CustomAlarmState, type RepeatMode } from "../lib/customAlarm";
+import { getCachedAlarmSoundPath, refreshAlarmSound } from "../lib/alarmSound";
 import { setDebugForceLive } from "../lib/schedule";
 import { fonts, radius, spacing, useThemeColors, type ThemeColors } from "../lib/theme";
 
@@ -83,10 +85,14 @@ function describeGroup(
   }
 }
 
-function SectionLabel({ children }: { children: string }) {
+// Primary sections (things you actually touch) get a real heading and a contained card.
+// Secondary/reference sections (permissions, about, debug) get a quieter label and sit
+// directly on the background as a plain list — so the screen isn't six identical bordered
+// cards stacked in a row, and "debug" visually reads as different from real controls.
+function SectionLabel({ children, variant = "primary" }: { children: string; variant?: "primary" | "secondary" }) {
   const colors = useThemeColors();
   const styles = createStyles(colors);
-  return <Text style={styles.sectionLabel}>{children}</Text>;
+  return <Text style={variant === "primary" ? styles.sectionLabel : styles.sectionLabelSecondary}>{children}</Text>;
 }
 
 type Props = NativeStackScreenProps<RootStackParamList, "Settings">;
@@ -94,6 +100,7 @@ type Props = NativeStackScreenProps<RootStackParamList, "Settings">;
 export default function SettingsScreen({ navigation }: Props) {
   const colors = useThemeColors();
   const styles = createStyles(colors);
+  const insets = useSafeAreaInsets();
   const [forcingLive, setForcingLive] = useState(false);
   const [alarms, setAlarms] = useState<ScheduledAlarmSummary[]>([]);
   const [customState, setCustomState] = useState<CustomAlarmState | null>(null);
@@ -137,7 +144,10 @@ export default function SettingsScreen({ navigation }: Props) {
     .filter((g) => g.items.length > 0);
 
   return (
-    <ScrollView style={styles.root} contentContainerStyle={styles.content}>
+    <ScrollView
+      style={styles.root}
+      contentContainerStyle={[styles.content, { paddingBottom: spacing.xxl + insets.bottom }]}
+    >
       <SectionLabel>Notifications</SectionLabel>
       <View style={styles.card}>
         <NotifyToggle />
@@ -153,28 +163,25 @@ export default function SettingsScreen({ navigation }: Props) {
               {index > 0 && <View style={styles.rowDivider} />}
               <Text style={styles.rowText}>{KIND_LABEL[group.kind]}</Text>
               <Text style={styles.cardHint}>{describeGroup(group.kind, group.items, customState)}</Text>
-              <Text style={styles.cardHint}>Next: {formatAlarmTime(group.items[0].timestamp)}</Text>
+              <Text style={styles.cardHintMono}>Next: {formatAlarmTime(group.items[0].timestamp)}</Text>
             </View>
           ))
         )}
         {alarms.length > 0 && (
-          <Pressable style={styles.debugButton} onPress={handleClearAll}>
-            <Ionicons name="trash-outline" size={15} color={colors.danger} />
-            <Text style={[styles.debugButtonText, { color: colors.danger }]}>
-              Clear all scheduled alarms
-            </Text>
+          <Pressable style={styles.dangerButton} onPress={handleClearAll}>
+            <Text style={styles.dangerButtonText}>Clear all scheduled alarms</Text>
           </Pressable>
         )}
       </View>
 
       {Platform.OS === "android" && (
         <>
-          <SectionLabel>Real alarm permissions</SectionLabel>
-          <View style={styles.card}>
-            <Text style={styles.cardHint}>
-              One-time setup so the alarm actually rings through Do Not Disturb and over the
-              lock screen — safe to revisit any time.
-            </Text>
+          <SectionLabel variant="secondary">Real alarm permissions</SectionLabel>
+          <Text style={styles.plainHint}>
+            One-time setup so the alarm actually rings through Do Not Disturb and over the
+            lock screen — safe to revisit any time.
+          </Text>
+          <View style={styles.plainList}>
             <Pressable style={styles.row} onPress={openAlarmPermissionSettings}>
               <Text style={styles.rowText}>Allow exact alarms</Text>
               <Ionicons name="chevron-forward" size={16} color={colors.textSecondary} />
@@ -188,12 +195,12 @@ export default function SettingsScreen({ navigation }: Props) {
         </>
       )}
 
-      <SectionLabel>About</SectionLabel>
-      <View style={styles.card}>
-        <Text style={styles.cardHint}>
-          Bruno is a real dog who howls at a church bell, twice a day, no accounts and no
-          tracking involved.
-        </Text>
+      <SectionLabel variant="secondary">About</SectionLabel>
+      <Text style={styles.plainHint}>
+        Bruno is a real dog who howls at a church bell, twice a day, no accounts and no
+        tracking involved.
+      </Text>
+      <View style={styles.plainList}>
         <Pressable style={styles.row} onPress={() => Linking.openURL(PRIVACY_POLICY_URL)}>
           <Text style={styles.rowText}>Privacy Policy</Text>
           <Ionicons name="chevron-forward" size={16} color={colors.textSecondary} />
@@ -205,17 +212,17 @@ export default function SettingsScreen({ navigation }: Props) {
         </View>
       </View>
 
-      <SectionLabel>Debug</SectionLabel>
-      <View style={styles.card}>
-        <Text style={styles.cardHint}>Testing tools — not visible to real users.</Text>
-        <Pressable style={styles.debugButton} onPress={() => navigation.navigate("OnboardingPreview")}>
-          <Ionicons name="eye-outline" size={15} color={colors.textSecondary} />
-          <Text style={styles.debugButtonText}>Preview onboarding</Text>
+      <SectionLabel variant="secondary">Debug</SectionLabel>
+      <Text style={styles.plainHint}>Testing tools — not visible to real users.</Text>
+      <View style={styles.consoleList}>
+        <Pressable style={styles.consoleRow} onPress={() => navigation.navigate("OnboardingPreview")}>
+          <Text style={styles.consoleText}>&gt; preview onboarding</Text>
         </Pressable>
         {Platform.OS === "android" && (
           <>
+            <View style={styles.rowDivider} />
             <Pressable
-              style={styles.debugButton}
+              style={styles.consoleRow}
               onPress={async () => {
                 const granted = await requestPermission();
                 if (!granted) {
@@ -227,21 +234,40 @@ export default function SettingsScreen({ navigation }: Props) {
                 Alert.alert("Test alarm set", "Fires in ~90 seconds. Lock the phone and try silent/DND now.");
               }}
             >
-              <Ionicons name="flask-outline" size={15} color={colors.textSecondary} />
-              <Text style={styles.debugButtonText}>Test alarm in 90s</Text>
+              <Text style={styles.consoleText}>&gt; test alarm in 90s</Text>
             </Pressable>
+            <View style={styles.rowDivider} />
             <Pressable
-              style={styles.debugButton}
+              style={styles.consoleRow}
               onPress={() => {
                 const next = !forcingLive;
                 setDebugForceLive(next ? true : null);
                 setForcingLive(next);
               }}
             >
-              <Ionicons name="radio-button-on" size={15} color={colors.live} />
-              <Text style={styles.debugButtonText}>
-                {forcingLive ? "Forcing LIVE — tap to clear" : "Force LIVE (debug)"}
+              <Text style={[styles.consoleText, forcingLive && { color: colors.live }]}>
+                {forcingLive ? "> forcing live — tap to clear" : "> force live (debug)"}
               </Text>
+            </Pressable>
+            <View style={styles.rowDivider} />
+            <Pressable
+              style={styles.consoleRow}
+              onPress={async () => {
+                // Calls the exact function the periodic background task runs — a much more
+                // direct test than expo-background-task's own trigger-for-testing API, which
+                // silently no-ops whenever the app is in the foreground (i.e. always, when
+                // you're the one tapping this button).
+                await refreshAlarmSound();
+                const path = await getCachedAlarmSoundPath();
+                Alert.alert(
+                  path ? "Refreshed" : "No cached sound",
+                  path
+                    ? `Cached at:\n${path}`
+                    : "Refresh ran but nothing is cached — check EXPO_PUBLIC_BACKEND_URL and network access."
+                );
+              }}
+            >
+              <Text style={styles.consoleText}>&gt; run background sound refresh now</Text>
             </Pressable>
           </>
         )}
@@ -260,14 +286,23 @@ function createStyles(colors: ThemeColors) {
       padding: spacing.xl,
       paddingBottom: spacing.xxl,
     },
+    // Primary sections (Notifications, Scheduled alarms) get a real heading — sentence
+    // case, no letter-spacing — instead of the generic uppercase-tracked dashboard label.
     sectionLabel: {
-      color: colors.textSecondary,
-      fontFamily: fonts.bodyBold,
-      fontSize: 12,
-      textTransform: "uppercase",
-      letterSpacing: 1,
+      color: colors.textPrimary,
+      fontFamily: fonts.displaySemiBold,
+      fontSize: 16,
       marginBottom: spacing.sm,
-      marginTop: spacing.lg,
+      marginTop: spacing.xl,
+    },
+    // Secondary/reference sections get a quieter label — signals "less central" without
+    // resorting to the same all-caps treatment used everywhere before.
+    sectionLabelSecondary: {
+      color: colors.textSecondary,
+      fontFamily: fonts.bodyMedium,
+      fontSize: 13,
+      marginBottom: spacing.xs,
+      marginTop: spacing.xl,
     },
     card: {
       backgroundColor: colors.surface,
@@ -282,6 +317,23 @@ function createStyles(colors: ThemeColors) {
       fontFamily: fonts.body,
       fontSize: 13,
       lineHeight: 19,
+    },
+    cardHintMono: {
+      color: colors.textSecondary,
+      fontFamily: fonts.mono,
+      fontSize: 12,
+    },
+    // Reference sections (permissions/about) sit directly on the background as a plain
+    // list — no border/card chrome — so the screen isn't six identical bordered widgets.
+    plainHint: {
+      color: colors.textSecondary,
+      fontFamily: fonts.body,
+      fontSize: 13,
+      lineHeight: 19,
+      marginBottom: spacing.sm,
+    },
+    plainList: {
+      gap: 0,
     },
     row: {
       flexDirection: "row",
@@ -303,20 +355,32 @@ function createStyles(colors: ThemeColors) {
       fontFamily: fonts.mono,
       fontSize: 14,
     },
-    debugButton: {
-      flexDirection: "row",
+    // A real, user-facing destructive action — styled as an honest outlined button, not a
+    // dashed "debug" pill.
+    dangerButton: {
       alignItems: "center",
       justifyContent: "center",
-      gap: spacing.sm,
       borderWidth: 1,
-      borderColor: colors.border,
-      borderStyle: "dashed",
+      borderColor: colors.danger,
       borderRadius: radius.md,
       paddingVertical: spacing.md,
     },
-    debugButtonText: {
+    dangerButtonText: {
+      color: colors.danger,
+      fontFamily: fonts.bodyBold,
+      fontSize: 14,
+    },
+    // Debug tools read like console output rather than styled buttons — deliberately
+    // distinct from every real control elsewhere in the app.
+    consoleList: {
+      gap: 0,
+    },
+    consoleRow: {
+      paddingVertical: spacing.md,
+    },
+    consoleText: {
       color: colors.textSecondary,
-      fontFamily: fonts.body,
+      fontFamily: fonts.mono,
       fontSize: 13,
     },
   });

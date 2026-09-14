@@ -2,6 +2,7 @@ import * as IntentLauncher from "expo-intent-launcher";
 import * as Notifications from "expo-notifications";
 import { Platform } from "react-native";
 import RNAlarmModule, { type AlarmSubscription } from "react-native-alarmageddon";
+import { getCachedAlarmSoundPath, refreshAlarmSound } from "./alarmSound";
 import { nextSessions } from "./schedule";
 
 const ID_PREFIX = "bruno-session-";
@@ -58,6 +59,10 @@ export async function scheduleUpcomingSessions(): Promise<void> {
   await clearScheduled();
 
   if (Platform.OS === "android") {
+    // Best-effort refresh of the guaranteed alarm sound to Bruno's latest real recording —
+    // never blocks scheduling if it's unconfigured, offline, or fails for any reason.
+    await refreshAlarmSound();
+    const soundPath = await getCachedAlarmSoundPath();
     for (const timestamp of nextSessions(SESSIONS_TO_SCHEDULE)) {
       await RNAlarmModule.scheduleAlarm({
         id: `${ID_PREFIX}${timestamp}`,
@@ -66,6 +71,7 @@ export async function scheduleUpcomingSessions(): Promise<void> {
         body: "The session just went live — open the app to watch.",
         snoozeEnabled: true,
         snoozeInterval: SNOOZE_MINUTES,
+        ...(soundPath ? { soundPath } : {}),
       });
     }
     return;
@@ -99,6 +105,9 @@ export async function scheduleTestAlarmSoon(): Promise<void> {
   await Promise.all(
     existing.filter((a) => a.id.startsWith(TEST_PREFIX)).map((a) => RNAlarmModule.cancelAlarm(a.id))
   );
+  // Uses whatever sound is currently cached (if any) so this debug button doubles as a way
+  // to verify the refreshed alarm sound actually plays, without waiting for a real session.
+  const soundPath = await getCachedAlarmSoundPath();
   await RNAlarmModule.scheduleAlarm({
     id: `${TEST_PREFIX}${Date.now()}`,
     datetimeISO: new Date(Date.now() + 90000).toISOString(),
@@ -106,6 +115,7 @@ export async function scheduleTestAlarmSoon(): Promise<void> {
     body: "This is a test — Stop or Snooze it.",
     snoozeEnabled: true,
     snoozeInterval: SNOOZE_MINUTES,
+    ...(soundPath ? { soundPath } : {}),
   });
 }
 

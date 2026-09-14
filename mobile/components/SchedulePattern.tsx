@@ -54,13 +54,16 @@ export default function SchedulePattern() {
         })}
       </View>
 
-      <View style={styles.countdown}>
-        <Text style={styles.label}>{live ? "Session in progress" : "Next session in"}</Text>
-        <Text style={styles.clock}>{live ? "— : — : —" : formatDuration(nextTarget - nowMs)}</Text>
-        <Text style={styles.localTime}>
-          {live ? "Bruno is howling right now" : `That's ${formatLocalTime(nextTarget)} your time`}
-        </Text>
-      </View>
+      <Text style={styles.nextLine}>
+        {live ? (
+          "Bruno is howling right now"
+        ) : (
+          <>
+            <Text style={styles.nextLineLabel}>Next in </Text>
+            <Text style={styles.nextLineTime}>{formatDuration(nextTarget - nowMs)}</Text>
+          </>
+        )}
+      </Text>
     </View>
   );
 }
@@ -120,29 +123,18 @@ function createStyles(colors: ThemeColors) {
       color: colors.live,
       fontFamily: fonts.bodyBold,
     },
-    countdown: {
-      alignItems: "center",
-      paddingTop: spacing.lg,
-      paddingBottom: spacing.xs,
+    nextLine: {
+      textAlign: "center",
+      fontSize: 15,
+      marginTop: spacing.sm,
     },
-    label: {
-      color: colors.textSecondary,
-      fontFamily: fonts.bodyMedium,
-      fontSize: 11,
-      textTransform: "uppercase",
-      letterSpacing: 1.5,
-      marginBottom: spacing.xs,
-    },
-    clock: {
-      fontFamily: fonts.monoBold,
-      fontSize: 40,
-      color: colors.accent,
-    },
-    localTime: {
+    nextLineLabel: {
       color: colors.textSecondary,
       fontFamily: fonts.body,
-      fontSize: 13,
-      marginTop: spacing.xs,
+    },
+    nextLineTime: {
+      color: colors.accent,
+      fontFamily: fonts.monoBold,
     },
   });
 }

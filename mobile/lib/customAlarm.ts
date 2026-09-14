@@ -2,6 +2,7 @@ import AsyncStorage from "@react-native-async-storage/async-storage";
 import * as Notifications from "expo-notifications";
 import { Platform } from "react-native";
 import RNAlarmModule from "react-native-alarmageddon";
+import { getCachedAlarmSoundPath, refreshAlarmSound } from "./alarmSound";
 
 // A second, independent alarm path alongside lib/notifications.ts's Bruno-session
 // scheduling — lets someone set a genuinely free-choice wake time, unrelated to when
@@ -117,6 +118,10 @@ export async function enableCustomAlarm(
   await clearScheduledCustom();
 
   if (Platform.OS === "android") {
+    // Best-effort refresh of the guaranteed alarm sound to Bruno's latest real recording —
+    // never blocks scheduling if it's unconfigured, offline, or fails for any reason.
+    await refreshAlarmSound();
+    const soundPath = await getCachedAlarmSoundPath();
     const timestamps =
       repeatMode === "once"
         ? [nextLocalOccurrence(hour, minute)]
@@ -129,6 +134,7 @@ export async function enableCustomAlarm(
         body: ALARM_BODY,
         snoozeEnabled: true,
         snoozeInterval: SNOOZE_MINUTES,
+        ...(soundPath ? { soundPath } : {}),
       });
     }
   } else if (repeatMode === "once") {

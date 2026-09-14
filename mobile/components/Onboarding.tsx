@@ -1,5 +1,6 @@
 import { useRef, useState } from "react";
 import {
+  Image,
   NativeScrollEvent,
   NativeSyntheticEvent,
   Pressable,
@@ -13,9 +14,13 @@ import { Ionicons } from "@expo/vector-icons";
 import { requestPermission, scheduleUpcomingSessions } from "../lib/notifications";
 import { fonts, radius, spacing, useThemeColors, type ThemeColors } from "../lib/theme";
 
+// Slide 1 uses the real studio photo of Bruno instead of a generic icon — it's the very
+// first thing a new user sees, and a real dog beats a stock paw glyph for making the point
+// that this app is about one specific, real animal. Slides 2-3 stay icon-led since they're
+// about concepts (schedule, notifications), not "this is a real dog."
 const SLIDES = [
   {
-    icon: "paw" as const,
+    image: require("../assets/icon.png"),
     title: "This app is one dog.",
     body: "Bruno hears the church bell and loses it. Every morning. Every evening. That's the whole app.",
   },
@@ -70,7 +75,11 @@ export default function Onboarding({ onDone }: { onDone: () => void }) {
       >
         {SLIDES.map((slide) => (
           <View key={slide.title} style={[styles.slide, { width }]}>
-            <Ionicons name={slide.icon} size={56} color={colors.accent} style={styles.icon} />
+            {"image" in slide ? (
+              <Image source={slide.image} style={styles.slideImage} resizeMode="cover" />
+            ) : (
+              <Ionicons name={slide.icon} size={56} color={colors.accent} style={styles.icon} />
+            )}
             <Text style={styles.title}>{slide.title}</Text>
             <Text style={styles.body}>{slide.body}</Text>
           </View>
@@ -130,6 +139,15 @@ function createStyles(colors: ThemeColors) {
       paddingHorizontal: spacing.xxl + spacing.sm,
     },
     icon: {
+      marginBottom: spacing.xxl - spacing.xs,
+    },
+    slideImage: {
+      width: 220,
+      height: 220,
+      borderRadius: radius.lg,
+      borderWidth: 1,
+      borderColor: colors.accentBorder,
+      backgroundColor: colors.surface,
       marginBottom: spacing.xxl - spacing.xs,
     },
     title: {

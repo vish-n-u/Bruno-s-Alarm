@@ -3,6 +3,7 @@ import * as Notifications from "expo-notifications";
 import { Platform } from "react-native";
 import RNAlarmModule, { type AlarmSubscription } from "react-native-alarmageddon";
 import { getCachedAlarmSoundPath, refreshAlarmSound } from "./alarmSound";
+import { toAlarmDatetime } from "./alarmDateTime";
 import { nextSessions } from "./schedule";
 
 const ID_PREFIX = "bruno-session-";
@@ -66,7 +67,7 @@ export async function scheduleUpcomingSessions(): Promise<void> {
     for (const timestamp of nextSessions(SESSIONS_TO_SCHEDULE)) {
       await RNAlarmModule.scheduleAlarm({
         id: `${ID_PREFIX}${timestamp}`,
-        datetimeISO: new Date(timestamp).toISOString(),
+        datetimeISO: toAlarmDatetime(timestamp),
         title: "🐕 Bruno is howling!",
         body: "The session just went live — open the app to watch.",
         snoozeEnabled: true,
@@ -110,7 +111,7 @@ export async function scheduleTestAlarmSoon(): Promise<void> {
   const soundPath = await getCachedAlarmSoundPath();
   await RNAlarmModule.scheduleAlarm({
     id: `${TEST_PREFIX}${Date.now()}`,
-    datetimeISO: new Date(Date.now() + 90000).toISOString(),
+    datetimeISO: toAlarmDatetime(Date.now() + 90000),
     title: "🐕 TEST ALARM",
     body: "This is a test — Stop or Snooze it.",
     snoozeEnabled: true,
@@ -125,6 +126,17 @@ export async function scheduleTestAlarmSoon(): Promise<void> {
 export function onAlarmRinging(callback: (alarmId: string | null) => void): AlarmSubscription | null {
   if (Platform.OS !== "android") return null;
   return RNAlarmModule.onAlarmStateChange(callback);
+}
+
+/** Whether an alarm is already ringing right this moment, checked once on app startup — this
+ * subscription-only approach in onAlarmRinging() misses the case where the alarm started
+ * playing (and the OS cold-launched the app over the lock screen via full-screen intent)
+ * before the JS side finished booting and attached its listener; that "already ringing"
+ * event fires once natively and is never replayed to a late subscriber. */
+export async function getActiveRingingAlarm(): Promise<string | null> {
+  if (Platform.OS !== "android") return null;
+  const active = await RNAlarmModule.getCurrentAlarmPlaying();
+  return active?.activeAlarmId ?? null;
 }
 
 export async function stopRingingAlarm(alarmId: string): Promise<void> {

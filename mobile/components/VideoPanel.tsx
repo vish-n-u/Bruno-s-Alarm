@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from "react";
 import { Pressable, StyleSheet, View } from "react-native";
 import { useVideoPlayer, VideoView, type VideoSource } from "expo-video";
 import { Ionicons } from "@expo/vector-icons";
+import { getCachedAlarmVideoUri } from "../lib/alarmSound";
 import { isLiveWindow } from "../lib/schedule";
 import { getCloudflareLiveManifestUrl, isCloudflareConfigured, isCloudflareStreamLive } from "../lib/liveStatus";
 
@@ -16,8 +17,10 @@ const SAMPLE_VIDEO = require("../assets/videos/Bruno Howl Alarm.mp4");
 // bundled sample.
 const LIVE_SOURCE: VideoSource =
   getCloudflareLiveManifestUrl() || process.env.EXPO_PUBLIC_LIVE_VIDEO_URL || SAMPLE_VIDEO;
-// The recorded replay — a plain R2 (or any direct) URL, same fallback chain.
-const VOD_SOURCE: VideoSource = process.env.EXPO_PUBLIC_VOD_VIDEO_URL || SAMPLE_VIDEO;
+// Static fallback for the recorded replay, used only until the real cached recording (see
+// lib/alarmSound.ts — the same file periodically refreshed from Cloudflare for the native
+// alarm sound) has been downloaded at least once.
+const FALLBACK_VOD_SOURCE: VideoSource = process.env.EXPO_PUBLIC_VOD_VIDEO_URL || SAMPLE_VIDEO;
 
 // Only rendered on the alarm-ringing screen now (Home doesn't show video at all). Starts
 // muted (autoplay shouldn't blast sound the moment the alarm fires) — allowUnmute={false}
@@ -27,6 +30,21 @@ const VOD_SOURCE: VideoSource = process.env.EXPO_PUBLIC_VOD_VIDEO_URL || SAMPLE_
 export default function VideoPanel({ allowUnmute = true }: { allowUnmute?: boolean }) {
   const [live, setLive] = useState(isLiveWindow());
   const [muted, setMuted] = useState(true);
+  // Bruno's actual latest recording, if one's ever been downloaded — takes priority over the
+  // fixed placeholder clip so the ringing screen shows the real thing, not one static video
+  // forever. Checked once on mount; refreshAlarmSound() (run periodically in the background
+  // and at schedule time) is what keeps the underlying file itself up to date.
+  const [cachedVideoUri, setCachedVideoUri] = useState<string | undefined>(undefined);
+
+  useEffect(() => {
+    let cancelled = false;
+    getCachedAlarmVideoUri().then((uri) => {
+      if (!cancelled) setCachedVideoUri(uri);
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, []);
 
   useEffect(() => {
     let cancelled = false;
@@ -56,7 +74,8 @@ export default function VideoPanel({ allowUnmute = true }: { allowUnmute?: boole
     };
   }, []);
 
-  const source = live ? LIVE_SOURCE : VOD_SOURCE;
+  const vodSource: VideoSource = cachedVideoUri || FALLBACK_VOD_SOURCE;
+  const source = live ? LIVE_SOURCE : vodSource;
 
   // The first load is handled entirely by useVideoPlayer's own source argument — play()
   // right in its setup callback. This ref exists only to detect a *later* change (live/VOD
@@ -102,7 +121,7 @@ export default function VideoPanel({ allowUnmute = true }: { allowUnmute?: boole
 
   return (
     <View style={styles.frame}>
-      <VideoView style={styles.video} player={player} nativeControls contentFit="cover" />
+      <VideoView style={styles.video} player={player} contentFit="cover" />
       {allowUnmute && (
         <Pressable style={styles.muteButton} onPress={() => setMuted((m) => !m)} hitSlop={10}>
           <Ionicons name={muted ? "volume-mute" : "volume-high"} size={16} color="#fff" />
@@ -113,11 +132,14 @@ export default function VideoPanel({ allowUnmute = true }: { allowUnmute?: boole
 }
 
 const styles = StyleSheet.create({
+  // Fills whatever full-screen container it's placed in (only ever the alarm-ringing
+  // screen now) — no card frame/rounded corners, this is the entire screen's background.
   frame: {
-    width: "100%",
-    aspectRatio: 16 / 9,
-    borderRadius: 10,
-    overflow: "hidden",
+    position: "absolute",
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
     backgroundColor: "#000",
   },
   video: {

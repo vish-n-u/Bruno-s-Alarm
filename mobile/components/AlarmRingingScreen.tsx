@@ -1,4 +1,5 @@
 import { Pressable, StyleSheet, Text, View } from "react-native";
+import { SafeAreaView } from "react-native-safe-area-context";
 import { Ionicons } from "@expo/vector-icons";
 import VideoPanel from "./VideoPanel";
 import { snoozeRingingAlarm, stopRingingAlarm } from "../lib/notifications";
@@ -21,28 +22,31 @@ export default function AlarmRingingScreen({ alarmId }: { alarmId: string }) {
 
   return (
     <View style={styles.root}>
-      <View style={styles.titleRow}>
-        <Ionicons
-          name={isRealSession ? "paw" : "alarm"}
-          size={22}
-          color={colors.accent}
-        />
-        <Text style={styles.title}>{isRealSession ? "Bruno is howling!" : "Your Bruno alarm"}</Text>
-      </View>
-      {timeLabel && <Text style={styles.timeLabel}>{timeLabel}</Text>}
+      {/* Video fills the entire screen — the ringing take-over IS the video, not a card
+          floating inside a UI. Text/buttons sit on solid scrim bands over it, since video
+          content isn't theme-aware and can't guarantee contrast against arbitrary footage. */}
+      <VideoPanel allowUnmute={false} />
 
-      <View style={styles.videoWrap}>
-        <VideoPanel allowUnmute={false} />
-      </View>
+      <SafeAreaView style={styles.overlay} edges={["top", "bottom"]}>
+        <View style={styles.topScrim}>
+          <View style={styles.titleRow}>
+            <Ionicons name={isRealSession ? "paw" : "alarm"} size={22} color="#fff" />
+            <Text style={styles.title}>{isRealSession ? "Bruno is howling!" : "Your Bruno alarm"}</Text>
+          </View>
+          {timeLabel && <Text style={styles.timeLabel}>{timeLabel}</Text>}
+        </View>
 
-      <Pressable style={styles.stopButton} onPress={() => stopRingingAlarm(alarmId)}>
-        <Text style={styles.stopButtonText}>Stop</Text>
-      </Pressable>
+        <View style={styles.bottomScrim}>
+          <Pressable style={styles.stopButton} onPress={() => stopRingingAlarm(alarmId)}>
+            <Text style={styles.stopButtonText}>Stop</Text>
+          </Pressable>
 
-      <Pressable style={styles.snoozeButton} onPress={() => snoozeRingingAlarm(alarmId)}>
-        <Ionicons name="moon-outline" size={16} color={colors.textSecondary} />
-        <Text style={styles.snoozeButtonText}>Snooze 10 min</Text>
-      </Pressable>
+          <Pressable style={styles.snoozeButton} onPress={() => snoozeRingingAlarm(alarmId)}>
+            <Ionicons name="moon-outline" size={16} color="#fff" />
+            <Text style={styles.snoozeButtonText}>Snooze 10 min</Text>
+          </Pressable>
+        </View>
+      </SafeAreaView>
     </View>
   );
 }
@@ -51,10 +55,17 @@ function createStyles(colors: ThemeColors) {
   return StyleSheet.create({
     root: {
       flex: 1,
-      backgroundColor: colors.background,
-      justifyContent: "center",
-      padding: spacing.xxl,
-      gap: spacing.lg,
+      backgroundColor: "#000",
+    },
+    overlay: {
+      flex: 1,
+      justifyContent: "space-between",
+    },
+    topScrim: {
+      backgroundColor: "rgba(0,0,0,0.45)",
+      paddingHorizontal: spacing.xl,
+      paddingVertical: spacing.lg,
+      gap: spacing.xs,
     },
     titleRow: {
       flexDirection: "row",
@@ -63,7 +74,7 @@ function createStyles(colors: ThemeColors) {
       gap: spacing.sm,
     },
     title: {
-      color: colors.textPrimary,
+      color: "#fff",
       fontFamily: fonts.display,
       fontSize: 22,
       textAlign: "center",
@@ -73,10 +84,11 @@ function createStyles(colors: ThemeColors) {
       fontFamily: fonts.monoBold,
       fontSize: 15,
       textAlign: "center",
-      marginTop: -spacing.sm,
     },
-    videoWrap: {
-      marginVertical: spacing.sm,
+    bottomScrim: {
+      backgroundColor: "rgba(0,0,0,0.45)",
+      padding: spacing.xl,
+      gap: spacing.lg,
     },
     stopButton: {
       width: "100%",
@@ -96,13 +108,13 @@ function createStyles(colors: ThemeColors) {
       paddingVertical: spacing.lg,
       borderRadius: radius.md + 2,
       borderWidth: 1,
-      borderColor: colors.border,
+      borderColor: "rgba(255,255,255,0.4)",
       alignItems: "center",
       justifyContent: "center",
       gap: spacing.sm,
     },
     snoozeButtonText: {
-      color: colors.textSecondary,
+      color: "#fff",
       fontFamily: fonts.bodyMedium,
       fontSize: 15,
     },

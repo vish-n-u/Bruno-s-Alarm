@@ -1,44 +1,42 @@
 import { useColorScheme } from "react-native";
 
-// Third pass. The first two attempts (cream/terracotta/serif, then forest-green/brass)
-// fixed hue and typography but kept the same generic shape: rounded cards, soft neutral
-// background, one polite accent color — the actual tell wasn't the palette, it was that
-// shape itself. This pass borrows a real physical object instead: a paper notice pinned
-// up by someone who loves this dog — aged paper, ink-black structural lines, a single
-// stamp-red accent used the way a rubber stamp actually gets used (sparingly, for status),
-// and sharp/near-flat corners instead of soft rounded ones. Real light/dark palettes stay,
-// resolved via the device's system setting — "dark" reads as the same board seen at night
-// under a lamp, not a palette inversion.
+// Fifth pass — same "Notice Board" shape (paper pinned up, ink-black structural lines,
+// sharp/near-flat corners, one accent used sparingly like a rubber stamp) as every prior
+// pass, recolored again: this time toward dawn/dusk sky rather than a generic "blue theme"
+// pick — Bruno's two real sessions ARE 6AM and 6PM, so the palette is literally the sky at
+// the moments this app is about. Light mode reads as a pale dawn-sky notice board; dark
+// mode as the same board under a dusk/night sky. Danger stays warm red/rust regardless of
+// scheme — universal "destructive" signal, not part of the palette identity.
 const darkColors = {
-  background: "#1c160e",
-  surface: "#241d13",
-  surfaceAlt: "#2d2416",
-  border: "#4a3d26",
-  textPrimary: "#ece2c8",
-  textSecondary: "#a89a72",
-  accent: "#e2624a",
-  accentBorder: "#9c3f2c",
-  accentText: "#1c160e",
-  live: "#e2624a",
-  liveBg: "rgba(226,98,74,0.16)",
-  danger: "#c1453a",
-  dangerBg: "rgba(193,69,58,0.14)",
+  background: "#121a2a",
+  surface: "#1a2438",
+  surfaceAlt: "#222f47",
+  border: "#3d4f6b",
+  textPrimary: "#dde6f2",
+  textSecondary: "#8a9bb5",
+  accent: "#6fa8dc",
+  accentBorder: "#4a7fb0",
+  accentText: "#121a2a",
+  live: "#6fa8dc",
+  liveBg: "rgba(111,168,220,0.16)",
+  danger: "#d9695c",
+  dangerBg: "rgba(217,105,92,0.14)",
 };
 
 const lightColors = {
-  background: "#efe4cc",
-  surface: "#f7f0dc",
-  surfaceAlt: "#e6d9b8",
-  border: "#241f16",
-  textPrimary: "#241f16",
-  textSecondary: "#6b6350",
-  accent: "#a83a2f",
-  accentBorder: "#7a281f",
-  accentText: "#f7f0dc",
-  live: "#a83a2f",
-  liveBg: "rgba(168,58,47,0.12)",
-  danger: "#7a281f",
-  dangerBg: "rgba(122,40,31,0.10)",
+  background: "#dce6ee",
+  surface: "#eaf1f6",
+  surfaceAlt: "#cddce8",
+  border: "#1f2d3d",
+  textPrimary: "#1f2d3d",
+  textSecondary: "#5c6d7f",
+  accent: "#2e5f8a",
+  accentBorder: "#1f4570",
+  accentText: "#eaf1f6",
+  live: "#2e5f8a",
+  liveBg: "rgba(46,95,138,0.12)",
+  danger: "#a83a2f",
+  dangerBg: "rgba(168,58,47,0.10)",
 };
 
 export type ThemeColors = typeof darkColors;

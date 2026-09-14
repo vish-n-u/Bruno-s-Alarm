@@ -17,13 +17,6 @@ export function isLatestRecordingConfigured(): boolean {
  * been recorded yet — every failure mode collapses to the same "nothing to use" signal so
  * callers can fall back without needing to distinguish why. */
 export async function fetchLatestRecording(): Promise<LatestRecording | null> {
-  // TEMPORARY: stubbed to the already-known-good VOD URL to validate the
-  // download-cache-native-playback pipeline before the backend is deployed. Revert to the
-  // real fetch below once /api/latest-recording is live.
-  if (process.env.EXPO_PUBLIC_VOD_VIDEO_URL) {
-    return { url: process.env.EXPO_PUBLIC_VOD_VIDEO_URL, recordedAt: "test-" + Date.now() };
-  }
-
   if (!BACKEND_URL) return null;
   try {
     const res = await fetch(`${BACKEND_URL}/api/latest-recording`);

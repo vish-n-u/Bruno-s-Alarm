@@ -17,7 +17,6 @@ import {
   type ScheduledAlarmKind,
   type ScheduledAlarmSummary,
 } from "../lib/notifications";
-import { getCustomAlarm, type CustomAlarmState, type RepeatMode } from "../lib/customAlarm";
 import { getCachedAlarmSoundPath, refreshAlarmSound } from "../lib/alarmSound";
 import { setDebugForceLive } from "../lib/schedule";
 import { fonts, radius, spacing, useThemeColors, type ThemeColors } from "../lib/theme";
@@ -27,7 +26,7 @@ const PRIVACY_POLICY_URL =
 
 const KIND_LABEL: Record<ScheduledAlarmKind, string> = {
   session: "Real sessions (Bruno's actual schedule)",
-  custom: "Your custom alarm",
+  custom: "Your custom alarms",
   test: "Debug test alarms",
   other: "Unrecognized",
 };
@@ -46,38 +45,16 @@ function formatTimeOnly(timestamp: number): string {
   return new Date(timestamp).toLocaleString(undefined, { hour: "numeric", minute: "2-digit" });
 }
 
-const REPEAT_DESCRIPTION: Record<RepeatMode, string> = {
-  once: "Once",
-  everyday: "Every day",
-  weekdays: "Weekdays",
-  custom: "",
-};
-const DAY_NAMES = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
-
-function describeCustomPattern(customState: CustomAlarmState | null): string {
-  if (!customState) return "Daily";
-  if (customState.repeatMode === "custom") {
-    return customState.customDays.length
-      ? customState.customDays.slice().sort().map((d) => DAY_NAMES[d]).join(", ")
-      : "Custom";
-  }
-  return REPEAT_DESCRIPTION[customState.repeatMode];
-}
-
 // A real alarm clock never shows someone "14 alarms" for one daily 7:00 AM repeat — that
 // count is only an artifact of how Android's lack of native daily-recurrence forces this
 // app to pre-schedule a batch of individual future occurrences (see lib/notifications.ts /
 // lib/customAlarm.ts). Describe each group the way a person actually thinks about it.
-function describeGroup(
-  kind: ScheduledAlarmKind,
-  items: ScheduledAlarmSummary[],
-  customState: CustomAlarmState | null
-): string {
+function describeGroup(kind: ScheduledAlarmKind, items: ScheduledAlarmSummary[]): string {
   switch (kind) {
     case "session":
       return "6:00 AM & 6:00 PM IST, every day";
     case "custom":
-      return `${describeCustomPattern(customState)} at ${formatTimeOnly(items[0].timestamp)}`;
+      return `Next at ${formatTimeOnly(items[0].timestamp)} — manage in "Your alarms"`;
     case "test":
       return items.length === 1 ? "1 test alarm pending" : `${items.length} test alarms pending`;
     case "other":
@@ -103,15 +80,11 @@ export default function SettingsScreen({ navigation }: Props) {
   const insets = useSafeAreaInsets();
   const [forcingLive, setForcingLive] = useState(false);
   const [alarms, setAlarms] = useState<ScheduledAlarmSummary[]>([]);
-  const [customState, setCustomState] = useState<CustomAlarmState | null>(null);
 
   const refreshAlarms = useCallback(() => {
     getAllScheduledAlarms()
       .then(setAlarms)
       .catch(() => setAlarms([]));
-    getCustomAlarm()
-      .then(setCustomState)
-      .catch(() => setCustomState(null));
   }, []);
 
   // Refresh every time this screen comes into focus, not just on first mount — so it
@@ -162,7 +135,7 @@ export default function SettingsScreen({ navigation }: Props) {
             <View key={group.kind}>
               {index > 0 && <View style={styles.rowDivider} />}
               <Text style={styles.rowText}>{KIND_LABEL[group.kind]}</Text>
-              <Text style={styles.cardHint}>{describeGroup(group.kind, group.items, customState)}</Text>
+              <Text style={styles.cardHint}>{describeGroup(group.kind, group.items)}</Text>
               <Text style={styles.cardHintMono}>Next: {formatAlarmTime(group.items[0].timestamp)}</Text>
             </View>
           ))

@@ -14,8 +14,9 @@ import HomeScreen from "./components/HomeScreen";
 import AlarmRingingScreen from "./components/AlarmRingingScreen";
 import SettingsScreen from "./screens/SettingsScreen";
 import CustomAlarmScreen from "./screens/CustomAlarmScreen";
+import EditCustomAlarmScreen from "./screens/EditCustomAlarmScreen";
 import { hasOnboarded, markOnboarded } from "./lib/onboarding";
-import { onAlarmRinging } from "./lib/notifications";
+import { getActiveRingingAlarm, onAlarmRinging } from "./lib/notifications";
 import { registerBackgroundAlarmSoundRefresh } from "./lib/backgroundRefresh";
 import { useThemeColors } from "./lib/theme";
 
@@ -25,6 +26,7 @@ export type RootStackParamList = {
   Home: undefined;
   Settings: undefined;
   CustomAlarm: undefined;
+  EditCustomAlarm: { alarmId?: string };
   OnboardingPreview: undefined;
 };
 
@@ -62,6 +64,13 @@ export default function App() {
   }, []);
 
   useEffect(() => {
+    // Covers the cold-start case: the phone was locked, the alarm fired, and the OS
+    // launched the app fresh over the lock screen — the native side already started
+    // ringing before this listener could attach, so that initial event is missed and
+    // must be checked for explicitly instead of only watching for future changes.
+    getActiveRingingAlarm().then((id) => {
+      if (id) setRingingAlarmId(id);
+    });
     const subscription = onAlarmRinging(setRingingAlarmId);
     return () => subscription?.remove();
   }, []);
@@ -119,7 +128,12 @@ export default function App() {
             <Stack.Screen
               name="CustomAlarm"
               component={CustomAlarmScreen}
-              options={{ title: "Set Alarm" }}
+              options={{ title: "Your alarms" }}
+            />
+            <Stack.Screen
+              name="EditCustomAlarm"
+              component={EditCustomAlarmScreen}
+              options={{ headerShown: false, presentation: "modal" }}
             />
             <Stack.Screen
               name="OnboardingPreview"

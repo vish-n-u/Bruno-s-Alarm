@@ -48,6 +48,19 @@ export async function getCachedAlarmSoundPath(): Promise<string | undefined> {
   return record.path.startsWith("file://") ? record.path.slice("file://".length) : record.path;
 }
 
+/** The cached recording as a file:// URI, suitable for expo-video (unlike
+ * getCachedAlarmSoundPath(), this keeps the file:// scheme — VideoView needs a real URI,
+ * not a bare filesystem path). Same underlying file as the native alarm sound; showing it as
+ * video too means the ringing screen visually shows Bruno's actual latest recording instead
+ * of one fixed placeholder clip. */
+export async function getCachedAlarmVideoUri(): Promise<string | undefined> {
+  const record = await getCacheRecord();
+  if (!record) return undefined;
+  const info = await FileSystem.getInfoAsync(record.path);
+  if (!info.exists) return undefined;
+  return record.path;
+}
+
 /** Fetches the latest recording and downloads it, replacing the cached sound only once the
  * new download actually finishes — a failed or partial refresh always leaves whatever was
  * cached before untouched, never a half-written file. Safe to call opportunistically (e.g.

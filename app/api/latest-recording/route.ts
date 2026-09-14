@@ -15,7 +15,7 @@ async function cloudflareFetch(path: string, init?: RequestInit) {
       ...init?.headers,
     },
   });
-  return { ok: res.ok, body: await res.json().catch(() => null) };
+  return { ok: res.ok, status: res.status, body: await res.json().catch(() => null) };
 }
 
 type CloudflareVideoSummary = { uid: string; created: string };
@@ -49,7 +49,12 @@ export async function GET() {
   try {
     const videosRes = await cloudflareFetch(`/stream/live_inputs/${CLOUDFLARE_LIVE_INPUT_UID}/videos`);
     if (!videosRes.ok) {
-      return NextResponse.json({ error: "cloudflare_error" }, { status: 502 });
+      // TEMPORARY: surfacing Cloudflare's own status/error body to diagnose the initial
+      // deploy — remove once the token/permission setup is confirmed working end-to-end.
+      return NextResponse.json(
+        { error: "cloudflare_error", step: "list_videos", cloudflareStatus: videosRes.status, cloudflareBody: videosRes.body },
+        { status: 502 }
+      );
     }
 
     const videos: CloudflareVideoSummary[] = videosRes.body?.result ?? [];
@@ -64,7 +69,11 @@ export async function GET() {
     // one (which a later call will find ready).
     const downloadsRes = await cloudflareFetch(`/stream/${latest.uid}/downloads`, { method: "POST" });
     if (!downloadsRes.ok) {
-      return NextResponse.json({ error: "cloudflare_error" }, { status: 502 });
+      // TEMPORARY: see above.
+      return NextResponse.json(
+        { error: "cloudflare_error", step: "create_download", cloudflareStatus: downloadsRes.status, cloudflareBody: downloadsRes.body },
+        { status: 502 }
+      );
     }
 
     const download = downloadsRes.body?.result?.default;
@@ -73,7 +82,8 @@ export async function GET() {
     }
 
     return NextResponse.json({ error: "not_ready" }, { status: 202 });
-  } catch {
-    return NextResponse.json({ error: "cloudflare_error" }, { status: 502 });
+  } catch (err) {
+    // TEMPORARY: see above.
+    return NextResponse.json({ error: "cloudflare_error", step: "exception", message: String(err) }, { status: 502 });
   }
 }

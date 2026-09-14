@@ -12,7 +12,7 @@ import {
   type CustomAlarm,
   type RepeatMode,
 } from "../lib/customAlarm";
-import { fonts, radius, spacing, useThemeColors, type ThemeColors } from "../lib/theme";
+import { fonts, radius, shadow, spacing, useThemeColors, type ThemeColors } from "../lib/theme";
 
 const REPEAT_LABEL: Record<RepeatMode, string> = {
   once: "Once",
@@ -173,6 +173,7 @@ function createStyles(colors: ThemeColors) {
       borderRadius: radius.lg,
       paddingVertical: spacing.lg,
       paddingHorizontal: spacing.lg,
+      ...shadow,
     },
     cardDisabled: {
       opacity: 0.55,
@@ -205,7 +206,7 @@ function createStyles(colors: ThemeColors) {
       borderColor: colors.accentBorder,
       alignItems: "center",
       justifyContent: "center",
-      elevation: 3,
+      ...shadow,
     },
   });
 }

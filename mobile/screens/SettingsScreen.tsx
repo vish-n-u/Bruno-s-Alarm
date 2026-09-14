@@ -19,7 +19,7 @@ import {
 } from "../lib/notifications";
 import { getCachedAlarmSoundPath, refreshAlarmSound } from "../lib/alarmSound";
 import { setDebugForceLive } from "../lib/schedule";
-import { fonts, radius, spacing, useThemeColors, type ThemeColors } from "../lib/theme";
+import { fonts, radius, shadow, spacing, useThemeColors, type ThemeColors } from "../lib/theme";
 
 const PRIVACY_POLICY_URL =
   "https://plant-garnet-37d.notion.site/BRUNO-S-ALARM-3d327ffbfc9180a3b404f1de22bf62b8";
@@ -40,11 +40,6 @@ function formatAlarmTime(timestamp: number): string {
   });
 }
 
-function formatTimeOnly(timestamp: number): string {
-  if (!Number.isFinite(timestamp)) return "unknown time";
-  return new Date(timestamp).toLocaleString(undefined, { hour: "numeric", minute: "2-digit" });
-}
-
 // A real alarm clock never shows someone "14 alarms" for one daily 7:00 AM repeat — that
 // count is only an artifact of how Android's lack of native daily-recurrence forces this
 // app to pre-schedule a batch of individual future occurrences (see lib/notifications.ts /
@@ -54,7 +49,7 @@ function describeGroup(kind: ScheduledAlarmKind, items: ScheduledAlarmSummary[])
     case "session":
       return "6:00 AM & 6:00 PM IST, every day";
     case "custom":
-      return `Next at ${formatTimeOnly(items[0].timestamp)} — manage in "Your alarms"`;
+      return `Manage in "Your alarms"`;
     case "test":
       return items.length === 1 ? "1 test alarm pending" : `${items.length} test alarms pending`;
     case "other":
@@ -284,6 +279,7 @@ function createStyles(colors: ThemeColors) {
       borderRadius: radius.lg,
       padding: spacing.lg,
       gap: spacing.md,
+      ...shadow,
     },
     cardHint: {
       color: colors.textSecondary,

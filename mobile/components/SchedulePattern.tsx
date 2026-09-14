@@ -1,7 +1,8 @@
 import { useEffect, useState } from "react";
 import { StyleSheet, Text, View } from "react-native";
+import { Ionicons } from "@expo/vector-icons";
 import { isLiveWindow, lastSessionAt, nextSessionAt, todaysSessions } from "../lib/schedule";
-import { fonts, radius, spacing, useThemeColors, type ThemeColors } from "../lib/theme";
+import { fonts, radius, shadow, spacing, useThemeColors, type ThemeColors } from "../lib/theme";
 
 function formatDuration(ms: number): string {
   const totalSeconds = Math.max(0, Math.floor(ms / 1000));
@@ -34,17 +35,25 @@ export default function SchedulePattern() {
   return (
     <View style={styles.container}>
       <Text style={styles.boardLabel}>Today's schedule</Text>
+      <View style={styles.boardShadowWrap}>
       <View style={styles.board}>
         {sessions.map((session, index) => {
           const isLiveNow = live && session === lastSession;
           const isPast = session <= nowMs && !isLiveNow;
+          // The two sessions ARE dawn and dusk — a small sun/moon mark next to the time
+          // makes that literal instead of just implied by the numbers.
+          const isMorning = new Date(session).getHours() < 12;
+          const timeColor = isLiveNow ? colors.live : colors.textPrimary;
           return (
             <View key={session}>
               {index > 0 && <View style={styles.boardDivider} />}
               <View style={[styles.boardRow, isLiveNow && styles.boardRowLive]}>
-                <Text style={[styles.boardTime, isLiveNow && styles.boardTimeLive]}>
-                  {formatLocalTime(session)}
-                </Text>
+                <View style={styles.boardTimeGroup}>
+                  <Ionicons name={isMorning ? "sunny" : "moon"} size={16} color={timeColor} />
+                  <Text style={[styles.boardTime, isLiveNow && styles.boardTimeLive]}>
+                    {formatLocalTime(session)}
+                  </Text>
+                </View>
                 <Text style={[styles.boardStatus, isLiveNow && styles.boardStatusLive]}>
                   {isLiveNow ? "● LIVE NOW" : isPast ? "Departed" : "On schedule"}
                 </Text>
@@ -52,6 +61,7 @@ export default function SchedulePattern() {
             </View>
           );
         })}
+      </View>
       </View>
 
       <Text style={styles.nextLine}>
@@ -76,10 +86,17 @@ function createStyles(colors: ThemeColors) {
     boardLabel: {
       color: colors.textSecondary,
       fontFamily: fonts.bodyMedium,
-      fontSize: 11,
+      fontSize: 12,
       textTransform: "uppercase",
-      letterSpacing: 1.5,
+      letterSpacing: 1,
       marginBottom: spacing.xs,
+    },
+    // Shadow needs to live on a wrapper, not the clipped board itself — overflow:"hidden"
+    // below (needed so the live row's highlight background respects the rounded corners)
+    // would otherwise clip the shadow to nothing.
+    boardShadowWrap: {
+      borderRadius: radius.md,
+      ...shadow,
     },
     board: {
       backgroundColor: colors.surface,
@@ -104,6 +121,11 @@ function createStyles(colors: ThemeColors) {
     boardRowLive: {
       backgroundColor: colors.liveBg,
       borderLeftColor: colors.live,
+    },
+    boardTimeGroup: {
+      flexDirection: "row",
+      alignItems: "center",
+      gap: spacing.sm,
     },
     boardTime: {
       color: colors.textPrimary,

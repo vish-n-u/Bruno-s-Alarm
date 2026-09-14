@@ -6,6 +6,11 @@ import { useFonts } from "expo-font";
 import { Anton_400Regular } from "@expo-google-fonts/anton";
 import { CourierPrime_400Regular, CourierPrime_700Bold } from "@expo-google-fonts/courier-prime";
 import { Caveat_600SemiBold } from "@expo-google-fonts/caveat";
+import {
+  BricolageGrotesque_400Regular,
+  BricolageGrotesque_600SemiBold,
+  BricolageGrotesque_700Bold,
+} from "@expo-google-fonts/bricolage-grotesque";
 import { NavigationContainer, DarkTheme, DefaultTheme } from "@react-navigation/native";
 import { createNativeStackNavigator, type NativeStackScreenProps } from "@react-navigation/native-stack";
 import { SafeAreaProvider } from "react-native-safe-area-context";
@@ -55,6 +60,9 @@ export default function App() {
     CourierPrime_400Regular,
     CourierPrime_700Bold,
     Caveat_600SemiBold,
+    BricolageGrotesque_400Regular,
+    BricolageGrotesque_600SemiBold,
+    BricolageGrotesque_700Bold,
   });
 
   useEffect(() => {

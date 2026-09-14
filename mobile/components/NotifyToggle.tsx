@@ -2,7 +2,7 @@ import { useEffect, useState } from "react";
 import { ActivityIndicator, Pressable, StyleSheet, Text, View } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import { isSubscribed, requestPermission, scheduleUpcomingSessions, unsubscribe } from "../lib/notifications";
-import { fonts, radius, spacing, useThemeColors, type ThemeColors } from "../lib/theme";
+import { fonts, radius, shadow, spacing, useThemeColors, type ThemeColors } from "../lib/theme";
 
 type Status = "checking" | "idle" | "subscribed" | "denied" | "unsupported";
 
@@ -41,7 +41,7 @@ export default function NotifyToggle() {
   if (status === "checking") {
     return (
       <View style={[styles.button, styles.disabled]}>
-        <ActivityIndicator color={colors.accent} />
+        <ActivityIndicator color={colors.accentText} />
       </View>
     );
   }
@@ -99,13 +99,18 @@ function createStyles(colors: ThemeColors) {
     alignItems: "center",
     justifyContent: "center",
     gap: spacing.sm,
+    ...shadow,
   },
   disabled: {
     opacity: 0.6,
   },
+  // Already-done state reads as quiet/flat on purpose — cancel the elevation, a transparent
+  // outline button doesn't want to look like it's lifting off the page.
   subscribed: {
     backgroundColor: "transparent",
     borderColor: colors.accent,
+    shadowOpacity: 0,
+    elevation: 0,
   },
   buttonText: {
     color: colors.accentText,

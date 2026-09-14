@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { StyleSheet, useColorScheme } from "react-native";
+import { StyleSheet } from "react-native";
 import { StatusBar } from "expo-status-bar";
 import * as SplashScreen from "expo-splash-screen";
 import { useFonts } from "expo-font";
@@ -23,7 +23,7 @@ import EditCustomAlarmScreen from "./screens/EditCustomAlarmScreen";
 import { hasOnboarded, markOnboarded } from "./lib/onboarding";
 import { getActiveRingingAlarm, onAlarmRinging } from "./lib/notifications";
 import { registerBackgroundAlarmSoundRefresh } from "./lib/backgroundRefresh";
-import { useThemeColors } from "./lib/theme";
+import { useThemeColors, useTimeOfDay } from "./lib/theme";
 
 type Screen = "checking" | "onboarding" | "home";
 
@@ -54,7 +54,10 @@ export default function App() {
   const [screen, setScreen] = useState<Screen>("checking");
   const [ringingAlarmId, setRingingAlarmId] = useState<string | null>(null);
   const colors = useThemeColors();
-  const scheme = useColorScheme();
+  const timeOfDay = useTimeOfDay();
+  // Night is the only phase with a dark background — everything else (dawn/midday/sunset)
+  // wants the light system chrome, matching whichever palette useThemeColors() picked.
+  const isNight = timeOfDay === "night";
   const [fontsLoaded] = useFonts({
     Anton_400Regular,
     CourierPrime_400Regular,
@@ -104,9 +107,9 @@ export default function App() {
   if (!fontsLoaded || screen === "checking") return null;
 
   const navigationTheme = {
-    ...(scheme === "light" ? DefaultTheme : DarkTheme),
+    ...(isNight ? DarkTheme : DefaultTheme),
     colors: {
-      ...(scheme === "light" ? DefaultTheme.colors : DarkTheme.colors),
+      ...(isNight ? DarkTheme.colors : DefaultTheme.colors),
       background: colors.background,
       card: colors.surface,
       border: colors.border,
@@ -117,7 +120,7 @@ export default function App() {
 
   return (
     <SafeAreaProvider style={[styles.root, { backgroundColor: colors.background }]}>
-      <StatusBar style={scheme === "light" ? "dark" : "light"} />
+      <StatusBar style={isNight ? "light" : "dark"} />
       {ringingAlarmId ? (
         <AlarmRingingScreen alarmId={ringingAlarmId} />
       ) : screen === "onboarding" ? (

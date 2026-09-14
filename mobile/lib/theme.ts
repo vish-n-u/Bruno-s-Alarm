@@ -1,29 +1,28 @@
-import { useColorScheme } from "react-native";
+import { useEffect, useState } from "react";
 
-// Seventh pass — a genuine clear-sky blue instead of the golden-hour warm tones, so the
-// storybook sun/cloud/leaf decoration on Home actually sits in a believable sky instead of
-// looking pasted onto a tan background. The warm amber accent stays (blue sky + orange sun
-// is a real, harmonious complementary pairing, not an arbitrary leftover) — it's the
-// backdrop that changes, not every color. Dark mode reads as the same sky at night. Danger
-// stays warm red/rust regardless of scheme — universal "destructive" signal, not part of
-// the palette identity.
-const darkColors = {
-  background: "#0f1c2e",
-  surface: "#16283f",
-  surfaceAlt: "#1e3450",
-  border: "#3a5578",
-  textPrimary: "#dce9f5",
-  textSecondary: "#8ba3bd",
-  accent: "#f5b942",
-  accentBorder: "#c99427",
-  accentText: "#0f1c2e",
-  live: "#f2703a",
-  liveBg: "rgba(242,112,58,0.18)",
-  danger: "#d9695c",
-  dangerBg: "rgba(217,105,92,0.14)",
+// Eighth pass — the palette now follows the real clock instead of the device's system
+// light/dark setting: four sky states (dawn, midday, sunset, night) so the app actually
+// feels like a different time of day as the day goes on, matching the real dog/real bell
+// premise instead of a generic app-wide dark-mode toggle. Danger stays warm red/rust and
+// "live" stays the same warm orange in every phase — universal status signals, not part of
+// the sky's own identity, so they don't compete with whichever phase is active.
+const morningColors = {
+  background: "#dcebf4",
+  surface: "#f5fafd",
+  surfaceAlt: "#e7f1f7",
+  border: "#2f4f61",
+  textPrimary: "#1d3542",
+  textSecondary: "#597486",
+  accent: "#e8a33e",
+  accentBorder: "#bd7f21",
+  accentText: "#fffaf0",
+  live: "#e8562f",
+  liveBg: "rgba(232,86,47,0.14)",
+  danger: "#a83a2f",
+  dangerBg: "rgba(168,58,47,0.10)",
 };
 
-const lightColors = {
+const afternoonColors = {
   background: "#bfe3f7",
   surface: "#eef8fd",
   surfaceAlt: "#d3ecf8",
@@ -42,12 +41,86 @@ const lightColors = {
   dangerBg: "rgba(168,58,47,0.10)",
 };
 
-export type ThemeColors = typeof darkColors;
+const eveningColors = {
+  background: "#f2c194",
+  surface: "#fdf1e3",
+  surfaceAlt: "#f8e0c2",
+  border: "#5b3820",
+  textPrimary: "#3c2313",
+  textSecondary: "#7d5735",
+  accent: "#d1483a",
+  accentBorder: "#a8362b",
+  accentText: "#fff6ee",
+  live: "#e8562f",
+  liveBg: "rgba(232,86,47,0.14)",
+  danger: "#a83a2f",
+  dangerBg: "rgba(168,58,47,0.10)",
+};
 
-/** Resolves the palette for the device's current system light/dark setting. */
+const nightColors = {
+  background: "#0f1c2e",
+  surface: "#16283f",
+  surfaceAlt: "#1e3450",
+  border: "#3a5578",
+  textPrimary: "#dce9f5",
+  textSecondary: "#8ba3bd",
+  accent: "#f5b942",
+  accentBorder: "#c99427",
+  accentText: "#0f1c2e",
+  live: "#f2703a",
+  liveBg: "rgba(242,112,58,0.18)",
+  danger: "#d9695c",
+  dangerBg: "rgba(217,105,92,0.14)",
+};
+
+export type ThemeColors = typeof afternoonColors;
+export type TimeOfDay = "morning" | "afternoon" | "evening" | "night";
+
+const palettesByTimeOfDay: Record<TimeOfDay, ThemeColors> = {
+  morning: morningColors,
+  afternoon: afternoonColors,
+  evening: eveningColors,
+  night: nightColors,
+};
+
+// Boundaries chosen so "night" starts right around 6:30pm as asked for, with a short sunset
+// window beforehand rather than snapping straight from bright midday to full dark.
+const PHASE_BOUNDS: Record<Exclude<TimeOfDay, "night">, [number, number]> = {
+  morning: [5, 11],
+  afternoon: [11, 17],
+  evening: [17, 18.5],
+};
+
+/** Pure function of a clock time, no device/system state involved. */
+export function getTimeOfDay(date: Date = new Date()): TimeOfDay {
+  const hour = date.getHours() + date.getMinutes() / 60;
+  if (hour >= PHASE_BOUNDS.morning[0] && hour < PHASE_BOUNDS.morning[1]) return "morning";
+  if (hour >= PHASE_BOUNDS.afternoon[0] && hour < PHASE_BOUNDS.afternoon[1]) return "afternoon";
+  if (hour >= PHASE_BOUNDS.evening[0] && hour < PHASE_BOUNDS.evening[1]) return "evening";
+  return "night";
+}
+
+/** A ticking clock, re-rendering whatever calls it once a minute — shared basis for both
+ * the theme phase and the Home screen's sun/moon position, so they never drift out of sync
+ * with each other. */
+export function useNow(intervalMs: number = 60000): Date {
+  const [now, setNow] = useState(() => new Date());
+  useEffect(() => {
+    const id = setInterval(() => setNow(new Date()), intervalMs);
+    return () => clearInterval(id);
+  }, [intervalMs]);
+  return now;
+}
+
+export function useTimeOfDay(): TimeOfDay {
+  const now = useNow();
+  return getTimeOfDay(now);
+}
+
+/** Resolves the palette for the real current time of day. */
 export function useThemeColors(): ThemeColors {
-  const scheme = useColorScheme();
-  return scheme === "light" ? lightColors : darkColors;
+  const timeOfDay = useTimeOfDay();
+  return palettesByTimeOfDay[timeOfDay];
 }
 
 /** A soft, deliberate lift for primary surfaces (the schedule board, alarm cards, the main

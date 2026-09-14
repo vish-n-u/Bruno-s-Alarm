@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import {
+  ActivityIndicator,
   Alert,
   FlatList,
   Pressable,
@@ -118,6 +119,7 @@ export default function EditCustomAlarmScreen({ navigation, route }: Props) {
   const [repeatMode, setRepeatMode] = useState<RepeatMode>("everyday");
   const [customDays, setCustomDays] = useState<number[]>([]);
   const [loading, setLoading] = useState(isEditing);
+  const [saving, setSaving] = useState(false);
 
   useEffect(() => {
     if (!alarmId) return;
@@ -149,32 +151,42 @@ export default function EditCustomAlarmScreen({ navigation, route }: Props) {
     .join(" and ");
 
   async function handleDone() {
+    // saveCustomAlarm() below does a network call plus up to 14 native scheduleAlarm()
+    // calls, which is slow enough that a real tap felt unresponsive — without this guard,
+    // that invited a second tap, which created a second, duplicate alarm entirely.
+    if (saving) return;
+
     if (repeatMode === "custom" && customDays.length === 0) {
       Alert.alert("Pick at least one day", "Choose which days this alarm should repeat on.");
       return;
     }
 
-    const granted = await requestPermission();
-    if (!granted) {
-      Alert.alert("Permission needed", "Grant notification permission first (from the Home screen or Settings).");
-      return;
+    setSaving(true);
+    try {
+      const granted = await requestPermission();
+      if (!granted) {
+        Alert.alert("Permission needed", "Grant notification permission first (from the Home screen or Settings).");
+        return;
+      }
+
+      const hour12 = HOURS[hourIndex];
+      const hour24 = ampmIndex === 1 ? (hour12 === 12 ? 12 : hour12 + 12) : hour12 === 12 ? 0 : hour12;
+      const minute = MINUTES[minuteIndex];
+
+      const alarm: CustomAlarm = {
+        id: alarmId ?? `custom-${Date.now()}`,
+        name: name.trim(),
+        hour: hour24,
+        minute,
+        enabled: true,
+        repeatMode,
+        customDays,
+      };
+      await saveCustomAlarm(alarm);
+      navigation.goBack();
+    } finally {
+      setSaving(false);
     }
-
-    const hour12 = HOURS[hourIndex];
-    const hour24 = ampmIndex === 1 ? (hour12 === 12 ? 12 : hour12 + 12) : hour12 === 12 ? 0 : hour12;
-    const minute = MINUTES[minuteIndex];
-
-    const alarm: CustomAlarm = {
-      id: alarmId ?? `custom-${Date.now()}`,
-      name: name.trim(),
-      hour: hour24,
-      minute,
-      enabled: true,
-      repeatMode,
-      customDays,
-    };
-    await saveCustomAlarm(alarm);
-    navigation.goBack();
   }
 
   function handleDelete() {
@@ -197,12 +209,16 @@ export default function EditCustomAlarmScreen({ navigation, route }: Props) {
   return (
     <SafeAreaView style={styles.root} edges={["top", "bottom"]}>
       <View style={styles.header}>
-        <Pressable onPress={() => navigation.goBack()} hitSlop={8}>
-          <Text style={styles.headerAction}>Cancel</Text>
+        <Pressable onPress={() => navigation.goBack()} disabled={saving} hitSlop={8}>
+          <Text style={[styles.headerAction, saving && styles.headerActionDisabled]}>Cancel</Text>
         </Pressable>
         <Text style={styles.headerTitle}>{isEditing ? "Edit alarm" : "New alarm"}</Text>
-        <Pressable onPress={handleDone} hitSlop={8}>
-          <Text style={[styles.headerAction, styles.headerActionPrimary]}>Done</Text>
+        <Pressable onPress={handleDone} disabled={saving} hitSlop={8}>
+          {saving ? (
+            <ActivityIndicator size="small" color={colors.accent} />
+          ) : (
+            <Text style={[styles.headerAction, styles.headerActionPrimary]}>Done</Text>
+          )}
         </Pressable>
       </View>
 
@@ -309,6 +325,9 @@ function createStyles(colors: ThemeColors) {
     headerActionPrimary: {
       color: colors.accent,
       fontFamily: fonts.bodyBold,
+    },
+    headerActionDisabled: {
+      opacity: 0.4,
     },
     headerTitle: {
       color: colors.textPrimary,

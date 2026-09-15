@@ -9,10 +9,16 @@
     "backgroundColor": "#0f1a14",
     "ios": {
       "supportsTablet": true,
-      "bundleIdentifier": "com.brunosalarm.app"
+      "bundleIdentifier": "com.brunosalarm.app",
+      "infoPlist": {
+        "UIBackgroundModes": [
+          "audio"
+        ]
+      }
     },
     "android": {
       "package": "com.brunosalarm.app",
+      "googleServicesFile": "./google-services.json",
       "adaptiveIcon": {
         "backgroundColor": "#0f1a14",
         "foregroundImage": "./assets/android-icon-foreground.png",
@@ -23,7 +29,11 @@
         "SCHEDULE_EXACT_ALARM",
         "RECEIVE_BOOT_COMPLETED",
         "POST_NOTIFICATIONS",
-        "USE_FULL_SCREEN_INTENT"
+        "USE_FULL_SCREEN_INTENT",
+        "android.permission.RECORD_AUDIO",
+        "android.permission.MODIFY_AUDIO_SETTINGS",
+        "android.permission.FOREGROUND_SERVICE",
+        "android.permission.FOREGROUND_SERVICE_MEDIA_PLAYBACK"
       ]
     },
     "web": {
@@ -54,7 +64,18 @@
           }
         }
       ],
-      "expo-background-task"
-    ]
+      "expo-background-task",
+      "expo-audio",
+      "expo-asset",
+      "@react-native-firebase/app",
+      "@react-native-firebase/analytics",
+      "@react-native-firebase/crashlytics"
+    ],
+    "extra": {
+      "eas": {
+        "projectId": "b4488518-c831-40b7-87ed-97562b6a44d5"
+      }
+    },
+    "owner": "vishnuna123"
   }
 }

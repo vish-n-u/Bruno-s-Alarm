@@ -4,6 +4,7 @@ import { Platform } from "react-native";
 import RNAlarmModule from "react-native-alarmageddon";
 import { getCachedAlarmSoundPath, refreshAlarmSound } from "./alarmSound";
 import { toAlarmDatetime } from "./alarmDateTime";
+import { armIOSBackgroundAlarms } from "./iosAlarmEngine";
 
 // A second, independent alarm path alongside lib/notifications.ts's Bruno-session
 // scheduling — lets someone set genuinely free-choice wake times, unrelated to when Bruno
@@ -90,9 +91,14 @@ function resolveDays(repeatMode: RepeatMode, customDays: number[]): number[] {
 }
 
 /** Every alarm config gets its own id-scoped OS-level id prefix (bruno-custom-<alarmId>-...)
- * so clearing/rescheduling one alarm never touches another's already-scheduled occurrences. */
+ * so clearing/rescheduling one alarm never touches another's already-scheduled occurrences.
+ * The same scoping carries over to lib/iosAlarmEngine.ts's group ids, for the same reason. */
 function scopedPrefix(alarmId: string): string {
   return `${ID_PREFIX}${alarmId}-`;
+}
+
+function iosEngineGroupId(alarmId: string): string {
+  return `custom-${alarmId}`;
 }
 
 async function clearScheduledForAlarm(alarmId: string): Promise<void> {
@@ -110,6 +116,7 @@ async function clearScheduledForAlarm(alarmId: string): Promise<void> {
       .filter((n) => n.identifier.startsWith(prefix))
       .map((n) => Notifications.cancelScheduledNotificationAsync(n.identifier))
   );
+  await armIOSBackgroundAlarms(iosEngineGroupId(alarmId), []);
 }
 
 function alarmTitle(name: string): string {
@@ -183,6 +190,21 @@ async function applySchedule(alarm: CustomAlarm): Promise<void> {
         },
       });
     }
+  }
+
+  if (Platform.OS === "ios") {
+    // expo-notifications' repeating CalendarTriggerInput above has no concept of discrete
+    // future timestamps to hand the background-audio engine — it needs actual dates to poll
+    // against, so compute the same kind of upcoming-occurrence batch Android already uses.
+    await refreshAlarmSound();
+    const timestamps =
+      alarm.repeatMode === "once"
+        ? [nextLocalOccurrence(alarm.hour, alarm.minute)]
+        : nextLocalOccurrences(alarm.hour, alarm.minute, resolveDays(alarm.repeatMode, alarm.customDays), DAYS_TO_SCHEDULE);
+    await armIOSBackgroundAlarms(
+      iosEngineGroupId(alarm.id),
+      timestamps.map((timestamp) => ({ id: `${prefix}${timestamp}`, timestamp, title, body: ALARM_BODY }))
+    );
   }
 }
 

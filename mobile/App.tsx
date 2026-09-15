@@ -23,6 +23,7 @@ import EditCustomAlarmScreen from "./screens/EditCustomAlarmScreen";
 import { hasOnboarded, markOnboarded } from "./lib/onboarding";
 import { getActiveRingingAlarm, onAlarmRinging } from "./lib/notifications";
 import { registerBackgroundAlarmSoundRefresh } from "./lib/backgroundRefresh";
+import { resumeIOSAlarmEngineIfNeeded } from "./lib/iosAlarmEngine";
 import { useThemeColors, useTimeOfDay } from "./lib/theme";
 
 type Screen = "checking" | "onboarding" | "home";
@@ -88,6 +89,10 @@ export default function App() {
 
   useEffect(() => {
     registerBackgroundAlarmSoundRefresh();
+    // No-ops on Android. On iOS, re-establishes the keep-alive background audio session if
+    // an alarm was still armed from before this app process started — e.g. the OS restarted
+    // it, as opposed to the user force-quitting it (which this can't recover from).
+    resumeIOSAlarmEngineIfNeeded();
   }, []);
 
   // Only dismiss the splash once there's real content ready to replace it with — fonts

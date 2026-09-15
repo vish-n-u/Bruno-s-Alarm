@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "698347285307",
+    "project_id": "bruno-s-howl",
+    "storage_bucket": "bruno-s-howl.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:698347285307:android:18ea6fa8286ff7a6d2a51e",
+        "android_client_info": {
+          "package_name": "com.brunosalarm.app"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyCh3JcHHwKCU1Rb8E8aHaw9ilPJWcgGvLI"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}

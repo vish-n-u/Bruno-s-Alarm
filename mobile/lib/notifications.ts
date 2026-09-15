@@ -4,6 +4,13 @@ import { Platform } from "react-native";
 import RNAlarmModule, { type AlarmSubscription } from "react-native-alarmageddon";
 import { getCachedAlarmSoundPath, refreshAlarmSound } from "./alarmSound";
 import { toAlarmDatetime } from "./alarmDateTime";
+import {
+  armIOSBackgroundAlarms,
+  getIOSActiveRingingAlarm,
+  onIOSAlarmRinging,
+  snoozeIOSRingingAlarm,
+  stopIOSRingingAlarm,
+} from "./iosAlarmEngine";
 import { nextSessions } from "./schedule";
 
 const ID_PREFIX = "bruno-session-";
@@ -53,23 +60,28 @@ async function clearScheduled(): Promise<void> {
       .filter((n) => n.identifier.startsWith(ID_PREFIX))
       .map((n) => Notifications.cancelScheduledNotificationAsync(n.identifier))
   );
+  await armIOSBackgroundAlarms("session", []);
 }
+
+const SESSION_TITLE = "🐕 Bruno is howling!";
+const SESSION_BODY = "The session just went live — open the app to watch.";
 
 /** Schedules the next batch of session notifications, replacing any previously scheduled. */
 export async function scheduleUpcomingSessions(): Promise<void> {
   await clearScheduled();
+  // Best-effort refresh of Bruno's latest real recording — used as the guaranteed alarm
+  // sound on Android (its own native MediaPlayer) and iOS (lib/iosAlarmEngine.ts's ringing
+  // player) alike. Never blocks scheduling if it's unconfigured, offline, or fails.
+  await refreshAlarmSound();
 
   if (Platform.OS === "android") {
-    // Best-effort refresh of the guaranteed alarm sound to Bruno's latest real recording —
-    // never blocks scheduling if it's unconfigured, offline, or fails for any reason.
-    await refreshAlarmSound();
     const soundPath = await getCachedAlarmSoundPath();
     for (const timestamp of nextSessions(SESSIONS_TO_SCHEDULE)) {
       await RNAlarmModule.scheduleAlarm({
         id: `${ID_PREFIX}${timestamp}`,
         datetimeISO: toAlarmDatetime(timestamp),
-        title: "🐕 Bruno is howling!",
-        body: "The session just went live — open the app to watch.",
+        title: SESSION_TITLE,
+        body: SESSION_BODY,
         snoozeEnabled: true,
         snoozeInterval: SNOOZE_MINUTES,
         ...(soundPath ? { soundPath } : {}),
@@ -78,12 +90,13 @@ export async function scheduleUpcomingSessions(): Promise<void> {
     return;
   }
 
-  for (const timestamp of nextSessions(SESSIONS_TO_SCHEDULE)) {
+  const timestamps = nextSessions(SESSIONS_TO_SCHEDULE);
+  for (const timestamp of timestamps) {
     await Notifications.scheduleNotificationAsync({
       identifier: `${ID_PREFIX}${timestamp}`,
       content: {
-        title: "🐕 Bruno is howling!",
-        body: "The session just went live — open the app to watch.",
+        title: SESSION_TITLE,
+        body: SESSION_BODY,
         sound: true,
       },
       trigger: {
@@ -92,6 +105,13 @@ export async function scheduleUpcomingSessions(): Promise<void> {
       },
     });
   }
+  // Additive companion to the notification above, not a replacement — see
+  // docs/ios-real-alarm.md. This is what actually gives sessions a shot at ringing through
+  // silent mode/lock screen, via the background-audio-session mechanism.
+  await armIOSBackgroundAlarms(
+    "session",
+    timestamps.map((timestamp) => ({ id: `${ID_PREFIX}${timestamp}`, timestamp, title: SESSION_TITLE, body: SESSION_BODY }))
+  );
 }
 
 export async function unsubscribe(): Promise<void> {
@@ -120,31 +140,35 @@ export async function scheduleTestAlarmSoon(): Promise<void> {
   });
 }
 
-/** Subscribes to the alarm actually ringing right now (or stopping). Android only — used to
- * drive the in-app "ringing" screen, since the notification shade may not be reachable while
- * the app is full-screen over the lock screen. */
+/** Subscribes to the alarm actually ringing right now (or stopping) — drives the in-app
+ * "ringing" screen, since the notification shade may not be reachable while the app is
+ * full-screen over the lock screen (Android) or the background-audio engine is what's
+ * actually firing it (iOS; see lib/iosAlarmEngine.ts). */
 export function onAlarmRinging(callback: (alarmId: string | null) => void): AlarmSubscription | null {
-  if (Platform.OS !== "android") return null;
-  return RNAlarmModule.onAlarmStateChange(callback);
+  if (Platform.OS === "android") return RNAlarmModule.onAlarmStateChange(callback);
+  return onIOSAlarmRinging(callback);
 }
 
 /** Whether an alarm is already ringing right this moment, checked once on app startup — this
  * subscription-only approach in onAlarmRinging() misses the case where the alarm started
- * playing (and the OS cold-launched the app over the lock screen via full-screen intent)
- * before the JS side finished booting and attached its listener; that "already ringing"
- * event fires once natively and is never replayed to a late subscriber. */
+ * playing before the JS side finished booting and attached its listener; that "already
+ * ringing" event fires once and is never replayed to a late subscriber. */
 export async function getActiveRingingAlarm(): Promise<string | null> {
-  if (Platform.OS !== "android") return null;
-  const active = await RNAlarmModule.getCurrentAlarmPlaying();
-  return active?.activeAlarmId ?? null;
+  if (Platform.OS === "android") {
+    const active = await RNAlarmModule.getCurrentAlarmPlaying();
+    return active?.activeAlarmId ?? null;
+  }
+  return getIOSActiveRingingAlarm();
 }
 
 export async function stopRingingAlarm(alarmId: string): Promise<void> {
   if (Platform.OS === "android") await RNAlarmModule.stopCurrentAlarm(alarmId);
+  else await stopIOSRingingAlarm(alarmId);
 }
 
 export async function snoozeRingingAlarm(alarmId: string): Promise<void> {
   if (Platform.OS === "android") await RNAlarmModule.snoozeCurrentAlarm(alarmId, SNOOZE_MINUTES);
+  else await snoozeIOSRingingAlarm(alarmId);
 }
 
 /** Opens the system "Alarms & reminders" screen for this app (Android 12+). */

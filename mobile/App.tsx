@@ -11,15 +11,23 @@ import {
   BricolageGrotesque_600SemiBold,
   BricolageGrotesque_700Bold,
 } from "@expo-google-fonts/bricolage-grotesque";
-import { NavigationContainer, DarkTheme, DefaultTheme } from "@react-navigation/native";
+import {
+  NavigationContainer,
+  DarkTheme,
+  DefaultTheme,
+  getFocusedRouteNameFromRoute,
+} from "@react-navigation/native";
 import { createNativeStackNavigator, type NativeStackScreenProps } from "@react-navigation/native-stack";
+import { createBottomTabNavigator } from "@react-navigation/bottom-tabs";
 import { SafeAreaProvider } from "react-native-safe-area-context";
+import { Ionicons } from "@expo/vector-icons";
 import Onboarding from "./components/Onboarding";
 import HomeScreen from "./components/HomeScreen";
 import AlarmRingingScreen from "./components/AlarmRingingScreen";
 import SettingsScreen from "./screens/SettingsScreen";
 import CustomAlarmScreen from "./screens/CustomAlarmScreen";
-import EditCustomAlarmScreen from "./screens/EditCustomAlarmScreen";
+import LiveScreen from "./screens/LiveScreen";
+import MessagesPlaceholderScreen from "./screens/MessagesPlaceholderScreen";
 import { hasOnboarded, markOnboarded } from "./lib/onboarding";
 import { getActiveRingingAlarm, onAlarmRinging } from "./lib/notifications";
 import { registerBackgroundAlarmSoundRefresh } from "./lib/backgroundRefresh";
@@ -28,15 +36,29 @@ import { useThemeColors, useTimeOfDay } from "./lib/theme";
 
 type Screen = "checking" | "onboarding" | "home";
 
-export type RootStackParamList = {
+// Chat isn't built yet — flip this to bring the tab back. Kept as a flag (rather than deleting
+// the screen/import) so re-enabling later is a one-line change.
+const CHAT_ENABLED = false;
+
+// The Home tab's own internal stack — Settings/CustomAlarm are reached by pushing on top of
+// Home, same as before the tab bar existed. Editing an alarm is a true in-place popup
+// (components/EditCustomAlarmModal.tsx) opened via local state, not a route here. The Live
+// and Messages tabs are single screens with no stack of their own (yet).
+export type HomeStackParamList = {
   Home: undefined;
   Settings: undefined;
   CustomAlarm: undefined;
-  EditCustomAlarm: { alarmId?: string };
   OnboardingPreview: undefined;
 };
 
-const Stack = createNativeStackNavigator<RootStackParamList>();
+type RootTabParamList = {
+  HomeTab: undefined;
+  LiveTab: undefined;
+  MessagesTab: undefined;
+};
+
+const HomeStackNav = createNativeStackNavigator<HomeStackParamList>();
+const Tab = createBottomTabNavigator<RootTabParamList>();
 
 // expo-splash-screen keeps the native splash up until hideAsync() is explicitly called from
 // JS — it does not auto-dismiss on its own. Call preventAutoHideAsync() as early as possible
@@ -47,8 +69,34 @@ SplashScreen.preventAutoHideAsync().catch(() => {});
 // Renders the same Onboarding flow shown on first launch, but "Done"/"Skip" just pops
 // back to Settings instead of marking real onboarding state — lets it be checked any time
 // without resetting the app.
-function OnboardingPreviewScreen({ navigation }: NativeStackScreenProps<RootStackParamList, "OnboardingPreview">) {
+function OnboardingPreviewScreen({ navigation }: NativeStackScreenProps<HomeStackParamList, "OnboardingPreview">) {
   return <Onboarding onDone={() => navigation.goBack()} />;
+}
+
+// Extracted so it can be dropped straight in as the Home tab's screen component below —
+// everything here is exactly what the single root Stack.Navigator used to render directly.
+// Reads the theme itself (rather than taking it as a prop) since Tab.Screen's `component`
+// only ever passes navigation/route props.
+function HomeStack() {
+  const colors = useThemeColors();
+  return (
+    <HomeStackNav.Navigator
+      screenOptions={{
+        headerStyle: { backgroundColor: colors.background },
+        headerTintColor: colors.textPrimary,
+        headerShadowVisible: false,
+      }}
+    >
+      <HomeStackNav.Screen name="Home" component={HomeScreen} options={{ headerShown: false }} />
+      <HomeStackNav.Screen name="Settings" component={SettingsScreen} />
+      <HomeStackNav.Screen name="CustomAlarm" component={CustomAlarmScreen} options={{ title: "Your alarms" }} />
+      <HomeStackNav.Screen
+        name="OnboardingPreview"
+        component={OnboardingPreviewScreen}
+        options={{ headerShown: false }}
+      />
+    </HomeStackNav.Navigator>
+  );
 }
 
 export default function App() {
@@ -132,31 +180,56 @@ export default function App() {
         <Onboarding onDone={completeOnboarding} />
       ) : screen === "home" ? (
         <NavigationContainer theme={navigationTheme}>
-          <Stack.Navigator
+          <Tab.Navigator
             screenOptions={{
-              headerStyle: { backgroundColor: colors.background },
-              headerTintColor: colors.textPrimary,
-              headerShadowVisible: false,
+              headerShown: false,
+              tabBarActiveTintColor: colors.accent,
+              tabBarInactiveTintColor: colors.textSecondary,
+              tabBarStyle: { backgroundColor: colors.surface, borderTopColor: colors.border },
             }}
           >
-            <Stack.Screen name="Home" component={HomeScreen} options={{ headerShown: false }} />
-            <Stack.Screen name="Settings" component={SettingsScreen} />
-            <Stack.Screen
-              name="CustomAlarm"
-              component={CustomAlarmScreen}
-              options={{ title: "Your alarms" }}
+            <Tab.Screen
+              name="HomeTab"
+              component={HomeStack}
+              options={({ route }) => ({
+                title: "Home",
+                tabBarIcon: ({ color, size, focused }) => (
+                  <Ionicons name={focused ? "home" : "home-outline"} size={size} color={color} />
+                ),
+                // OnboardingPreview is meant to be a full-screen takeover just like real
+                // onboarding — without this, the tab bar stays visible (and tappable)
+                // underneath it, since it's a route nested inside this same tab's stack.
+                // (Editing an alarm no longer needs this — it's an in-place popup, not a
+                // route, so it already renders over everything including the tab bar.)
+                tabBarStyle:
+                  getFocusedRouteNameFromRoute(route) === "OnboardingPreview"
+                    ? { display: "none" }
+                    : { backgroundColor: colors.surface, borderTopColor: colors.border },
+              })}
             />
-            <Stack.Screen
-              name="EditCustomAlarm"
-              component={EditCustomAlarmScreen}
-              options={{ headerShown: false, presentation: "modal" }}
+            <Tab.Screen
+              name="LiveTab"
+              component={LiveScreen}
+              options={{
+                title: "Live",
+                tabBarIcon: ({ color, size, focused }) => (
+                  <Ionicons name={focused ? "play-circle" : "play-circle-outline"} size={size} color={color} />
+                ),
+              }}
             />
-            <Stack.Screen
-              name="OnboardingPreview"
-              component={OnboardingPreviewScreen}
-              options={{ headerShown: false }}
-            />
-          </Stack.Navigator>
+            {CHAT_ENABLED && (
+              <Tab.Screen
+                name="MessagesTab"
+                component={MessagesPlaceholderScreen}
+                options={{
+                  title: "Bruno's Pack",
+                  tabBarIcon: ({ color, size, focused }) => (
+                    <Ionicons name={focused ? "chatbubbles" : "chatbubbles-outline"} size={size} color={color} />
+                  ),
+                }}
+              />
+            )}
+          </Tab.Navigator>
         </NavigationContainer>
       ) : null}
     </SafeAreaProvider>

@@ -3,7 +3,9 @@ import {
   ActivityIndicator,
   Alert,
   FlatList,
+  Modal,
   Pressable,
+  ScrollView,
   StyleSheet,
   Text,
   TextInput,
@@ -21,8 +23,6 @@ import {
   type RepeatMode,
 } from "../lib/customAlarm";
 import { todaysSessions } from "../lib/schedule";
-import type { RootStackParamList } from "../App";
-import type { NativeStackScreenProps } from "@react-navigation/native-stack";
 import { fonts, radius, spacing, useThemeColors, type ThemeColors } from "../lib/theme";
 
 const ROW_HEIGHT = 44;
@@ -104,12 +104,22 @@ function Wheel<T extends string | number>({
   );
 }
 
-type Props = NativeStackScreenProps<RootStackParamList, "EditCustomAlarm">;
+type Props = {
+  visible: boolean;
+  /** Omit to create a new alarm; pass an existing id to edit it. */
+  alarmId?: string;
+  onClose: () => void;
+  /** Called after a successful save or delete, so the caller can refresh its own list. */
+  onSaved: () => void;
+};
 
-export default function EditCustomAlarmScreen({ navigation, route }: Props) {
+// A true in-place popup (RN's own Modal, sliding up over a dimmed backdrop) rather than a
+// pushed navigation route — even a "modal presentation" stack screen still reads as
+// "went to a new page." This is opened directly from HomeScreen/CustomAlarmScreen via local
+// state, not navigation.
+export default function EditCustomAlarmModal({ visible, alarmId, onClose, onSaved }: Props) {
   const colors = useThemeColors();
   const styles = createStyles(colors);
-  const alarmId = route.params?.alarmId;
   const isEditing = Boolean(alarmId);
 
   const [name, setName] = useState("");
@@ -118,11 +128,24 @@ export default function EditCustomAlarmScreen({ navigation, route }: Props) {
   const [ampmIndex, setAmpmIndex] = useState(0);
   const [repeatMode, setRepeatMode] = useState<RepeatMode>("everyday");
   const [customDays, setCustomDays] = useState<number[]>([]);
-  const [loading, setLoading] = useState(isEditing);
+  const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
 
+  // Reloads (or resets to defaults for a new alarm) every time the popup opens — mirrors
+  // the previous screen's mount-time load, just keyed off `visible` instead.
   useEffect(() => {
-    if (!alarmId) return;
+    if (!visible) return;
+    if (!alarmId) {
+      setName("");
+      setHourIndex(6);
+      setMinuteIndex(0);
+      setAmpmIndex(0);
+      setRepeatMode("everyday");
+      setCustomDays([]);
+      setLoading(false);
+      return;
+    }
+    setLoading(true);
     getCustomAlarm(alarmId).then((alarm) => {
       if (alarm) {
         setName(alarm.name);
@@ -135,7 +158,7 @@ export default function EditCustomAlarmScreen({ navigation, route }: Props) {
       }
       setLoading(false);
     });
-  }, [alarmId]);
+  }, [visible, alarmId]);
 
   function toggleDay(day: number) {
     setCustomDays((prev) => (prev.includes(day) ? prev.filter((d) => d !== day) : [...prev, day].sort()));
@@ -183,7 +206,8 @@ export default function EditCustomAlarmScreen({ navigation, route }: Props) {
         customDays,
       };
       await saveCustomAlarm(alarm);
-      navigation.goBack();
+      onSaved();
+      onClose();
     } finally {
       setSaving(false);
     }
@@ -198,115 +222,153 @@ export default function EditCustomAlarmScreen({ navigation, route }: Props) {
         style: "destructive",
         onPress: async () => {
           await deleteCustomAlarm(alarmId);
-          navigation.goBack();
+          onSaved();
+          onClose();
         },
       },
     ]);
   }
 
-  if (loading) return null;
-
   return (
-    <SafeAreaView style={styles.root} edges={["top", "bottom"]}>
-      <View style={styles.header}>
-        <Pressable onPress={() => navigation.goBack()} disabled={saving} hitSlop={8}>
-          <Text style={[styles.headerAction, saving && styles.headerActionDisabled]}>Cancel</Text>
-        </Pressable>
-        <Text style={styles.headerTitle}>{isEditing ? "Edit alarm" : "New alarm"}</Text>
-        <Pressable onPress={handleDone} disabled={saving} hitSlop={8}>
-          {saving ? (
-            <ActivityIndicator size="small" color={colors.accent} />
-          ) : (
-            <Text style={[styles.headerAction, styles.headerActionPrimary]}>Done</Text>
-          )}
-        </Pressable>
-      </View>
-
-      <View style={styles.content}>
-        <Text style={styles.liveHint}>Bruno is live around {liveLabel} your time</Text>
-
-        <View style={styles.wheelsRow}>
-          <Wheel
-            data={HOURS}
-            format={(v) => String(v)}
-            selectedIndex={hourIndex}
-            onSettle={setHourIndex}
-            isLive={(v) => liveHourSet.has(v)}
-            styles={styles}
-          />
-          <Text style={styles.colon}>:</Text>
-          <Wheel
-            data={MINUTES}
-            format={(v) => String(v).padStart(2, "0")}
-            selectedIndex={minuteIndex}
-            onSettle={setMinuteIndex}
-            isLive={(v) => liveMinuteSet.has(v)}
-            styles={styles}
-          />
-          <Wheel
-            data={[...AMPM]}
-            format={(v) => v}
-            selectedIndex={ampmIndex}
-            onSettle={setAmpmIndex}
-            isLive={(v) => liveAmpmSet.has(v)}
-            styles={styles}
-          />
-        </View>
-
-        <View style={styles.repeatRow}>
-          {REPEAT_MODES.map((mode) => (
-            <Pressable
-              key={mode}
-              style={[styles.repeatChip, repeatMode === mode && styles.repeatChipActive]}
-              onPress={() => setRepeatMode(mode)}
-            >
-              <Text style={[styles.repeatChipText, repeatMode === mode && styles.repeatChipTextActive]}>
-                {REPEAT_LABEL[mode]}
-              </Text>
+    <Modal visible={visible} animationType="slide" transparent onRequestClose={saving ? () => {} : onClose}>
+      <View style={styles.backdrop}>
+        <Pressable style={styles.backdropTapArea} onPress={saving ? undefined : onClose} />
+        <SafeAreaView style={styles.sheet} edges={["bottom"]}>
+          <View style={styles.grabber} />
+          <View style={styles.header}>
+            <Pressable onPress={onClose} disabled={saving} hitSlop={8}>
+              <Text style={[styles.headerAction, saving && styles.headerActionDisabled]}>Cancel</Text>
             </Pressable>
-          ))}
-        </View>
-
-        {repeatMode === "custom" && (
-          <View style={styles.daysRow}>
-            {DAY_LETTERS.map((letter, day) => (
-              <Pressable
-                key={day}
-                style={[styles.dayCircle, customDays.includes(day) && styles.dayCircleActive]}
-                onPress={() => toggleDay(day)}
-              >
-                <Text style={[styles.dayCircleText, customDays.includes(day) && styles.dayCircleTextActive]}>
-                  {letter}
-                </Text>
-              </Pressable>
-            ))}
+            <Text style={styles.headerTitle}>{isEditing ? "Edit alarm" : "New alarm"}</Text>
+            <Pressable onPress={handleDone} disabled={saving} hitSlop={8}>
+              {saving ? (
+                <ActivityIndicator size="small" color={colors.accent} />
+              ) : (
+                <Text style={[styles.headerAction, styles.headerActionPrimary]}>Done</Text>
+              )}
+            </Pressable>
           </View>
-        )}
 
-        <TextInput
-          style={styles.nameInput}
-          value={name}
-          onChangeText={setName}
-          placeholder="Alarm name (optional)"
-          placeholderTextColor={colors.textSecondary}
-          maxLength={40}
-        />
+          {loading ? (
+            <View style={styles.loadingWrap}>
+              <ActivityIndicator color={colors.accent} />
+            </View>
+          ) : (
+            <View style={styles.content}>
+              <Text style={styles.liveHint}>Bruno is live around {liveLabel} your time</Text>
 
-        {isEditing && (
-          <Pressable style={styles.deleteButton} onPress={handleDelete}>
-            <Text style={styles.deleteButtonText}>Delete alarm</Text>
-          </Pressable>
-        )}
+              <View style={styles.wheelsRow}>
+                <Wheel
+                  data={HOURS}
+                  format={(v) => String(v)}
+                  selectedIndex={hourIndex}
+                  onSettle={setHourIndex}
+                  isLive={(v) => liveHourSet.has(v)}
+                  styles={styles}
+                />
+                <Text style={styles.colon}>:</Text>
+                <Wheel
+                  data={MINUTES}
+                  format={(v) => String(v).padStart(2, "0")}
+                  selectedIndex={minuteIndex}
+                  onSettle={setMinuteIndex}
+                  isLive={(v) => liveMinuteSet.has(v)}
+                  styles={styles}
+                />
+                <Wheel
+                  data={[...AMPM]}
+                  format={(v) => v}
+                  selectedIndex={ampmIndex}
+                  onSettle={setAmpmIndex}
+                  isLive={(v) => liveAmpmSet.has(v)}
+                  styles={styles}
+                />
+              </View>
+
+              <ScrollView
+                horizontal
+                showsHorizontalScrollIndicator={false}
+                contentContainerStyle={styles.repeatRow}
+                style={styles.repeatRowScroll}
+              >
+                {REPEAT_MODES.map((mode) => (
+                  <Pressable
+                    key={mode}
+                    style={[styles.repeatChip, repeatMode === mode && styles.repeatChipActive]}
+                    onPress={() => setRepeatMode(mode)}
+                  >
+                    <Text style={[styles.repeatChipText, repeatMode === mode && styles.repeatChipTextActive]}>
+                      {REPEAT_LABEL[mode]}
+                    </Text>
+                  </Pressable>
+                ))}
+              </ScrollView>
+
+              {repeatMode === "custom" && (
+                <View style={styles.daysRow}>
+                  {DAY_LETTERS.map((letter, day) => (
+                    <Pressable
+                      key={day}
+                      style={[styles.dayCircle, customDays.includes(day) && styles.dayCircleActive]}
+                      onPress={() => toggleDay(day)}
+                    >
+                      <Text style={[styles.dayCircleText, customDays.includes(day) && styles.dayCircleTextActive]}>
+                        {letter}
+                      </Text>
+                    </Pressable>
+                  ))}
+                </View>
+              )}
+
+              <TextInput
+                style={styles.nameInput}
+                value={name}
+                onChangeText={setName}
+                placeholder="Alarm name (optional)"
+                placeholderTextColor={colors.textSecondary}
+                maxLength={40}
+              />
+
+              {isEditing && (
+                <Pressable style={styles.deleteButton} onPress={handleDelete}>
+                  <Text style={styles.deleteButtonText}>Delete alarm</Text>
+                </Pressable>
+              )}
+            </View>
+          )}
+        </SafeAreaView>
       </View>
-    </SafeAreaView>
+    </Modal>
   );
 }
 
 function createStyles(colors: ThemeColors) {
   return StyleSheet.create({
-    root: {
+    backdrop: {
       flex: 1,
+      backgroundColor: "rgba(0,0,0,0.5)",
+      justifyContent: "flex-end",
+    },
+    backdropTapArea: {
+      flex: 1,
+    },
+    sheet: {
       backgroundColor: colors.background,
+      borderTopLeftRadius: radius.lg + 8,
+      borderTopRightRadius: radius.lg + 8,
+      maxHeight: "92%",
+    },
+    grabber: {
+      alignSelf: "center",
+      width: 36,
+      height: 4,
+      borderRadius: 2,
+      backgroundColor: colors.border,
+      marginTop: spacing.sm,
+    },
+    loadingWrap: {
+      paddingVertical: spacing.xxl * 2,
+      alignItems: "center",
     },
     header: {
       flexDirection: "row",
@@ -335,8 +397,8 @@ function createStyles(colors: ThemeColors) {
       fontSize: 17,
     },
     content: {
-      flex: 1,
       padding: spacing.xl,
+      paddingBottom: spacing.xxl,
       alignItems: "center",
     },
     liveHint: {
@@ -392,12 +454,14 @@ function createStyles(colors: ThemeColors) {
       fontSize: 20,
       marginHorizontal: spacing.xs,
     },
+    repeatRowScroll: {
+      width: "100%",
+      marginTop: spacing.xl,
+    },
     repeatRow: {
       flexDirection: "row",
-      justifyContent: "center",
-      flexWrap: "wrap",
+      alignItems: "center",
       gap: spacing.sm,
-      marginTop: spacing.xl,
     },
     repeatChip: {
       paddingVertical: spacing.sm,

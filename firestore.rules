@@ -1,0 +1,51 @@
+rules_version = '2';
+
+// Bruno's Alarm live chat. Every chat message is written exclusively by the
+// `sendChatMessage` callable Cloud Function (functions/src/index.ts), which uses the Admin
+// SDK and therefore bypasses these rules entirely — that's deliberate: the function is the
+// only place length, profanity, the per-device rate limit, and the per-session message cap
+// are actually enforced, since none of that can be done reliably here (Firestore rules can't
+// cleanly check "time since last write" or "count of writes" atomically across documents).
+// These rules exist purely to make sure nothing else — a modified client, a stray line of
+// code, a future contributor who forgets — can write here directly.
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    match /sessions/{sessionId} {
+      // The session doc itself only holds a messageCount counter (written by the function).
+      allow read: if true;
+      allow write: if false;
+
+      match /messages/{messageId} {
+        // Publicly readable — chat is visible to anyone watching, signed in or not.
+        allow read: if true;
+        // No client writes, ever. Only the callable function (Admin SDK) creates these.
+        allow create, update, delete: if false;
+      }
+
+      match /rateLimits/{uid} {
+        // Internal bookkeeping for the rate limit — never meant to be read or written by a
+        // client, including the client it belongs to.
+        allow read, write: if false;
+      }
+    }
+
+    match /reports/{reportId} {
+      // Clients may file a report (see lib/chat.ts's reportChatMessage) but can never read
+      // the collection back — reports are reviewed via the Firebase console for now, not
+      // surfaced in-app to anyone.
+      allow create: if request.auth != null
+        && request.resource.data.reportedBy == request.auth.uid
+        && request.resource.data.sessionId is string
+        && request.resource.data.messageId is string
+        && request.resource.data.reason is string
+        && request.resource.data.reason.size() <= 200;
+      allow read, update, delete: if false;
+    }
+
+    // Everything else stays closed by default.
+    match /{document=**} {
+      allow read, write: if false;
+    }
+  }
+}

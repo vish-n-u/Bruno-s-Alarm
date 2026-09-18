@@ -6,7 +6,7 @@ import { useFocusEffect } from "@react-navigation/native";
 import type { NativeStackScreenProps } from "@react-navigation/native-stack";
 import appConfig from "../app.json";
 import NotifyToggle from "../components/NotifyToggle";
-import type { RootStackParamList } from "../App";
+import type { HomeStackParamList } from "../App";
 import {
   cancelAllScheduledAlarms,
   getAllScheduledAlarms,
@@ -25,10 +25,17 @@ const PRIVACY_POLICY_URL =
   "https://plant-garnet-37d.notion.site/BRUNO-S-ALARM-3d327ffbfc9180a3b404f1de22bf62b8";
 
 const KIND_LABEL: Record<ScheduledAlarmKind, string> = {
-  session: "Real sessions (Bruno's actual schedule)",
+  session: "Bruno's real sessions",
   custom: "Your custom alarms",
-  test: "Debug test alarms",
+  test: "Test alarms",
   other: "Unrecognized",
+};
+
+const KIND_ICON: Record<ScheduledAlarmKind, keyof typeof Ionicons.glyphMap> = {
+  session: "paw-outline",
+  custom: "alarm-outline",
+  test: "flask-outline",
+  other: "help-circle-outline",
 };
 
 function formatAlarmTime(timestamp: number): string {
@@ -40,34 +47,70 @@ function formatAlarmTime(timestamp: number): string {
   });
 }
 
-// A real alarm clock never shows someone "14 alarms" for one daily 7:00 AM repeat — that
-// count is only an artifact of how Android's lack of native daily-recurrence forces this
-// app to pre-schedule a batch of individual future occurrences (see lib/notifications.ts /
-// lib/customAlarm.ts). Describe each group the way a person actually thinks about it.
+// One compact line instead of a paragraph — count/description plus next-fire time together,
+// the way a person actually scans a settings row rather than reads it.
 function describeGroup(kind: ScheduledAlarmKind, items: ScheduledAlarmSummary[]): string {
+  const next = `Next ${formatAlarmTime(items[0].timestamp)}`;
   switch (kind) {
     case "session":
-      return "6:00 AM & 6:00 PM IST, every day";
+      return `Every day · ${next}`;
     case "custom":
-      return `Manage in "Your alarms"`;
+      return next;
     case "test":
-      return items.length === 1 ? "1 test alarm pending" : `${items.length} test alarms pending`;
+      return `${items.length} pending · ${next}`;
     case "other":
-      return items.length === 1 ? "1 unrecognized alarm" : `${items.length} unrecognized alarms`;
+      return `${items.length} · ${next}`;
   }
 }
 
-// Primary sections (things you actually touch) get a real heading and a contained card.
-// Secondary/reference sections (permissions, about, debug) get a quieter label and sit
-// directly on the background as a plain list — so the screen isn't six identical bordered
-// cards stacked in a row, and "debug" visually reads as different from real controls.
+// Primary sections (Notifications) get a real heading; secondary/reference sections
+// (permissions, about, debug) get a quieter label — signals "less central" without a
+// second all-caps convention. Both still sit in the same card treatment (icon rows,
+// dividers) so the screen reads as one consistent list, not a mix of two card styles.
+// "Debug" console rows keep their own distinct monospace treatment further below.
 function SectionLabel({ children, variant = "primary" }: { children: string; variant?: "primary" | "secondary" }) {
   const colors = useThemeColors();
   const styles = createStyles(colors);
   return <Text style={variant === "primary" ? styles.sectionLabel : styles.sectionLabelSecondary}>{children}</Text>;
 }
 
-type Props = NativeStackScreenProps<RootStackParamList, "Settings">;
+// One icon-led row shape reused everywhere instead of paragraphs of explanation above each
+// section — a short subtitle carries the "why" inline, the way a real settings app does.
+function SettingsRow({
+  icon,
+  title,
+  subtitle,
+  value,
+  onPress,
+  colors,
+  styles,
+}: {
+  icon: keyof typeof Ionicons.glyphMap;
+  title: string;
+  subtitle?: string;
+  value?: string;
+  onPress?: () => void;
+  colors: ThemeColors;
+  styles: ReturnType<typeof createStyles>;
+}) {
+  const Wrapper = onPress ? Pressable : View;
+  return (
+    <Wrapper style={styles.row} onPress={onPress}>
+      <Ionicons name={icon} size={18} color={colors.textSecondary} style={styles.rowIcon} />
+      <View style={styles.rowTextWrap}>
+        <Text style={styles.rowText}>{title}</Text>
+        {subtitle && <Text style={styles.rowSubtitle}>{subtitle}</Text>}
+      </View>
+      {value ? (
+        <Text style={styles.rowValue}>{value}</Text>
+      ) : (
+        onPress && <Ionicons name="chevron-forward" size={16} color={colors.textSecondary} />
+      )}
+    </Wrapper>
+  );
+}
+
+type Props = NativeStackScreenProps<HomeStackParamList, "Settings">;
 
 export default function SettingsScreen({ navigation }: Props) {
   const colors = useThemeColors();
@@ -75,6 +118,24 @@ export default function SettingsScreen({ navigation }: Props) {
   const insets = useSafeAreaInsets();
   const [forcingLive, setForcingLive] = useState(false);
   const [alarms, setAlarms] = useState<ScheduledAlarmSummary[]>([]);
+  // The Debug section's own copy claims these tools aren't visible to real users — that was
+  // only true in wording, not in practice, since every build (including what testers install
+  // from Play Store) showed it unconditionally. Same unlock gesture Android itself uses for
+  // its hidden developer options: tap the version number 7 times. `__DEV__` still shows it
+  // automatically in a debug build, so local development is unaffected.
+  const [versionTapCount, setVersionTapCount] = useState(0);
+  const [debugUnlocked, setDebugUnlocked] = useState(__DEV__);
+
+  function handleVersionTap() {
+    if (debugUnlocked) return;
+    const next = versionTapCount + 1;
+    if (next >= 7) {
+      setDebugUnlocked(true);
+      Alert.alert("Debug tools unlocked", "Scroll down: a Debug section just appeared.");
+      return;
+    }
+    setVersionTapCount(next);
+  }
 
   const refreshAlarms = useCallback(() => {
     getAllScheduledAlarms()
@@ -90,7 +151,7 @@ export default function SettingsScreen({ navigation }: Props) {
   function handleClearAll() {
     Alert.alert(
       "Clear all scheduled alarms?",
-      "Cancels every alarm — real sessions, your custom alarm, and any leftover test alarms. You'll need to re-subscribe/re-enable afterward.",
+      "Cancels every alarm: real sessions, your custom alarm, and any leftover test alarms. You'll need to re-subscribe/re-enable afterward.",
       [
         { text: "Cancel", style: "cancel" },
         {
@@ -116,130 +177,144 @@ export default function SettingsScreen({ navigation }: Props) {
       style={styles.root}
       contentContainerStyle={[styles.content, { paddingBottom: spacing.xxl + insets.bottom }]}
     >
-      <SectionLabel>Notifications</SectionLabel>
       <View style={styles.card}>
         <NotifyToggle />
-      </View>
-
-      <SectionLabel>Scheduled alarms</SectionLabel>
-      <View style={styles.card}>
-        {groups.length === 0 ? (
-          <Text style={styles.cardHint}>Nothing scheduled right now.</Text>
-        ) : (
-          groups.map((group, index) => (
-            <View key={group.kind}>
-              {index > 0 && <View style={styles.rowDivider} />}
-              <Text style={styles.rowText}>{KIND_LABEL[group.kind]}</Text>
-              <Text style={styles.cardHint}>{describeGroup(group.kind, group.items)}</Text>
-              <Text style={styles.cardHintMono}>Next: {formatAlarmTime(group.items[0].timestamp)}</Text>
-            </View>
-          ))
-        )}
-        {alarms.length > 0 && (
-          <Pressable style={styles.dangerButton} onPress={handleClearAll}>
-            <Text style={styles.dangerButtonText}>Clear all scheduled alarms</Text>
-          </Pressable>
-        )}
       </View>
 
       {Platform.OS === "android" && (
         <>
           <SectionLabel variant="secondary">Real alarm permissions</SectionLabel>
-          <Text style={styles.plainHint}>
-            One-time setup so the alarm actually rings through Do Not Disturb and over the
-            lock screen — safe to revisit any time.
-          </Text>
-          <View style={styles.plainList}>
-            <Pressable style={styles.row} onPress={openAlarmPermissionSettings}>
-              <Text style={styles.rowText}>Allow exact alarms</Text>
-              <Ionicons name="chevron-forward" size={16} color={colors.textSecondary} />
-            </Pressable>
+          <View style={styles.card}>
+            <SettingsRow
+              icon="alarm-outline"
+              title="Exact alarms"
+              subtitle="Rings exactly on time"
+              onPress={openAlarmPermissionSettings}
+              colors={colors}
+              styles={styles}
+            />
             <View style={styles.rowDivider} />
-            <Pressable style={styles.row} onPress={openFullScreenIntentSettings}>
-              <Text style={styles.rowText}>Allow full-screen alerts</Text>
-              <Ionicons name="chevron-forward" size={16} color={colors.textSecondary} />
-            </Pressable>
+            <SettingsRow
+              icon="phone-portrait-outline"
+              title="Full-screen alerts"
+              subtitle="Shows over the lock screen"
+              onPress={openFullScreenIntentSettings}
+              colors={colors}
+              styles={styles}
+            />
           </View>
         </>
       )}
 
       <SectionLabel variant="secondary">About</SectionLabel>
-      <Text style={styles.plainHint}>
-        Bruno is a real dog who howls at a church bell, twice a day, no accounts and no
-        tracking involved.
-      </Text>
-      <View style={styles.plainList}>
-        <Pressable style={styles.row} onPress={() => Linking.openURL(PRIVACY_POLICY_URL)}>
-          <Text style={styles.rowText}>Privacy Policy</Text>
-          <Ionicons name="chevron-forward" size={16} color={colors.textSecondary} />
-        </Pressable>
+      <View style={styles.card}>
+        <SettingsRow
+          icon="shield-checkmark-outline"
+          title="Privacy Policy"
+          onPress={() => Linking.openURL(PRIVACY_POLICY_URL)}
+          colors={colors}
+          styles={styles}
+        />
         <View style={styles.rowDivider} />
-        <View style={styles.row}>
-          <Text style={styles.rowText}>Version</Text>
-          <Text style={styles.rowValue}>{appConfig.expo.version}</Text>
-        </View>
+        <SettingsRow
+          icon="information-circle-outline"
+          title="Version"
+          value={appConfig.expo.version}
+          onPress={handleVersionTap}
+          colors={colors}
+          styles={styles}
+        />
       </View>
 
-      <SectionLabel variant="secondary">Debug</SectionLabel>
-      <Text style={styles.plainHint}>Testing tools — not visible to real users.</Text>
-      <View style={styles.consoleList}>
-        <Pressable style={styles.consoleRow} onPress={() => navigation.navigate("OnboardingPreview")}>
-          <Text style={styles.consoleText}>&gt; preview onboarding</Text>
-        </Pressable>
-        {Platform.OS === "android" && (
-          <>
-            <View style={styles.rowDivider} />
-            <Pressable
-              style={styles.consoleRow}
-              onPress={async () => {
-                const granted = await requestPermission();
-                if (!granted) {
-                  Alert.alert("Permission needed", "Grant notification permission first.");
-                  return;
-                }
-                await scheduleTestAlarmSoon();
-                refreshAlarms();
-                Alert.alert("Test alarm set", "Fires in ~90 seconds. Lock the phone and try silent/DND now.");
-              }}
-            >
-              <Text style={styles.consoleText}>&gt; test alarm in 90s</Text>
+      {debugUnlocked && (
+        <>
+          <SectionLabel variant="secondary">Scheduled alarms</SectionLabel>
+          <View style={styles.card}>
+            {groups.length === 0 ? (
+              <Text style={styles.cardHint}>Nothing scheduled right now.</Text>
+            ) : (
+              groups.map((group, index) => (
+                <View key={group.kind}>
+                  {index > 0 && <View style={styles.rowDivider} />}
+                  <SettingsRow
+                    icon={KIND_ICON[group.kind]}
+                    title={KIND_LABEL[group.kind]}
+                    subtitle={describeGroup(group.kind, group.items)}
+                    onPress={group.kind === "custom" ? () => navigation.navigate("CustomAlarm") : undefined}
+                    colors={colors}
+                    styles={styles}
+                  />
+                </View>
+              ))
+            )}
+            {alarms.length > 0 && (
+              <Pressable style={styles.dangerButton} onPress={handleClearAll}>
+                <Text style={styles.dangerButtonText}>Clear all scheduled alarms</Text>
+              </Pressable>
+            )}
+          </View>
+
+          <SectionLabel variant="secondary">Debug</SectionLabel>
+          <View style={styles.consoleList}>
+            <Pressable style={styles.consoleRow} onPress={() => navigation.navigate("OnboardingPreview")}>
+              <Text style={styles.consoleText}>&gt; preview onboarding</Text>
             </Pressable>
-            <View style={styles.rowDivider} />
-            <Pressable
-              style={styles.consoleRow}
-              onPress={() => {
-                const next = !forcingLive;
-                setDebugForceLive(next ? true : null);
-                setForcingLive(next);
-              }}
-            >
-              <Text style={[styles.consoleText, forcingLive && { color: colors.live }]}>
-                {forcingLive ? "> forcing live — tap to clear" : "> force live (debug)"}
-              </Text>
-            </Pressable>
-            <View style={styles.rowDivider} />
-            <Pressable
-              style={styles.consoleRow}
-              onPress={async () => {
-                // Calls the exact function the periodic background task runs — a much more
-                // direct test than expo-background-task's own trigger-for-testing API, which
-                // silently no-ops whenever the app is in the foreground (i.e. always, when
-                // you're the one tapping this button).
-                await refreshAlarmSound();
-                const path = await getCachedAlarmSoundPath();
-                Alert.alert(
-                  path ? "Refreshed" : "No cached sound",
-                  path
-                    ? `Cached at:\n${path}`
-                    : "Refresh ran but nothing is cached — check EXPO_PUBLIC_BACKEND_URL and network access."
-                );
-              }}
-            >
-              <Text style={styles.consoleText}>&gt; run background sound refresh now</Text>
-            </Pressable>
-          </>
-        )}
-      </View>
+            {Platform.OS === "android" && (
+              <>
+                <View style={styles.rowDivider} />
+                <Pressable
+                  style={styles.consoleRow}
+                  onPress={async () => {
+                    const granted = await requestPermission();
+                    if (!granted) {
+                      Alert.alert("Permission needed", "Grant notification permission first.");
+                      return;
+                    }
+                    await scheduleTestAlarmSoon();
+                    refreshAlarms();
+                    Alert.alert("Test alarm set", "Fires in ~90 seconds. Lock the phone and try silent/DND now.");
+                  }}
+                >
+                  <Text style={styles.consoleText}>&gt; test alarm in 90s</Text>
+                </Pressable>
+                <View style={styles.rowDivider} />
+                <Pressable
+                  style={styles.consoleRow}
+                  onPress={() => {
+                    const next = !forcingLive;
+                    setDebugForceLive(next ? true : null);
+                    setForcingLive(next);
+                  }}
+                >
+                  <Text style={[styles.consoleText, forcingLive && { color: colors.live }]}>
+                    {forcingLive ? "> forcing live, tap to clear" : "> force live (debug)"}
+                  </Text>
+                </Pressable>
+                <View style={styles.rowDivider} />
+                <Pressable
+                  style={styles.consoleRow}
+                  onPress={async () => {
+                    // Calls the exact function the periodic background task runs — a much more
+                    // direct test than expo-background-task's own trigger-for-testing API, which
+                    // silently no-ops whenever the app is in the foreground (i.e. always, when
+                    // you're the one tapping this button).
+                    await refreshAlarmSound();
+                    const path = await getCachedAlarmSoundPath();
+                    Alert.alert(
+                      path ? "Refreshed" : "No cached sound",
+                      path
+                        ? `Cached at:\n${path}`
+                        : "Refresh ran but nothing is cached. Check EXPO_PUBLIC_BACKEND_URL and network access."
+                    );
+                  }}
+                >
+                  <Text style={styles.consoleText}>&gt; run background sound refresh now</Text>
+                </Pressable>
+              </>
+            )}
+          </View>
+        </>
+      )}
     </ScrollView>
   );
 }
@@ -287,28 +362,18 @@ function createStyles(colors: ThemeColors) {
       fontSize: 13,
       lineHeight: 19,
     },
-    cardHintMono: {
-      color: colors.textSecondary,
-      fontFamily: fonts.mono,
-      fontSize: 12,
-    },
-    // Reference sections (permissions/about) sit directly on the background as a plain
-    // list — no border/card chrome — so the screen isn't six identical bordered widgets.
-    plainHint: {
-      color: colors.textSecondary,
-      fontFamily: fonts.body,
-      fontSize: 13,
-      lineHeight: 19,
-      marginBottom: spacing.sm,
-    },
-    plainList: {
-      gap: 0,
-    },
     row: {
       flexDirection: "row",
       alignItems: "center",
-      justifyContent: "space-between",
+      gap: spacing.sm,
       paddingVertical: spacing.sm,
+    },
+    rowIcon: {
+      width: 20,
+    },
+    rowTextWrap: {
+      flex: 1,
+      gap: 1,
     },
     rowDivider: {
       height: 1,
@@ -318,6 +383,11 @@ function createStyles(colors: ThemeColors) {
       color: colors.textPrimary,
       fontFamily: fonts.body,
       fontSize: 15,
+    },
+    rowSubtitle: {
+      color: colors.textSecondary,
+      fontFamily: fonts.body,
+      fontSize: 12,
     },
     rowValue: {
       color: colors.textSecondary,

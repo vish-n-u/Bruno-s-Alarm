@@ -64,7 +64,7 @@ async function clearScheduled(): Promise<void> {
 }
 
 const SESSION_TITLE = "🐕 Bruno is howling!";
-const SESSION_BODY = "The session just went live — open the app to watch.";
+const SESSION_BODY = "The session just went live. Open the app to watch.";
 
 /** Schedules the next batch of session notifications, replacing any previously scheduled. */
 export async function scheduleUpcomingSessions(): Promise<void> {
@@ -133,7 +133,7 @@ export async function scheduleTestAlarmSoon(): Promise<void> {
     id: `${TEST_PREFIX}${Date.now()}`,
     datetimeISO: toAlarmDatetime(Date.now() + 90000),
     title: "🐕 TEST ALARM",
-    body: "This is a test — Stop or Snooze it.",
+    body: "This is a test. Stop or Snooze it.",
     snoozeEnabled: true,
     snoozeInterval: SNOOZE_MINUTES,
     ...(soundPath ? { soundPath } : {}),

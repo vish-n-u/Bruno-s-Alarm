@@ -1,7 +1,9 @@
-# iOS real alarm (Alarmy-style) — deferred until after Android
+# iOS real alarm (Alarmy-style)
 
-Status: **not started**. Sequencing: build the Android real-alarm (Notifee full-screen
-intent + exact alarm) first; come back to this once that's done.
+Status: **implemented, never actually tested**. The engine and its wiring into real
+scheduling both exist in code. What's missing is everything that requires a real iPhone and
+a paid Apple Developer account — neither of which has existed yet — so none of this has ever
+actually run.
 
 ## Why iOS is a separate, harder problem
 
@@ -12,7 +14,7 @@ instead. Confirmed against Alarmy's own support docs: force-quitting the app bef
 their #1 cause of alarms not ringing, and closing it while silent/DND is on breaks it too.
 Real technique, real fragility — not a hypothetical.
 
-## What it takes
+## What it takes — and where each piece actually lives
 
 The actual trigger is a **continuous background audio session**, not a scheduled OS task —
 this is the real mechanism, not an implementation detail. Declaring `audio` in
@@ -23,52 +25,51 @@ wall-clock time against the next Bruno session — that fires the alarm sound/UI
 second. There is no "wake me up at 6:00am" API being scheduled here; the app just never goes
 to sleep in the first place, for as long as it's allowed to keep audio playing.
 
-`expo-background-task` (wrapping `BGTaskScheduler`) was originally scoped as the scheduling
-piece, but that's the wrong tool for this: `BGTaskScheduler` is explicitly deferrable and
+`expo-background-task` (wrapping `BGTaskScheduler`) was considered as the scheduling piece,
+but that's the wrong tool for this: `BGTaskScheduler` is explicitly deferrable and
 opportunistic — iOS decides *if and when* to actually run it based on battery/usage
 heuristics, sometimes minutes or hours late, sometimes not at all. That's fine for "sync my
-data sometime today," not for "ring at exactly 6:00am." It has a real but secondary role: a
-fallback resurrection mechanism, so if the background audio session does get killed (e.g. by
-memory pressure) there's still a chance of re-arming state later — never the primary trigger.
+data sometime today," not for "ring at exactly 6:00am." It was left out entirely — there is
+no fallback resurrection mechanism built; the background audio session staying alive is the
+only thing keeping an armed alarm alive.
 
-1. **Two new libraries in `mobile/`**
-   - `expo-audio` — configured to the `.playback` audio session category (not the default
-     `.soloAmbient`), which is the actual switch that both (a) lets sound play through the
-     mute switch and lock screen, and (b) keeps the app alive in the background as long as
-     it's actively playing something.
-   - `expo-background-task` — optional, fallback-only (see above). Not the trigger.
-
-2. **`app.json` changes**
-   - `ios.infoPlist.UIBackgroundModes: ["audio"]` — this one entry is what keeps the app
-     alive in the background; nothing else does the scheduling work.
-   - If the `expo-background-task` fallback is included, register the background task
-     identifier it requires too — but it stays a secondary safety net, not load-bearing.
-
-3. **New logic in the app**
-   - A silent/near-silent looping player (via `expo-audio`) started when the alarm is armed,
-     keeping the background audio session — and therefore the JS runtime — alive.
-   - An in-app timer, running only because the runtime is alive, that checks the real clock
-     against the next Bruno session (reuse `lib/schedule.ts`) and fires the actual alarm
-     sound + full-screen UI at that moment — this is the app's own clock doing the firing,
-     not an OS-scheduled wake.
-   - Keep the existing local notification (`lib/notifications.ts`) as a visible companion,
-     not a replacement — belt and suspenders.
-
-4. **A new native build**
-   - Custom background-mode config means this can't run in the current dev client. Needs a
-     fresh `eas build --platform ios` with these changes baked in.
-
-5. **Two hard requirements this introduces**
+1. **`lib/iosAlarmEngine.ts` — built.** The full engine: a near-silent looping
+   `expo-audio` player (`assets/audio/keep_alive_silence.mp3`) that keeps the JS runtime
+   alive, a 15s poll loop that checks pending targets against the real clock
+   (`lib/schedule.ts`), fire/stop/snooze logic, and an `AsyncStorage`-backed pending-target
+   store so armed alarms survive a cold start after the OS restarts the process (not a user
+   force-quit — see the caveat below, that case is unrecoverable by design).
+2. **`app.json` — done.** `ios.infoPlist.UIBackgroundModes: ["audio"]` is set. No
+   `expo-background-task` fallback was added (see above — deliberately skipped).
+3. **Wired into real scheduling — done.** Both real paths call into the engine:
+   `lib/notifications.ts` (Bruno's real 6AM/6PM sessions) and `lib/customAlarm.ts` (your own
+   custom alarms) both call `armIOSBackgroundAlarms` when alarms are (re)scheduled, and
+   `App.tsx` calls `resumeIOSAlarmEngineIfNeeded()` on cold start. The existing local
+   notification stays in place as a visible companion, not a replacement — belt and
+   suspenders.
+4. **A new native build — not done.** No `ios/` directory has ever been generated for this
+   project, and `eas.json` has no iOS-specific build profile configured. This has never been
+   built, on simulator or device.
+5. **Two hard requirements, neither in place yet:**
    - **A real iPhone.** The Simulator doesn't reliably reproduce background-execution
      timing or the physical mute switch — the exact things being tested. Untestable
      without a physical device.
    - **A paid Apple Developer account ($99/yr).** No Mac here, so `eas build` is the only
      path to a real device, and that path requires enrolling the device under a paid
-     account — the free tier doesn't cover it. (Same cost the original build plan already
-     expected for real App Store builds — just arriving earlier, for testing rather than
-     shipping.)
+     account — the free tier doesn't cover it.
 
-## Caveats to accept even once built
+## What's actually left before this can be tested at all
+
+1. Get a paid Apple Developer account and a real iPhone (both external, not code).
+2. `eas build --platform ios` to generate the native project and produce an installable
+   build — first time this will have ever compiled for iOS.
+3. Install it on the physical iPhone and actually arm an alarm — first real signal on
+   whether any of the above works as designed.
+4. Add `NSMicrophoneUsageDescription`/any other iOS `infoPlist` entries Xcode's build
+   flags as missing once a real build is attempted — none have been needed yet because no
+   build has been attempted.
+
+## Caveats to accept even once tested
 
 - No exact-second guarantee, and there's no OS-level scheduler being trusted here to begin
   with — timing precision depends entirely on the background audio session staying alive so
@@ -88,4 +89,4 @@ memory pressure) there's still a chance of re-arming state later — never the p
 
 - [Alarmy: "The alarm isn't ringing" (iOS)](https://www.slimfaq.com/alarmy-en/427-ios/1069-the-alarm-isn-t-ringing)
 - [Alarmy alarm not going off — 8 causes and fixes](https://www.wakeupbroo.com/blog/alarmy-alarm-not-going-off)
-- [gdelataillade/alarm iOS install guide](https://github.com/gdelataillade/alarm/blob/main/help/INSTALL-IOS.md) — the concrete recipe (audio session category, background modes, `BGTaskScheduler`) this plan is based on.
+- [gdelataillade/alarm iOS install guide](https://github.com/gdelataillade/alarm/blob/main/help/INSTALL-IOS.md) — the concrete recipe (audio session category, background modes, `BGTaskScheduler`) this was based on.

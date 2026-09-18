@@ -1,63 +1,106 @@
 BRUNO'S ALARM — PRIVACY POLICY
-Effective September 6, 2026
+Effective September 18, 2026
 Package: com.brunosalarm.app
 
-Bruno's Alarm wakes you up with a real dog's twice-daily howl. This page explains,
-plainly, what the app does and doesn't do with your data.
+Bruno's Alarm wakes you up with a real dog's twice-daily howl, and lets you chat with
+other viewers while he's live. This page explains, plainly, what the app does and
+doesn't do with your data.
 
 THE SHORT VERSION
-There are no accounts, no analytics, no ads, and no server this app talks to. Every
-alarm you schedule is stored only on your own phone. The one exception is the video
-panel, which embeds YouTube — see Section 4.
+There's no sign-up and we never learn your name, email, or phone number. Your alarms
+are stored only on your phone. When you use live chat, the app creates an anonymous
+device ID (no personal info attached) so messages can be moderated and rate-limited —
+anything you send in chat is public to everyone watching that session. We also use
+Firebase Analytics/Crashlytics for basic usage and crash data, and Cloudflare to
+deliver the video. No ads, nothing sold to third parties.
 
 1. INFORMATION WE COLLECT
-None. Bruno's Alarm has no user accounts, no sign-up, and no first-party backend
-server. We don't know who you are, and we have no way to find out.
+- Automatically, via Firebase Analytics and Crashlytics: basic app-usage events
+  (like which screens you open), device/OS info, and crash or error reports. This
+  is standard, aggregate diagnostic data — it isn't tied to your name or contact
+  info.
+- If you use live chat: an anonymous device ID (created by Firebase Anonymous
+  Authentication, with no name/email/phone attached), the text of any message you
+  send, an auto-generated display name like "Viewer 4821", and a timestamp. These
+  are stored in a shared database (Cloud Firestore) and are visible to everyone
+  viewing that session's chat, since that's the point of a public chat.
+- If you report a chat message: the message you reported, your reason, and your
+  anonymous device ID, so we can review it.
+- We do not collect your real name, email address, phone number, or precise
+  location, and there is no account or sign-up anywhere in the app.
 
-2. WHAT'S STORED ON YOUR DEVICE
-Everything the app needs lives entirely on your phone, never transmitted anywhere:
+2. WHAT'S STORED ONLY ON YOUR DEVICE
+Never transmitted anywhere:
 - Your scheduled alarm times, held by Android's own AlarmManager.
-- Whether you've completed the app's one-time onboarding screen (a single yes/no
-  flag, saved locally via Android's standard app storage).
-Uninstalling the app removes all of it. Nothing survives anywhere else.
+- Whether you've completed the app's one-time onboarding screen.
+- A nickname you can optionally type during onboarding — currently unused by any
+  feature (live chat generates its own display name instead), kept only in case a
+  future feature uses it.
+- Whether you've accepted live chat's conduct rules, and a list of any chat
+  participants you've chosen to block. Blocking is local only — it hides that
+  person's messages on your device, it doesn't remove them for anyone else or
+  notify them.
+- The most recently cached copy of Bruno's howl, downloaded so the app has
+  something to play even without a live connection.
+Uninstalling the app removes all of this. Nothing survives anywhere else.
 
-3. PERMISSIONS THIS APP REQUESTS, AND WHY
-Android requires apps to declare each permission up front. Here's what Bruno's
-Alarm asks for and the exact reason:
+3. LIVE CHAT AND MODERATION
+Chat is only open while Bruno is actually live, and resets with each session — it's
+not one continuous room. Every message goes through a moderated server function
+before it's posted: it checks length, filters certain language, and enforces a
+rate limit and a per-session cap so chat can't be flooded. Messages that get posted
+are public — anyone viewing that session can read them, and they're stored as part
+of that session's chat history for moderation and app functionality. We don't sell
+or share chat content with third parties, and it's never linked to your name, email,
+or any account.
 
-- POST_NOTIFICATIONS
-  Lets the app show you anything at all — required on Android 13+ for any
-  notification, including the alarm itself.
+Two tools if something in chat bothers you:
+- Report a message — sends it to us for review, along with your reason.
+- Block a viewer — hides their messages for you, immediately, on your device only.
 
-- SCHEDULE_EXACT_ALARM
-  Lets Bruno's alarm fire at the exact scheduled second, the same permission
-  every alarm-clock app uses.
+4. SERVICES WE USE
+- Firebase (Google): Anonymous Authentication, Cloud Firestore, and Cloud Functions
+  power live chat; Analytics and Crashlytics provide basic usage and crash data.
+  Governed by Google's Privacy Policy: https://policies.google.com/privacy
+- Cloudflare Stream: delivers the live and recorded video. Loading video means your
+  device's IP address and standard request data reach Cloudflare's servers, the
+  same as loading video from any CDN. Governed by Cloudflare's Privacy Policy:
+  https://www.cloudflare.com/privacypolicy/
+None of these services are used to serve you ads, and Bruno's Alarm doesn't run any
+ad network of its own.
 
-- USE_FULL_SCREEN_INTENT
-  Lets the alarm screen wake your phone and show over the lock screen when it
-  goes off — otherwise it would just be a quiet notification.
+5. PERMISSIONS THIS APP REQUESTS, AND WHY
+- POST_NOTIFICATIONS — lets the app show you anything at all, required on
+  Android 13+ for any notification, including the alarm itself.
+- SCHEDULE_EXACT_ALARM — lets Bruno's alarm fire at the exact scheduled second,
+  the same permission every alarm-clock app uses.
+- USE_FULL_SCREEN_INTENT — lets the alarm screen wake your phone and show over
+  the lock screen when it goes off.
+- RECEIVE_BOOT_COMPLETED — lets your alarms survive a phone restart.
+- SYSTEM_ALERT_WINDOW — lets the ringing alarm screen draw over other apps if
+  needed when it fires.
+- MODIFY_AUDIO_SETTINGS, FOREGROUND_SERVICE, FOREGROUND_SERVICE_MEDIA_PLAYBACK —
+  let the alarm sound play reliably, including while the app isn't in the
+  foreground.
+- RECORD_AUDIO — declared by the video-playback library the app uses; Bruno's
+  Alarm never accesses your microphone or records audio.
+- VIBRATE — lets the alarm vibrate your phone alongside the sound.
+- READ_EXTERNAL_STORAGE / WRITE_EXTERNAL_STORAGE (older Android versions only) —
+  used to cache the downloaded recording of Bruno's howl for offline playback.
 
-- RECEIVE_BOOT_COMPLETED
-  Lets your alarms survive a phone restart, so a reboot overnight doesn't
-  silently cancel tomorrow's wake-up.
+6. CHILDREN'S PRIVACY
+Bruno's Alarm isn't directed at children. Live chat's public, moderated nature
+means it isn't intended for use by children either. We don't knowingly collect
+information from children — if you believe a child has used chat inappropriately
+or shared personal information, contact us using the email below and we'll remove
+it.
 
-4. YOUTUBE EMBEDDED VIDEO
-The app's video panel plays Bruno's clips through YouTube's standard embedded
-player. When that player loads, Google may collect data according to its own
-Privacy Policy (https://policies.google.com/privacy), the same as on any website
-that embeds a YouTube video. Bruno's Alarm has no access to and receives none of
-that data — it's a direct relationship between your device and Google.
-
-5. CHILDREN'S PRIVACY
-Bruno's Alarm isn't directed at children and doesn't knowingly collect
-information from anyone, of any age — see Section 1.
-
-6. CHANGES TO THIS POLICY
+7. CHANGES TO THIS POLICY
 If this policy changes, the date at the top of this page will change with it.
 Continuing to use the app after an update means you accept the revised policy.
 
-7. CONTACT
-Questions about this policy or the app: vishnuna26@gmail.com
+8. CONTACT
+Questions about this policy, the app, or a chat report: vishnuna26@gmail.com
 
-Bruno's Alarm is an independent app, not affiliated with or endorsed by YouTube
-or Google.
+Bruno's Alarm is an independent app, not affiliated with or endorsed by Google,
+Firebase, or Cloudflare.

@@ -1,14 +1,45 @@
-import { useEffect, useRef, useState } from "react";
-import { Animated, Dimensions, Easing, Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
+import { useCallback, useEffect, useRef, useState } from "react";
+import { Animated, Dimensions, Easing, Pressable, ScrollView, StyleSheet, Switch, Text, View } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { Ionicons } from "@expo/vector-icons";
+import { useFocusEffect } from "@react-navigation/native";
 import type { NativeStackScreenProps } from "@react-navigation/native-stack";
-import SchedulePattern from "./SchedulePattern";
-import NotifyToggle from "./NotifyToggle";
-import type { RootStackParamList } from "../App";
-import { fonts, spacing, useNow, useThemeColors, type ThemeColors } from "../lib/theme";
+import EditCustomAlarmModal from "./EditCustomAlarmModal";
+import type { HomeStackParamList } from "../App";
+import { getCustomAlarms, setCustomAlarmEnabled, type CustomAlarm, type RepeatMode } from "../lib/customAlarm";
+import { isSubscribed } from "../lib/notifications";
+import { todaysSessions } from "../lib/schedule";
+import { fonts, radius, shadow, spacing, useNow, useThemeColors, type ThemeColors } from "../lib/theme";
+import { useWeatherCondition } from "../lib/weather";
 
-type Props = NativeStackScreenProps<RootStackParamList, "Home">;
+// Matches screens/CustomAlarmScreen.tsx's own repeat-summary convention exactly, so an
+// alarm reads the same way whether you're looking at it on Home or on the full list.
+const REPEAT_LABEL: Record<RepeatMode, string> = {
+  once: "Once",
+  everyday: "Every day",
+  weekdays: "Weekdays",
+  custom: "",
+};
+const DAY_LETTERS = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
+
+function repeatSummary(alarm: CustomAlarm): string {
+  if (alarm.repeatMode !== "custom") return REPEAT_LABEL[alarm.repeatMode];
+  if (alarm.customDays.length === 0) return "Custom";
+  if (alarm.customDays.length === 7) return "Every day";
+  return alarm.customDays.slice().sort().map((d) => DAY_LETTERS[d]).join(", ");
+}
+
+function formatAlarmTime(hour: number, minute: number): string {
+  const d = new Date();
+  d.setHours(hour, minute, 0, 0);
+  return d.toLocaleString(undefined, { hour: "numeric", minute: "2-digit" });
+}
+
+function formatLocalTime(timestamp: number): string {
+  return new Date(timestamp).toLocaleString(undefined, { hour: "numeric", minute: "2-digit" });
+}
+
+type Props = NativeStackScreenProps<HomeStackParamList, "Home">;
 
 const SCREEN_HEIGHT = Dimensions.get("window").height;
 const SCREEN_WIDTH = Dimensions.get("window").width;
@@ -121,6 +152,49 @@ function useFall(duration: number, fallDistance: number, startDelay: number) {
     translateX: value.interpolate({ inputRange: [0, 0.5, 1], outputRange: [0, 7, -5] }),
     rotate: value.interpolate({ inputRange: [0, 1], outputRange: ["0deg", "50deg"] }),
     opacity: value.interpolate({ inputRange: [0, 0.7, 1], outputRange: [1, 1, 0] }),
+  };
+}
+
+// Positions for the rain/snow "hint" overlays — a fixed, hand-placed set rather than
+// randomly generated each render, same reasoning as STARS above.
+type PrecipConfig = { left: `${number}%`; size: number; duration: number; delay: number };
+// `size` is a streak length here, not an icon size — a plain thin tilted line reads as
+// falling rain at a glance, where the "water" glyph (a static, rounded teardrop) just looked
+// like floating drops sitting in place.
+const RAIN_DROPS: PrecipConfig[] = [
+  { left: "8%", size: 20, duration: 650, delay: 0 },
+  { left: "22%", size: 24, duration: 560, delay: 150 },
+  { left: "38%", size: 18, duration: 700, delay: 300 },
+  { left: "54%", size: 22, duration: 620, delay: 80 },
+  { left: "68%", size: 19, duration: 660, delay: 400 },
+  { left: "84%", size: 24, duration: 580, delay: 220 },
+];
+const SNOW_FLAKES: PrecipConfig[] = [
+  { left: "10%", size: 14, duration: 4200, delay: 0 },
+  { left: "26%", size: 10, duration: 5200, delay: 900 },
+  { left: "44%", size: 16, duration: 3800, delay: 1800 },
+  { left: "60%", size: 11, duration: 4800, delay: 500 },
+  { left: "76%", size: 15, duration: 4400, delay: 2400 },
+  { left: "90%", size: 10, duration: 5000, delay: 1300 },
+];
+
+/** A raindrop falling straight down, fast, fading out near the bottom, then resetting to
+ * the top and falling again — staggered per-drop via delay. Storm reuses this with more
+ * drops and shorter durations rather than a separate effect, since the visual difference
+ * that actually reads at a glance is "how much rain," not a distinct storm animation. */
+function useRainFall(duration: number, fallDistance: number, startDelay: number) {
+  const value = useRef(new Animated.Value(0)).current;
+  useEffect(() => {
+    const animation = Animated.sequence([
+      Animated.delay(startDelay),
+      Animated.loop(Animated.timing(value, { toValue: 1, duration, easing: Easing.linear, useNativeDriver: true })),
+    ]);
+    animation.start();
+    return () => animation.stop();
+  }, [value, duration, startDelay]);
+  return {
+    translateY: value.interpolate({ inputRange: [0, 1], outputRange: [0, fallDistance] }),
+    opacity: value.interpolate({ inputRange: [0, 0.85, 1], outputRange: [0.6, 0.6, 0] }),
   };
 }
 
@@ -249,14 +323,93 @@ export default function HomeScreen({ navigation }: Props) {
   ];
   const shootingStar = useShootingStar(!celestial.isDaytime);
 
-  const cloud1X = useDriftAcross(28000, 92, 0);
-  const cloud2X = useDriftAcross(36000, 68, 7000);
-  const cloud3X = useDriftAcross(22000, 56, 14000);
+  const cloud1X = useDriftAcross(50000, 92, 0);
+  const cloud2X = useDriftAcross(65000, 68, 7000);
+  const cloud3X = useDriftAcross(40000, 56, 14000);
+
+  // A "hint," not a forecast — null (loading, or the lookup failed) is treated exactly like
+  // "clear" so the sky just falls back to how it's always looked, never a loading state of
+  // its own. See lib/weather.ts for why this needs no location permission.
+  const weatherCondition = useWeatherCondition();
+  const isStorm = weatherCondition === "storm";
+  const showRain = weatherCondition === "rain" || isStorm;
+  const showSnow = weatherCondition === "snow";
+  const showFog = weatherCondition === "fog";
+  // Storm reuses the rain drops but faster, rather than a separate animation — see
+  // useRainFall's own doc for why.
+  const rainSpeedFactor = isStorm ? 0.6 : 1;
+  const cloudColor =
+    weatherCondition === "rain" || isStorm
+      ? "#9aa7b0"
+      : weatherCondition === "cloudy" || weatherCondition === "fog"
+        ? "#e7ebee"
+        : "#ffffff";
+  // Fixed hook-call count regardless of whether rain is actually showing right now — same
+  // convention as starTwinkles above.
+  const rainDrops = [
+    useRainFall(RAIN_DROPS[0].duration * rainSpeedFactor, SCREEN_HEIGHT, RAIN_DROPS[0].delay),
+    useRainFall(RAIN_DROPS[1].duration * rainSpeedFactor, SCREEN_HEIGHT, RAIN_DROPS[1].delay),
+    useRainFall(RAIN_DROPS[2].duration * rainSpeedFactor, SCREEN_HEIGHT, RAIN_DROPS[2].delay),
+    useRainFall(RAIN_DROPS[3].duration * rainSpeedFactor, SCREEN_HEIGHT, RAIN_DROPS[3].delay),
+    useRainFall(RAIN_DROPS[4].duration * rainSpeedFactor, SCREEN_HEIGHT, RAIN_DROPS[4].delay),
+    useRainFall(RAIN_DROPS[5].duration * rainSpeedFactor, SCREEN_HEIGHT, RAIN_DROPS[5].delay),
+  ];
+  const snowFlakes = [
+    useFall(SNOW_FLAKES[0].duration, SCREEN_HEIGHT, SNOW_FLAKES[0].delay),
+    useFall(SNOW_FLAKES[1].duration, SCREEN_HEIGHT, SNOW_FLAKES[1].delay),
+    useFall(SNOW_FLAKES[2].duration, SCREEN_HEIGHT, SNOW_FLAKES[2].delay),
+    useFall(SNOW_FLAKES[3].duration, SCREEN_HEIGHT, SNOW_FLAKES[3].delay),
+    useFall(SNOW_FLAKES[4].duration, SCREEN_HEIGHT, SNOW_FLAKES[4].delay),
+    useFall(SNOW_FLAKES[5].duration, SCREEN_HEIGHT, SNOW_FLAKES[5].delay),
+  ];
 
   const leafFallDistance = ((100 - LEAF_START_TOP_PERCENT) / 100) * SCREEN_HEIGHT;
   const leafDuration = leafFallDistance / LEAF_FALL_SPEED_PX_PER_MS;
   const leaf1 = useFall(leafDuration, leafFallDistance, 0);
   const leaf2 = useFall(leafDuration, leafFallDistance, 1800);
+
+  const [customAlarms, setCustomAlarms] = useState<CustomAlarm[]>([]);
+  const [brunoSubscribed, setBrunoSubscribed] = useState(false);
+  const [editModalAlarmId, setEditModalAlarmId] = useState<string | undefined>(undefined);
+  const [editModalVisible, setEditModalVisible] = useState(false);
+
+  const refreshCustomAlarms = useCallback(() => {
+    getCustomAlarms()
+      .then(setCustomAlarms)
+      .catch(() => setCustomAlarms([]));
+  }, []);
+
+  // Refreshed on every focus, not just mount — reflects an alarm just added/edited/removed,
+  // or the real-session subscription being turned on/off from onboarding or Settings,
+  // without needing to leave and re-enter the Home tab.
+  useFocusEffect(
+    useCallback(() => {
+      refreshCustomAlarms();
+      isSubscribed()
+        .then(setBrunoSubscribed)
+        .catch(() => setBrunoSubscribed(false));
+    }, [refreshCustomAlarms])
+  );
+
+  const [brunoSessionA, brunoSessionB] = todaysSessions();
+  const brunoTimeLabel = `${formatLocalTime(brunoSessionA)} & ${formatLocalTime(brunoSessionB)}`;
+
+  // Same optimistic-update-then-persist pattern as CustomAlarmScreen's own toggle — lets
+  // someone flip an alarm on/off right from Home without opening the full list.
+  async function toggleCustomAlarm(alarm: CustomAlarm, value: boolean) {
+    setCustomAlarms((prev) => prev.map((a) => (a.id === alarm.id ? { ...a, enabled: value } : a)));
+    await setCustomAlarmEnabled(alarm.id, value);
+  }
+
+  function openNewAlarm() {
+    setEditModalAlarmId(undefined);
+    setEditModalVisible(true);
+  }
+
+  function openEditAlarm(alarmId: string) {
+    setEditModalAlarmId(alarmId);
+    setEditModalVisible(true);
+  }
 
   return (
     <SafeAreaView style={styles.safeArea}>
@@ -327,14 +480,53 @@ export default function HomeScreen({ navigation }: Props) {
         />
       )}
       <Animated.View style={[styles.cloud1, { transform: [{ translateX: cloud1X }] }]} pointerEvents="none">
-        <Ionicons name="cloud" size={92} color="#ffffff" />
+        <Ionicons name="cloud" size={92} color={cloudColor} />
       </Animated.View>
       <Animated.View style={[styles.cloud2, { transform: [{ translateX: cloud2X }] }]} pointerEvents="none">
-        <Ionicons name="cloud" size={68} color="#ffffff" />
+        <Ionicons name="cloud" size={68} color={cloudColor} />
       </Animated.View>
       <Animated.View style={[styles.cloud3, { transform: [{ translateX: cloud3X }] }]} pointerEvents="none">
-        <Ionicons name="cloud" size={56} color="#ffffff" />
+        <Ionicons name="cloud" size={56} color={cloudColor} />
       </Animated.View>
+      {showRain &&
+        RAIN_DROPS.map((drop, i) => (
+          <Animated.View
+            key={i}
+            style={[
+              styles.rainStreak,
+              {
+                left: drop.left,
+                height: drop.size,
+                backgroundColor: isStorm ? "rgba(124,138,149,0.6)" : "rgba(159,184,201,0.6)",
+                opacity: rainDrops[i].opacity,
+                transform: [{ translateY: rainDrops[i].translateY }, { rotate: "12deg" }],
+              },
+            ]}
+            pointerEvents="none"
+          />
+        ))}
+      {showSnow &&
+        SNOW_FLAKES.map((flake, i) => (
+          <Animated.View
+            key={i}
+            style={[
+              styles.snowFlake,
+              {
+                left: flake.left,
+                opacity: snowFlakes[i].opacity,
+                transform: [
+                  { translateY: snowFlakes[i].translateY },
+                  { translateX: snowFlakes[i].translateX },
+                  { rotate: snowFlakes[i].rotate },
+                ],
+              },
+            ]}
+            pointerEvents="none"
+          >
+            <Ionicons name="snow" size={flake.size} color="#eaf3fb" />
+          </Animated.View>
+        ))}
+      {showFog && <View style={styles.fogHaze} pointerEvents="none" />}
       <Animated.View
         style={[
           styles.leaf1,
@@ -384,21 +576,50 @@ export default function HomeScreen({ navigation }: Props) {
             </Pressable>
           </View>
 
-          <View style={styles.section}>
-            <SchedulePattern />
-          </View>
+          {brunoSubscribed && (
+            <Pressable style={styles.brunoCard} onPress={() => navigation.navigate("Settings")}>
+              <View style={styles.alarmCardLeft}>
+                <Text style={styles.brunoCardTime}>{brunoTimeLabel}</Text>
+                <Text style={styles.brunoCardLabel}>Bruno's real howl · Every day</Text>
+              </View>
+              <View style={styles.brunoTag}>
+                <Text style={styles.brunoTagText}>BRUNO</Text>
+              </View>
+            </Pressable>
+          )}
 
-          <View style={styles.section}>
-            <NotifyToggle />
-          </View>
-
-          <Pressable style={styles.customAlarmRow} onPress={() => navigation.navigate("CustomAlarm")}>
-            <View style={styles.customAlarmLeft}>
-              <Ionicons name="alarm-outline" size={18} color={colors.textPrimary} />
-              <Text style={styles.customAlarmText}>Set your own alarm time</Text>
+          {customAlarms.length > 0 && (
+            <View style={styles.yourAlarmsSection}>
+              <Text style={styles.yourAlarmsLabel}>Your alarms</Text>
+              {customAlarms.map((alarm) => (
+                <Pressable
+                  key={alarm.id}
+                  style={[styles.alarmCard, !alarm.enabled && styles.alarmCardDisabled]}
+                  onPress={() => openEditAlarm(alarm.id)}
+                >
+                  <View style={styles.alarmCardLeft}>
+                    <Text style={[styles.alarmTime, !alarm.enabled && styles.alarmTextDisabled]}>
+                      {formatAlarmTime(alarm.hour, alarm.minute)}
+                    </Text>
+                    <Text style={[styles.alarmName, !alarm.enabled && styles.alarmTextDisabled]} numberOfLines={1}>
+                      {repeatSummary(alarm)}
+                      {alarm.name.trim() ? ` · ${alarm.name.trim()}` : ""}
+                    </Text>
+                  </View>
+                  <Switch
+                    value={alarm.enabled}
+                    onValueChange={(value) => toggleCustomAlarm(alarm, value)}
+                    trackColor={{ false: colors.surfaceAlt, true: colors.accent }}
+                    thumbColor={colors.surface}
+                  />
+                </Pressable>
+              ))}
+              <Pressable style={styles.manageAlarmsRow} onPress={() => navigation.navigate("CustomAlarm")}>
+                <Text style={styles.manageAlarmsText}>Manage alarms</Text>
+                <Ionicons name="chevron-forward" size={16} color={colors.textSecondary} />
+              </Pressable>
             </View>
-            <Ionicons name="chevron-forward" size={18} color={colors.textSecondary} />
-          </Pressable>
+          )}
         </View>
 
         {/* A quiet closing mark, not more content — gives the page a deliberate bottom
@@ -409,6 +630,17 @@ export default function HomeScreen({ navigation }: Props) {
           <Text style={styles.footerText}>No filters. No edits. Just Bruno.</Text>
         </View>
       </ScrollView>
+
+      <Pressable style={styles.fab} onPress={openNewAlarm} hitSlop={8}>
+        <Ionicons name="add" size={28} color={colors.accentText} />
+      </Pressable>
+
+      <EditCustomAlarmModal
+        visible={editModalVisible}
+        alarmId={editModalAlarmId}
+        onClose={() => setEditModalVisible(false)}
+        onSaved={refreshCustomAlarms}
+      />
     </SafeAreaView>
   );
 }
@@ -468,6 +700,27 @@ function createStyles(colors: ThemeColors) {
       top: "77%",
       left: 0,
     },
+    rainStreak: {
+      position: "absolute",
+      top: 0,
+      width: 2.5,
+      borderRadius: 2,
+    },
+    snowFlake: {
+      position: "absolute",
+      top: 0,
+    },
+    // A low-opacity wash over the whole decorative layer (rendered above the sky/clouds but
+    // still behind the ScrollView's opaque cards), just enough to soften contrast so the sky
+    // reads as hazy rather than perfectly clear.
+    fogHaze: {
+      position: "absolute",
+      top: 0,
+      left: 0,
+      right: 0,
+      bottom: 0,
+      backgroundColor: "rgba(255,255,255,0.16)",
+    },
     // Same top for both — they fall from the same height, just offset horizontally so they
     // don't overlap.
     leaf1: {
@@ -523,27 +776,118 @@ function createStyles(colors: ThemeColors) {
       alignItems: "center",
       justifyContent: "center",
     },
-    section: {
-      marginBottom: spacing.lg,
-    },
-    customAlarmRow: {
+    // Bruno's real-session subscription reads as a distinct thing from a custom alarm you
+    // set yourself — same card shape as alarmCard below for rhythm, but a live-colored left
+    // edge and a small tag instead of a switch, since this isn't something you toggle here
+    // (that lives in Settings' Notifications section — tapping this card goes there).
+    brunoCard: {
       flexDirection: "row",
       alignItems: "center",
       justifyContent: "space-between",
-      paddingVertical: spacing.md,
-      borderTopWidth: 1,
+      backgroundColor: colors.surface,
+      borderWidth: 1,
       borderColor: colors.border,
+      borderLeftWidth: 3,
+      borderLeftColor: colors.live,
+      borderRadius: radius.lg,
+      paddingVertical: spacing.lg,
+      paddingHorizontal: spacing.lg,
       marginBottom: spacing.lg,
+      ...shadow,
     },
-    customAlarmLeft: {
+    brunoCardTime: {
+      color: colors.textPrimary,
+      fontFamily: fonts.monoBold,
+      fontSize: 22,
+    },
+    brunoCardLabel: {
+      color: colors.textSecondary,
+      fontFamily: fonts.body,
+      fontSize: 13,
+    },
+    brunoTag: {
+      paddingHorizontal: spacing.sm,
+      paddingVertical: 4,
+      borderRadius: radius.pill,
+      backgroundColor: colors.live,
+    },
+    brunoTagText: {
+      color: "#fff",
+      fontFamily: fonts.bodyBold,
+      fontSize: 11,
+      letterSpacing: 0.5,
+    },
+    yourAlarmsSection: {
+      marginBottom: spacing.lg,
+      gap: spacing.md,
+    },
+    yourAlarmsLabel: {
+      color: colors.textSecondary,
+      fontFamily: fonts.bodyMedium,
+      fontSize: 12,
+      textTransform: "uppercase",
+      letterSpacing: 1,
+    },
+    // Same card language as screens/CustomAlarmScreen.tsx's own list — big legible time,
+    // label underneath, a real toggle you can flip right here — so an alarm looks and
+    // behaves the same whether you're seeing it on Home or on the full list.
+    alarmCard: {
       flexDirection: "row",
       alignItems: "center",
-      gap: spacing.sm,
+      justifyContent: "space-between",
+      backgroundColor: colors.surface,
+      borderWidth: 1,
+      borderColor: colors.border,
+      borderRadius: radius.lg,
+      paddingVertical: spacing.lg,
+      paddingHorizontal: spacing.lg,
+      ...shadow,
     },
-    customAlarmText: {
+    alarmCardDisabled: {
+      opacity: 0.55,
+    },
+    alarmCardLeft: {
+      gap: spacing.xs,
+    },
+    alarmTime: {
+      color: colors.textPrimary,
+      fontFamily: fonts.monoBold,
+      fontSize: 28,
+    },
+    alarmName: {
+      color: colors.textSecondary,
+      fontFamily: fonts.body,
+      fontSize: 13,
+    },
+    alarmTextDisabled: {
+      color: colors.textSecondary,
+    },
+    manageAlarmsRow: {
+      flexDirection: "row",
+      alignItems: "center",
+      justifyContent: "space-between",
+      paddingVertical: spacing.sm,
+    },
+    manageAlarmsText: {
       color: colors.textPrimary,
       fontFamily: fonts.bodyMedium,
-      fontSize: 15,
+      fontSize: 14,
+    },
+    // Same FAB as screens/CustomAlarmScreen.tsx — a quick "add" reachable straight from
+    // Home, not just from "Manage alarms".
+    fab: {
+      position: "absolute",
+      right: spacing.xl,
+      bottom: spacing.xxl,
+      width: 56,
+      height: 56,
+      borderRadius: radius.lg,
+      backgroundColor: colors.accent,
+      borderWidth: 1,
+      borderColor: colors.accentBorder,
+      alignItems: "center",
+      justifyContent: "center",
+      ...shadow,
     },
     footer: {
       alignItems: "center",

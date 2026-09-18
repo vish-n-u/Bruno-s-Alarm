@@ -18,6 +18,7 @@
     },
     "android": {
       "package": "com.brunosalarm.app",
+      "versionCode": 3,
       "googleServicesFile": "./google-services.json",
       "adaptiveIcon": {
         "backgroundColor": "#0f1a14",
@@ -49,6 +50,7 @@
       "./plugins/withLockScreenAlarmActivity",
       "./plugins/withIPv4GradleFix",
       "./plugins/withAlarmSound",
+      "./plugins/withReleaseSigning",
       "expo-video",
       "expo-font",
       [
@@ -69,7 +71,8 @@
       "expo-asset",
       "@react-native-firebase/app",
       "@react-native-firebase/analytics",
-      "@react-native-firebase/crashlytics"
+      "@react-native-firebase/crashlytics",
+      "@react-native-firebase/auth"
     ],
     "extra": {
       "eas": {

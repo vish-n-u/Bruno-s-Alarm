@@ -122,7 +122,7 @@ async function clearScheduledForAlarm(alarmId: string): Promise<void> {
 function alarmTitle(name: string): string {
   return name.trim() ? `⏰ ${name.trim()}` : "⏰ Your Bruno alarm";
 }
-const ALARM_BODY = "Time to get up — Bruno's latest is waiting.";
+const ALARM_BODY = "Time to get up. Bruno's latest is waiting.";
 
 /** (Re)schedules one alarm's OS-level occurrences to match its current saved config —
  * clears whatever was previously scheduled for it first, then schedules fresh if enabled. */

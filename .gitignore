@@ -6,3 +6,8 @@ out
 data/subscriptions.json
 data/status.json
 npm-debug.log*
+
+# Cloud Functions build output
+functions/lib
+firebase-debug.log
+.firebase/

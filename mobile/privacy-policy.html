@@ -170,6 +170,27 @@
     font-size: 0.95rem;
   }
 
+  .tool-list {
+    list-style: none;
+    padding: 0;
+    margin: 0 0 1rem;
+    display: flex;
+    flex-direction: column;
+    gap: 0.6rem;
+  }
+
+  .tool-list li {
+    padding-left: 1.4rem;
+    position: relative;
+  }
+
+  .tool-list li::before {
+    content: "→";
+    position: absolute;
+    left: 0;
+    color: var(--accent-text);
+  }
+
   a { color: var(--accent-text); }
 
   footer {
@@ -194,40 +215,108 @@
     <div class="mark">🐕</div>
     <div class="header-text">
       <h1>Bruno's Alarm — Privacy Policy</h1>
-      <div class="meta">Effective September 6, 2026 · com.brunosalarm.app</div>
+      <div class="meta">Effective September 18, 2026 · com.brunosalarm.app</div>
     </div>
   </header>
 
   <p class="lede">
-    Bruno's Alarm wakes you up with a real dog's twice-daily howl. This page explains,
-    plainly, what the app does and doesn't do with your data.
+    Bruno's Alarm wakes you up with a real dog's twice-daily howl, and lets you chat with
+    other viewers while he's live. This page explains, plainly, what the app does and
+    doesn't do with your data.
   </p>
 
   <div class="summary">
     <div class="label">The short version</div>
     <p>
-      There are no accounts, no analytics, no ads, and no server this app talks to. Every
-      alarm you schedule is stored only on your own phone. The one exception is the video
-      panel, which embeds YouTube — see Section 4.
+      There's no sign-up and we never learn your name, email, or phone number. Your alarms
+      are stored only on your phone. When you use live chat, the app creates an anonymous
+      device ID (no personal info attached) so messages can be moderated and rate-limited —
+      anything you send in chat is public to everyone watching that session. We also use
+      Firebase Analytics/Crashlytics for basic usage and crash data, and Cloudflare to
+      deliver the video. No ads, nothing sold to third parties.
     </p>
   </div>
 
   <h2><span class="num">1</span> Information we collect</h2>
+  <ul>
+    <li>
+      Automatically, via Firebase Analytics and Crashlytics: basic app-usage events (like
+      which screens you open), device/OS info, and crash or error reports. This is standard,
+      aggregate diagnostic data — it isn't tied to your name or contact info.
+    </li>
+    <li>
+      If you use live chat: an anonymous device ID (created by Firebase Anonymous
+      Authentication, with no name/email/phone attached), the text of any message you send,
+      an auto-generated display name like <code>Viewer 4821</code>, and a timestamp. These
+      are stored in a shared database (Cloud Firestore) and are visible to everyone viewing
+      that session's chat, since that's the point of a public chat.
+    </li>
+    <li>
+      If you report a chat message: the message you reported, your reason, and your
+      anonymous device ID, so we can review it.
+    </li>
+  </ul>
   <p>
-    None. Bruno's Alarm has no user accounts, no sign-up, and no first-party backend server.
-    We don't know who you are, and we have no way to find out.
+    We do not collect your real name, email address, phone number, or precise location, and
+    there is no account or sign-up anywhere in the app.
   </p>
 
-  <h2><span class="num">2</span> What's stored on your device</h2>
-  <p>Everything the app needs lives entirely on your phone, never transmitted anywhere:</p>
+  <h2><span class="num">2</span> What's stored only on your device</h2>
+  <p>Never transmitted anywhere:</p>
   <ul>
     <li>Your scheduled alarm times, held by Android's own <code>AlarmManager</code>.</li>
-    <li>Whether you've completed the app's one-time onboarding screen (a single yes/no flag, saved locally via Android's standard app storage).</li>
+    <li>Whether you've completed the app's one-time onboarding screen.</li>
+    <li>
+      A nickname you can optionally type during onboarding — currently unused by any feature
+      (live chat generates its own display name instead), kept only in case a future feature
+      uses it.
+    </li>
+    <li>
+      Whether you've accepted live chat's conduct rules, and a list of any chat participants
+      you've chosen to block. Blocking is local only — it hides that person's messages on
+      your device, it doesn't remove them for anyone else or notify them.
+    </li>
+    <li>The most recently cached copy of Bruno's howl, downloaded for offline playback.</li>
   </ul>
-  <p>Uninstalling the app removes all of it. Nothing survives anywhere else.</p>
+  <p>Uninstalling the app removes all of this. Nothing survives anywhere else.</p>
 
-  <h2><span class="num">3</span> Permissions this app requests, and why</h2>
-  <p>Android requires apps to declare each permission up front. Here's what Bruno's Alarm asks for and the exact reason:</p>
+  <h2><span class="num">3</span> Live chat and moderation</h2>
+  <p>
+    Chat is only open while Bruno is actually live, and resets with each session — it's not
+    one continuous room. Every message goes through a moderated server function before it's
+    posted: it checks length, filters certain language, and enforces a rate limit and a
+    per-session cap so chat can't be flooded. Messages that get posted are public — anyone
+    viewing that session can read them, and they're stored as part of that session's chat
+    history for moderation and app functionality. We don't sell or share chat content with
+    third parties, and it's never linked to your name, email, or any account.
+  </p>
+  <p>Two tools if something in chat bothers you:</p>
+  <ul class="tool-list">
+    <li><strong>Report a message</strong> — sends it to us for review, along with your reason.</li>
+    <li><strong>Block a viewer</strong> — hides their messages for you, immediately, on your device only.</li>
+  </ul>
+
+  <h2><span class="num">4</span> Services we use</h2>
+  <ul>
+    <li>
+      <strong>Firebase (Google)</strong>: Anonymous Authentication, Cloud Firestore, and
+      Cloud Functions power live chat; Analytics and Crashlytics provide basic usage and
+      crash data. Governed by
+      <a href="https://policies.google.com/privacy" target="_blank" rel="noopener">Google's Privacy Policy</a>.
+    </li>
+    <li>
+      <strong>Cloudflare Stream</strong>: delivers the live and recorded video. Loading video
+      means your device's IP address and standard request data reach Cloudflare's servers,
+      the same as loading video from any CDN. Governed by
+      <a href="https://www.cloudflare.com/privacypolicy/" target="_blank" rel="noopener">Cloudflare's Privacy Policy</a>.
+    </li>
+  </ul>
+  <p>
+    None of these services are used to serve you ads, and Bruno's Alarm doesn't run any ad
+    network of its own.
+  </p>
+
+  <h2><span class="num">5</span> Permissions this app requests, and why</h2>
   <ul class="perm-list">
     <li>
       <span class="perm-name">POST_NOTIFICATIONS</span>
@@ -239,42 +328,56 @@
     </li>
     <li>
       <span class="perm-name">USE_FULL_SCREEN_INTENT</span>
-      <span class="perm-why">Lets the alarm screen wake your phone and show over the lock screen when it goes off — otherwise it would just be a quiet notification.</span>
+      <span class="perm-why">Lets the alarm screen wake your phone and show over the lock screen when it goes off.</span>
     </li>
     <li>
       <span class="perm-name">RECEIVE_BOOT_COMPLETED</span>
       <span class="perm-why">Lets your alarms survive a phone restart, so a reboot overnight doesn't silently cancel tomorrow's wake-up.</span>
     </li>
+    <li>
+      <span class="perm-name">SYSTEM_ALERT_WINDOW</span>
+      <span class="perm-why">Lets the ringing alarm screen draw over other apps if needed when it fires.</span>
+    </li>
+    <li>
+      <span class="perm-name">MODIFY_AUDIO_SETTINGS · FOREGROUND_SERVICE · FOREGROUND_SERVICE_MEDIA_PLAYBACK</span>
+      <span class="perm-why">Let the alarm sound play reliably, including while the app isn't in the foreground.</span>
+    </li>
+    <li>
+      <span class="perm-name">RECORD_AUDIO</span>
+      <span class="perm-why">Declared by the video-playback library the app uses; Bruno's Alarm never accesses your microphone or records audio.</span>
+    </li>
+    <li>
+      <span class="perm-name">VIBRATE</span>
+      <span class="perm-why">Lets the alarm vibrate your phone alongside the sound.</span>
+    </li>
+    <li>
+      <span class="perm-name">READ_EXTERNAL_STORAGE · WRITE_EXTERNAL_STORAGE</span>
+      <span class="perm-why">Older Android versions only — used to cache the downloaded recording of Bruno's howl for offline playback.</span>
+    </li>
   </ul>
 
-  <h2><span class="num">4</span> YouTube embedded video</h2>
+  <h2><span class="num">6</span> Children's privacy</h2>
   <p>
-    The app's video panel plays Bruno's clips through YouTube's standard embedded player.
-    When that player loads, Google may collect data according to its own
-    <a href="https://policies.google.com/privacy" target="_blank" rel="noopener">Privacy Policy</a>,
-    the same as on any website that embeds a YouTube video. Bruno's Alarm has no access to
-    and receives none of that data — it's a direct relationship between your device and
-    Google.
+    Bruno's Alarm isn't directed at children. Live chat's public, moderated nature means
+    it isn't intended for use by children either. We don't knowingly collect information
+    from children — if you believe a child has used chat inappropriately or shared personal
+    information, contact us using the email below and we'll remove it.
   </p>
 
-  <h2><span class="num">5</span> Children's privacy</h2>
-  <p>
-    Bruno's Alarm isn't directed at children and doesn't knowingly collect information from
-    anyone, of any age — see Section 1.
-  </p>
-
-  <h2><span class="num">6</span> Changes to this policy</h2>
+  <h2><span class="num">7</span> Changes to this policy</h2>
   <p>
     If this policy changes, the date at the top of this page will change with it. Continuing
     to use the app after an update means you accept the revised policy.
   </p>
 
-  <h2><span class="num">7</span> Contact</h2>
+  <h2><span class="num">8</span> Contact</h2>
   <p>
-    Questions about this policy or the app: <a href="mailto:vishnuna26@gmail.com">vishnuna26@gmail.com</a>.
+    Questions about this policy, the app, or a chat report:
+    <a href="mailto:vishnuna26@gmail.com">vishnuna26@gmail.com</a>.
   </p>
 
   <footer>
-    Bruno's Alarm is an independent app, not affiliated with or endorsed by YouTube or Google.
+    Bruno's Alarm is an independent app, not affiliated with or endorsed by Google, Firebase,
+    or Cloudflare.
   </footer>
 </main>

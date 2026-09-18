@@ -1,9 +1,9 @@
 import { useEffect, useRef, useState } from "react";
-import { Pressable, StyleSheet, View } from "react-native";
+import { Animated, Pressable, StyleSheet, View } from "react-native";
 import { useVideoPlayer, VideoView, type VideoSource } from "expo-video";
 import { Ionicons } from "@expo/vector-icons";
-import { getCachedAlarmVideoUri } from "../lib/alarmSound";
-import { isLiveWindow } from "../lib/schedule";
+import { getCachedAlarmVideoUri, refreshAlarmSound } from "../lib/alarmSound";
+import { getDebugForceLive, isLiveWindow, isNearLiveWindow } from "../lib/schedule";
 import { getCloudflareLiveManifestUrl, isCloudflareConfigured, isCloudflareStreamLive } from "../lib/liveStatus";
 
 // Real footage of Bruno howling, bundled locally so it always plays with zero
@@ -27,41 +27,105 @@ const FALLBACK_VOD_SOURCE: VideoSource = process.env.EXPO_PUBLIC_VOD_VIDEO_URL |
 // there because the actual alarm sound comes from the native alarm itself (see
 // plugins/withAlarmSound.js), which loops continuously via react-native-alarmageddon's own
 // MediaPlayer until Stop/Snooze — unmuting the video too would just overlap/echo against it.
-export default function VideoPanel({ allowUnmute = true }: { allowUnmute?: boolean }) {
+export default function VideoPanel({
+  allowUnmute = true,
+  paused = false,
+  onLiveChange,
+}: {
+  allowUnmute?: boolean;
+  /** Pauses playback (video + audio) without unmounting the player — pass `!isFocused` from a
+   * screen inside a tab navigator, since switching tabs doesn't unmount by default and a
+   * playing/unmuted video would otherwise keep making sound in the background. */
+  paused?: boolean;
+  /** Reports this panel's own live/not-live determination (the real Cloudflare-confirmed one,
+   * not just the clock window) — lets a parent screen react to the same signal instead of
+   * running its own separate, potentially inconsistent check. */
+  onLiveChange?: (live: boolean) => void;
+}) {
   const [live, setLive] = useState(isLiveWindow());
-  const [muted, setMuted] = useState(true);
-  // Bruno's actual latest recording, if one's ever been downloaded — takes priority over the
-  // fixed placeholder clip so the ringing screen shows the real thing, not one static video
-  // forever. Checked once on mount; refreshAlarmSound() (run periodically in the background
-  // and at schedule time) is what keeps the underlying file itself up to date.
-  const [cachedVideoUri, setCachedVideoUri] = useState<string | undefined>(undefined);
 
   useEffect(() => {
+    onLiveChange?.(live);
+    // Only the parent's latest callback identity should matter, not re-fire this on every
+    // parent re-render — it should fire when `live` itself actually changes.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [live]);
+  const [muted, setMuted] = useState(true);
+  // Bruno's actual latest recording, if one's ever been downloaded — takes priority over the
+  // fixed placeholder clip so the VOD fallback shows the real thing, not one static video
+  // forever.
+  const [cachedVideoUri, setCachedVideoUri] = useState<string | undefined>(undefined);
+
+  // Reels-style tap-to-mute: tapping anywhere on the video toggles mute and briefly flashes a
+  // centered speaker icon that fades back out, instead of a small always-on corner button.
+  const iconOpacity = useRef(new Animated.Value(0)).current;
+  const hideTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  useEffect(() => {
+    return () => {
+      if (hideTimer.current) clearTimeout(hideTimer.current);
+    };
+  }, []);
+
+  function handleTap() {
+    setMuted((m) => !m);
+    if (hideTimer.current) clearTimeout(hideTimer.current);
+    iconOpacity.stopAnimation();
+    iconOpacity.setValue(1);
+    hideTimer.current = setTimeout(() => {
+      Animated.timing(iconOpacity, { toValue: 0, duration: 350, useNativeDriver: true }).start();
+    }, 550);
+  }
+
+  // Re-checks (and actively tries to refresh) the cached recording every time we're about to
+  // show the VOD fallback rather than only once on mount — e.g. right as a live session ends,
+  // the recording that just happened may not have been cached yet; refreshAlarmSound() is
+  // safe to call opportunistically (no-ops if there's nothing newer, per its own doc) so this
+  // gives the fallback its best shot at actually being the latest one, not a stale/previous
+  // recording or the bundled placeholder.
+  useEffect(() => {
+    if (live) return;
     let cancelled = false;
     getCachedAlarmVideoUri().then((uri) => {
       if (!cancelled) setCachedVideoUri(uri);
     });
+    refreshAlarmSound()
+      .then(() => getCachedAlarmVideoUri())
+      .then((uri) => {
+        if (!cancelled && uri) setCachedVideoUri(uri);
+      })
+      .catch(() => {});
     return () => {
       cancelled = true;
     };
-  }, []);
+  }, [live]);
 
   useEffect(() => {
     let cancelled = false;
 
     const check = async () => {
-      if (!isLiveWindow()) {
-        if (!cancelled) setLive(false);
+      const forced = getDebugForceLive();
+      if (forced !== null) {
+        // A true override — skips the real Cloudflare check entirely, so this actually
+        // forces the state rather than merely widening the window in which we're willing to
+        // ask (which would still report "not live" for a genuinely offline camera).
+        if (!cancelled) setLive(forced);
         return;
       }
       if (!isCloudflareConfigured()) {
-        // Not wired up yet — fall back to trusting the clock alone, same as
+        // Not wired up yet — fall back to trusting the clock window alone, same as
         // before this existed, so local testing/the debug toggle still work.
-        if (!cancelled) setLive(true);
+        if (!cancelled) setLive(isLiveWindow());
         return;
       }
-      // Inside the scheduled window — confirm the camera is actually
-      // connected before switching, so a dead camera doesn't show as "LIVE".
+      // The two sessions are fixed and known in advance, so there's no reason to hit
+      // Cloudflare's API the other ~23 hours of the day — only actually ask once we're
+      // close enough to a scheduled session for the answer to possibly be "yes" (a little
+      // before it, too, since Bruno doesn't always start exactly on schedule).
+      if (!isNearLiveWindow()) {
+        if (!cancelled) setLive(false);
+        return;
+      }
       const actuallyLive = await isCloudflareStreamLive();
       if (!cancelled) setLive(actuallyLive);
     };
@@ -103,6 +167,16 @@ export default function VideoPanel({ allowUnmute = true }: { allowUnmute?: boole
     player.muted = muted;
   }, [muted, player]);
 
+  // Stops playback (so audio can't keep going) the moment the screen loses focus, and
+  // resumes when it regains it — see the `paused` prop doc above for why this is needed.
+  useEffect(() => {
+    if (paused) {
+      player.pause();
+    } else {
+      player.play();
+    }
+  }, [paused, player]);
+
   // Covers the gap Cloudflare's own live-status check can't see: it confirms a camera is
   // connected, but not that *this* playback of the HLS stream actually succeeds (a dropped
   // segment, a local network hiccup, a CDN edge that hasn't caught up yet). If the player
@@ -111,7 +185,10 @@ export default function VideoPanel({ allowUnmute = true }: { allowUnmute?: boole
   // live again on its own if it's actually still up.
   useEffect(() => {
     const subscription = player.addListener("statusChange", ({ status, error }) => {
-      if (status === "error" && live) {
+      // A debug-forced state is a deliberate override for testing — a real playback error
+      // (expected here, since "force live" with no actual broadcast means the live manifest
+      // genuinely doesn't exist) shouldn't silently undo it.
+      if (status === "error" && live && getDebugForceLive() === null) {
         console.warn("Live stream failed to play — falling back to the recorded replay.", error);
         setLive(false);
       }
@@ -123,8 +200,12 @@ export default function VideoPanel({ allowUnmute = true }: { allowUnmute?: boole
     <View style={styles.frame}>
       <VideoView style={styles.video} player={player} contentFit="cover" />
       {allowUnmute && (
-        <Pressable style={styles.muteButton} onPress={() => setMuted((m) => !m)} hitSlop={10}>
-          <Ionicons name={muted ? "volume-mute" : "volume-high"} size={16} color="#fff" />
+        <Pressable style={StyleSheet.absoluteFill} onPress={handleTap}>
+          <Animated.View style={[styles.centerIconWrap, { opacity: iconOpacity }]} pointerEvents="none">
+            <View style={styles.centerIconBubble}>
+              <Ionicons name={muted ? "volume-mute" : "volume-high"} size={32} color="#fff" />
+            </View>
+          </Animated.View>
         </Pressable>
       )}
     </View>
@@ -146,13 +227,19 @@ const styles = StyleSheet.create({
     flex: 1,
     backgroundColor: "#000",
   },
-  muteButton: {
+  centerIconWrap: {
     position: "absolute",
-    top: 8,
-    right: 8,
-    width: 30,
-    height: 30,
-    borderRadius: 15,
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  centerIconBubble: {
+    width: 64,
+    height: 64,
+    borderRadius: 32,
     backgroundColor: "rgba(0,0,0,0.55)",
     alignItems: "center",
     justifyContent: "center",

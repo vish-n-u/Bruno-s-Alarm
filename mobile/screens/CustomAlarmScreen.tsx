@@ -4,7 +4,8 @@ import { SafeAreaView } from "react-native-safe-area-context";
 import { Ionicons } from "@expo/vector-icons";
 import { useFocusEffect } from "@react-navigation/native";
 import type { NativeStackScreenProps } from "@react-navigation/native-stack";
-import type { RootStackParamList } from "../App";
+import type { HomeStackParamList } from "../App";
+import EditCustomAlarmModal from "../components/EditCustomAlarmModal";
 import {
   getCustomAlarms,
   nextCustomAlarmOccurrence,
@@ -47,12 +48,14 @@ function formatCountdown(ms: number): string {
   return parts.join(" ");
 }
 
-type Props = NativeStackScreenProps<RootStackParamList, "CustomAlarm">;
+type Props = NativeStackScreenProps<HomeStackParamList, "CustomAlarm">;
 
-export default function CustomAlarmScreen({ navigation }: Props) {
+export default function CustomAlarmScreen({}: Props) {
   const colors = useThemeColors();
   const styles = createStyles(colors);
   const [alarms, setAlarms] = useState<CustomAlarm[]>([]);
+  const [editModalAlarmId, setEditModalAlarmId] = useState<string | undefined>(undefined);
+  const [editModalVisible, setEditModalVisible] = useState(false);
 
   const refresh = useCallback(() => {
     getCustomAlarms()
@@ -69,6 +72,16 @@ export default function CustomAlarmScreen({ navigation }: Props) {
     setAlarms((prev) => prev.map((a) => (a.id === alarm.id ? { ...a, enabled: value } : a)));
     await setCustomAlarmEnabled(alarm.id, value);
     refresh();
+  }
+
+  function openNewAlarm() {
+    setEditModalAlarmId(undefined);
+    setEditModalVisible(true);
+  }
+
+  function openEditAlarm(alarmId: string) {
+    setEditModalAlarmId(alarmId);
+    setEditModalVisible(true);
   }
 
   return (
@@ -90,7 +103,7 @@ export default function CustomAlarmScreen({ navigation }: Props) {
               <Pressable
                 key={alarm.id}
                 style={[styles.card, !alarm.enabled && styles.cardDisabled]}
-                onPress={() => navigation.navigate("EditCustomAlarm", { alarmId: alarm.id })}
+                onPress={() => openEditAlarm(alarm.id)}
               >
                 <View style={styles.cardLeft}>
                   <Text style={[styles.cardTime, !alarm.enabled && styles.cardTextDisabled]}>
@@ -113,13 +126,16 @@ export default function CustomAlarmScreen({ navigation }: Props) {
         )}
       </View>
 
-      <Pressable
-        style={styles.fab}
-        onPress={() => navigation.navigate("EditCustomAlarm", {})}
-        hitSlop={8}
-      >
+      <Pressable style={styles.fab} onPress={openNewAlarm} hitSlop={8}>
         <Ionicons name="add" size={28} color={colors.accentText} />
       </Pressable>
+
+      <EditCustomAlarmModal
+        visible={editModalVisible}
+        alarmId={editModalAlarmId}
+        onClose={() => setEditModalVisible(false)}
+        onSaved={refresh}
+      />
     </SafeAreaView>
   );
 }

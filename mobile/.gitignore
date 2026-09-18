@@ -3,6 +3,8 @@
 # dependencies
 node_modules/
 
+.env.example
+
 # Expo
 .expo/
 dist/
@@ -32,10 +34,17 @@ yarn-error.*
 
 # local env files
 .env*.local
-
+.env*.example
 # typescript
 *.tsbuildinfo
+
+# scratch files from on-device debugging (screenshots, uiautomator dumps)
+.tmp_*
 
 # generated native folders
 /ios
 /android
+
+# Play Store release signing key — never commit, losing it just means requesting a Play App
+# Signing upload-key reset; leaking it is far worse.
+/credentials/

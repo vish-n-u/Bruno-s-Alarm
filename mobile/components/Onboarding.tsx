@@ -1,4 +1,4 @@
-import { useRef, useState } from "react";
+import { useMemo, useRef, useState } from "react";
 import {
   Image,
   NativeScrollEvent,
@@ -7,42 +7,72 @@ import {
   ScrollView,
   StyleSheet,
   Text,
+  TextInput,
   View,
   useWindowDimensions,
 } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import { requestPermission, scheduleUpcomingSessions } from "../lib/notifications";
+import { generateGuestName, setDisplayName } from "../lib/profile";
+import { todaysSessions } from "../lib/schedule";
 import { fonts, radius, spacing, useThemeColors, type ThemeColors } from "../lib/theme";
+
+function formatLocalTime(timestamp: number): string {
+  return new Date(timestamp).toLocaleString(undefined, { hour: "numeric", minute: "2-digit" });
+}
+
+type ImageSlide = { kind: "image"; image: number; title: string; body: string };
+type IconSlide = { kind: "icon"; icon: keyof typeof Ionicons.glyphMap; title: string; body: string };
+type NameInputSlide = { kind: "name-input"; title: string; body: string };
+type Slide = ImageSlide | IconSlide | NameInputSlide;
 
 // Slide 1 uses the real studio photo of Bruno instead of a generic icon — it's the very
 // first thing a new user sees, and a real dog beats a stock paw glyph for making the point
-// that this app is about one specific, real animal. Slides 2-3 stay icon-led since they're
-// about concepts (schedule, notifications), not "this is a real dog."
-const SLIDES = [
-  {
-    image: require("../assets/icon.png"),
-    title: "This app is one dog.",
-    body: "Bruno hears the church bell and loses it. Every morning. Every evening. That's the whole app.",
-  },
-  {
-    icon: "time-outline" as const,
-    title: "6AM. 6PM. Give or take.",
-    body: "He's a good boy, not a Swiss watch. Most days he's dead on the bell. Some days a squirrel happens. That's the deal.",
-  },
-  {
-    icon: "notifications-outline" as const,
-    title: "Let a dog wake you up.",
-    body: "Turn on notifications and we'll ping you when he goes off. Best effort, same as him.",
-  },
-];
-
+// that this app is about one specific, real animal. Slides 2, 4 stay icon-led since they're
+// about concepts (schedule, notifications), not "this is a real dog." Slide 3 collects an
+// optional display name for a chat feature that doesn't exist yet (deferred) — stored
+// locally now so there's nothing left to retrofit once it ships.
 export default function Onboarding({ onDone }: { onDone: () => void }) {
   const colors = useThemeColors();
   const styles = createStyles(colors);
   const { width } = useWindowDimensions();
   const scrollRef = useRef<ScrollView>(null);
   const [index, setIndex] = useState(0);
-  const isLast = index === SLIDES.length - 1;
+  const [nameInput, setNameInput] = useState("");
+
+  // Bruno's real sessions are fixed to 6AM/6PM India time (see lib/schedule.ts) — converted
+  // here to whatever the viewer's own device clock calls that same moment, so this doesn't
+  // literally claim "6AM" for someone who isn't in India.
+  const slides = useMemo<Slide[]>(() => {
+    const [first, second] = todaysSessions();
+    return [
+      {
+        kind: "image",
+        image: require("../assets/icon.png"),
+        title: "This app is one dog.",
+        body: "Bruno hears a real church bell and loses it, twice a day: once at dawn, once at dusk. This app watches for it live and wakes you up with the actual howl. Bruno's Alarm is currently in beta, so expect a rough edge or two.",
+      },
+      {
+        kind: "icon",
+        icon: "time-outline",
+        title: `${formatLocalTime(first)}. ${formatLocalTime(second)}. Give or take.`,
+        body: "He's a good boy, not a Swiss watch. Most days he's dead on the bell. Some days a squirrel happens. That's the deal. Want a specific time instead? You can set your own custom alarm anytime from the Home screen.",
+      },
+      {
+        kind: "name-input",
+        title: "What should we call you?",
+        body: "Just for when Bruno's Pack (group chat) launches. Totally optional, skip if you'd rather stay anonymous.",
+      },
+      {
+        kind: "icon",
+        icon: "notifications-outline",
+        title: "Let a dog wake you up.",
+        body: "Turn on notifications and we'll ping you when he goes off. Best effort, same as him.",
+      },
+    ];
+  }, []);
+
+  const isLast = index === slides.length - 1;
 
   function goTo(next: number) {
     scrollRef.current?.scrollTo({ x: next * width, animated: true });
@@ -53,7 +83,20 @@ export default function Onboarding({ onDone }: { onDone: () => void }) {
     setIndex(Math.round(e.nativeEvent.contentOffset.x / width));
   }
 
+  // Saved exactly once, at actual completion, rather than per-slide — slides page via a
+  // swipeable ScrollView, so someone could swipe straight past the name slide without ever
+  // tapping its "Next," and this still needs to record a guest name for them either way.
+  async function persistDisplayName() {
+    await setDisplayName(nameInput.trim() || generateGuestName());
+  }
+
+  async function handleDone() {
+    await persistDisplayName();
+    onDone();
+  }
+
   async function finishWithNotifications() {
+    await persistDisplayName();
     const granted = await requestPermission();
     if (granted) await scheduleUpcomingSessions();
     onDone();
@@ -61,7 +104,7 @@ export default function Onboarding({ onDone }: { onDone: () => void }) {
 
   return (
     <View style={styles.container}>
-      <Pressable style={styles.skip} onPress={onDone} hitSlop={12}>
+      <Pressable style={styles.skip} onPress={handleDone} hitSlop={12}>
         <Text style={styles.skipText}>Skip</Text>
       </Pressable>
 
@@ -73,21 +116,35 @@ export default function Onboarding({ onDone }: { onDone: () => void }) {
         onMomentumScrollEnd={handleScrollEnd}
         style={styles.scroll}
       >
-        {SLIDES.map((slide) => (
+        {slides.map((slide) => (
           <View key={slide.title} style={[styles.slide, { width }]}>
-            {"image" in slide ? (
+            {slide.kind === "image" ? (
               <Image source={slide.image} style={styles.slideImage} resizeMode="cover" />
-            ) : (
+            ) : slide.kind === "icon" ? (
               <Ionicons name={slide.icon} size={56} color={colors.accent} style={styles.icon} />
+            ) : (
+              <Ionicons name="person-circle-outline" size={56} color={colors.accent} style={styles.icon} />
             )}
             <Text style={styles.title}>{slide.title}</Text>
             <Text style={styles.body}>{slide.body}</Text>
+            {slide.kind === "name-input" && (
+              <TextInput
+                value={nameInput}
+                onChangeText={setNameInput}
+                placeholder="e.g. Jamie"
+                placeholderTextColor={colors.textSecondary}
+                style={styles.nameInput}
+                maxLength={24}
+                autoCapitalize="words"
+                returnKeyType="done"
+              />
+            )}
           </View>
         ))}
       </ScrollView>
 
       <View style={styles.dots}>
-        {SLIDES.map((slide, i) => (
+        {slides.map((slide, i) => (
           <View key={slide.title} style={[styles.dot, i === index && styles.dotActive]} />
         ))}
       </View>
@@ -98,7 +155,7 @@ export default function Onboarding({ onDone }: { onDone: () => void }) {
             <Pressable style={styles.primaryButton} onPress={finishWithNotifications}>
               <Text style={styles.primaryButtonText}>Wake me up with Bruno</Text>
             </Pressable>
-            <Pressable style={styles.secondaryButton} onPress={onDone}>
+            <Pressable style={styles.secondaryButton} onPress={handleDone}>
               <Text style={styles.secondaryButtonText}>Nah, I'll risk it</Text>
             </Pressable>
           </>
@@ -163,6 +220,20 @@ function createStyles(colors: ThemeColors) {
       fontSize: 15,
       textAlign: "center",
       lineHeight: 22,
+    },
+    nameInput: {
+      marginTop: spacing.xl,
+      width: "100%",
+      paddingVertical: spacing.md,
+      paddingHorizontal: spacing.lg,
+      borderRadius: radius.md,
+      borderWidth: 1,
+      borderColor: colors.border,
+      backgroundColor: colors.surface,
+      color: colors.textPrimary,
+      fontFamily: fonts.body,
+      fontSize: 16,
+      textAlign: "center",
     },
     dots: {
       flexDirection: "row",

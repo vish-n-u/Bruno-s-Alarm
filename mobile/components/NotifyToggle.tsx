@@ -1,8 +1,8 @@
 import { useEffect, useState } from "react";
-import { ActivityIndicator, Pressable, StyleSheet, Text, View } from "react-native";
+import { ActivityIndicator, StyleSheet, Switch, Text, View } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import { isSubscribed, requestPermission, scheduleUpcomingSessions, unsubscribe } from "../lib/notifications";
-import { fonts, radius, shadow, spacing, useThemeColors, type ThemeColors } from "../lib/theme";
+import { fonts, radius, spacing, useThemeColors, type ThemeColors } from "../lib/theme";
 
 type Status = "checking" | "idle" | "subscribed" | "denied" | "unsupported";
 
@@ -10,6 +10,7 @@ export default function NotifyToggle() {
   const colors = useThemeColors();
   const styles = createStyles(colors);
   const [status, setStatus] = useState<Status>("checking");
+  const [busy, setBusy] = useState(false);
 
   useEffect(() => {
     isSubscribed()
@@ -23,63 +24,57 @@ export default function NotifyToggle() {
       .catch(() => setStatus("unsupported"));
   }, []);
 
-  async function handleSubscribe() {
-    const granted = await requestPermission();
-    if (!granted) {
-      setStatus("denied");
-      return;
+  async function handleToggle(value: boolean) {
+    if (busy) return;
+    setBusy(true);
+    try {
+      if (value) {
+        const granted = await requestPermission();
+        if (!granted) {
+          setStatus("denied");
+          return;
+        }
+        await scheduleUpcomingSessions();
+        setStatus("subscribed");
+      } else {
+        await unsubscribe();
+        setStatus("idle");
+      }
+    } finally {
+      setBusy(false);
     }
-    await scheduleUpcomingSessions();
-    setStatus("subscribed");
   }
 
-  async function handleUnsubscribe() {
-    await unsubscribe();
-    setStatus("idle");
-  }
-
-  if (status === "checking") {
-    return (
-      <View style={[styles.button, styles.disabled]}>
-        <ActivityIndicator color={colors.accentText} />
-      </View>
-    );
-  }
-
-  if (status === "unsupported") {
-    return (
-      <View>
-        <View style={[styles.button, styles.disabled]}>
-          <Text style={styles.buttonText}>Notifications unavailable</Text>
-        </View>
-        <Text style={styles.statusLine}>
-          Local notifications aren't supported on this device/simulator.
-        </Text>
-      </View>
-    );
-  }
-
-  if (status === "subscribed") {
-    return (
-      <Pressable style={[styles.button, styles.subscribed]} onPress={handleUnsubscribe}>
-        <Ionicons name="checkmark-circle" size={18} color={colors.accent} />
-        <Text style={[styles.buttonText, styles.subscribedText]}>
-          You'll be notified — tap to turn off
-        </Text>
-      </Pressable>
-    );
-  }
+  const subtitle =
+    status === "checking"
+      ? "Checking…"
+      : status === "unsupported"
+        ? "Not supported on this device"
+        : status === "denied"
+          ? "Blocked, enable in device settings"
+          : status === "subscribed"
+            ? "On for Bruno's 6AM & 6PM sessions"
+            : "Get woken up for Bruno's real sessions";
 
   return (
-    <View>
-      <Pressable style={styles.button} onPress={handleSubscribe}>
-        <Ionicons name="notifications-outline" size={18} color={colors.accentText} />
-        <Text style={styles.buttonText}>Notify me for the next session</Text>
-      </Pressable>
-      {status === "denied" && (
-        <Text style={styles.statusLine}>
-          Notifications are blocked — enable them in your device settings.
-        </Text>
+    <View style={styles.row}>
+      <View style={styles.iconChip}>
+        <Ionicons name="notifications" size={18} color={colors.accent} />
+      </View>
+      <View style={styles.textWrap}>
+        <Text style={styles.title}>Wake me up with Bruno</Text>
+        <Text style={[styles.subtitle, status === "denied" && { color: colors.danger }]}>{subtitle}</Text>
+      </View>
+      {status === "checking" || busy ? (
+        <ActivityIndicator color={colors.accent} />
+      ) : (
+        <Switch
+          value={status === "subscribed"}
+          onValueChange={handleToggle}
+          disabled={status === "unsupported"}
+          trackColor={{ false: colors.surfaceAlt, true: colors.accent }}
+          thumbColor={colors.surface}
+        />
       )}
     </View>
   );
@@ -87,45 +82,32 @@ export default function NotifyToggle() {
 
 function createStyles(colors: ThemeColors) {
   return StyleSheet.create({
-  button: {
-    width: "100%",
-    flexDirection: "row",
-    paddingVertical: spacing.lg,
-    paddingHorizontal: spacing.lg,
-    borderRadius: radius.md,
-    borderWidth: 1,
-    borderColor: colors.accentBorder,
-    backgroundColor: colors.accent,
-    alignItems: "center",
-    justifyContent: "center",
-    gap: spacing.sm,
-    ...shadow,
-  },
-  disabled: {
-    opacity: 0.6,
-  },
-  // Already-done state reads as quiet/flat on purpose — cancel the elevation, a transparent
-  // outline button doesn't want to look like it's lifting off the page.
-  subscribed: {
-    backgroundColor: "transparent",
-    borderColor: colors.accent,
-    shadowOpacity: 0,
-    elevation: 0,
-  },
-  buttonText: {
-    color: colors.accentText,
-    fontFamily: fonts.bodyBold,
-    fontSize: 15,
-  },
-  subscribedText: {
-    color: colors.accent,
-  },
-  statusLine: {
-    textAlign: "center",
-    color: colors.textSecondary,
-    fontFamily: fonts.body,
-    fontSize: 12,
-    marginTop: spacing.sm,
-  },
+    row: {
+      flexDirection: "row",
+      alignItems: "center",
+      gap: spacing.md,
+    },
+    iconChip: {
+      width: 38,
+      height: 38,
+      borderRadius: radius.md,
+      backgroundColor: colors.accentBg,
+      alignItems: "center",
+      justifyContent: "center",
+    },
+    textWrap: {
+      flex: 1,
+      gap: 2,
+    },
+    title: {
+      color: colors.textPrimary,
+      fontFamily: fonts.bodyMedium,
+      fontSize: 15,
+    },
+    subtitle: {
+      color: colors.textSecondary,
+      fontFamily: fonts.body,
+      fontSize: 12,
+    },
   });
 }

@@ -11,6 +11,7 @@
     "get-youtube-refresh-token": "node scripts/get-youtube-refresh-token.js"
   },
   "dependencies": {
+    "@aws-sdk/client-s3": "^3.1136.0",
     "googleapis": "^178.0.0",
     "next": "^15.5.4",
     "react": "^18.3.1",

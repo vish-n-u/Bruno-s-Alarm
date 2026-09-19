@@ -259,6 +259,10 @@ export default function SettingsScreen({ navigation }: Props) {
             <Pressable style={styles.consoleRow} onPress={() => navigation.navigate("OnboardingPreview")}>
               <Text style={styles.consoleText}>&gt; preview onboarding</Text>
             </Pressable>
+            <View style={styles.rowDivider} />
+            <Pressable style={styles.consoleRow} onPress={() => navigation.navigate("WeatherPreview")}>
+              <Text style={styles.consoleText}>&gt; preview weather &amp; time</Text>
+            </Pressable>
             {Platform.OS === "android" && (
               <>
                 <View style={styles.rowDivider} />

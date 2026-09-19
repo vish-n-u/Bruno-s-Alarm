@@ -198,7 +198,11 @@ export default function VideoPanel({
 
   return (
     <View style={styles.frame}>
-      <VideoView style={styles.video} player={player} contentFit="cover" />
+      {/* nativeControls explicitly off — this screen has its own Reels-style tap-to-mute
+          (below) plus, on the Live tab, a chat overlay anchored to the bottom; the native
+          play/pause/scrub bar not only duplicates that but paints a dimming scrim behind
+          itself whenever shown, which made the whole video read as broken/black. */}
+      <VideoView style={styles.video} player={player} contentFit="cover" nativeControls={false} />
       {allowUnmute && (
         <Pressable style={StyleSheet.absoluteFill} onPress={handleTap}>
           <Animated.View style={[styles.centerIconWrap, { opacity: iconOpacity }]} pointerEvents="none">

@@ -22,6 +22,13 @@ import { ensureAnonymousAuth } from "./firebase";
 // direct client writes entirely (see firestore.rules), so none of that is duplicated or
 // trusted client-side.
 
+// A fixed, non-resetting "session" for Bruno's Pack (screens/BrunosPackScreen.tsx) — every
+// function in this file is already generic over sessionId, so a persistent room is just a
+// constant ID rather than one derived from the real clock like currentSessionId(). The
+// backend Cloud Function knows this specific ID and exempts it from the per-session message
+// cap, which otherwise assumes a session eventually resets (see functions/src/index.ts).
+export const BRUNOS_PACK_SESSION_ID = "brunos-pack";
+
 const MAX_MESSAGE_LENGTH = 200;
 const MESSAGE_HISTORY_LIMIT = 100;
 const TOS_ACCEPTED_KEY = "bruno-chat-tos-accepted";

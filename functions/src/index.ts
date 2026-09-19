@@ -27,6 +27,12 @@ const RATE_LIMIT_MS = 3000;
 // cost control.
 const SESSION_MESSAGE_CAP = 500;
 
+// "Bruno's Pack" is a persistent room (see screens/BrunosPackScreen.tsx), not a per-session
+// chat that naturally resets — a lifetime message cap would eventually make it permanently
+// "full" and never recoverable. Exempted here rather than removing the cap outright, so a
+// real live session still gets the backstop. Rate limiting still applies either way.
+const UNCAPPED_SESSION_IDS = new Set(["brunos-pack"]);
+
 // Counts Unicode code points, not UTF-16 code units — matches the client's own check in
 // lib/chat.ts so the two never disagree about what "200 characters" means for a
 // surrogate-pair-heavy message (most emoji).
@@ -90,7 +96,7 @@ export const sendChatMessage = onCall<SendChatMessageRequest>(async (request) =>
     }
 
     const messageCount = (sessionSnap.data()?.messageCount as number | undefined) ?? 0;
-    if (messageCount >= SESSION_MESSAGE_CAP) {
+    if (!UNCAPPED_SESSION_IDS.has(sessionId) && messageCount >= SESSION_MESSAGE_CAP) {
       throw new HttpsError("failed-precondition", "Chat is full for this session.");
     }
 

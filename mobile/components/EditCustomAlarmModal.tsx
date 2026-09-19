@@ -73,6 +73,13 @@ function Wheel<T extends string | number>({
 }) {
   const listRef = useRef<FlatList<T>>(null);
 
+  // Scroll the wheel to the correct position whenever selectedIndex changes — covers the
+  // edit-existing-alarm case where state updates after mount, since initialScrollIndex only
+  // positions the FlatList at first render and doesn't react to later prop changes.
+  useEffect(() => {
+    listRef.current?.scrollToIndex({ index: selectedIndex, animated: false });
+  }, [selectedIndex]);
+
   function handleScrollEnd(e: NativeSyntheticEvent<NativeScrollEvent>) {
     const index = Math.round(e.nativeEvent.contentOffset.y / ROW_HEIGHT);
     onSettle(Math.max(0, Math.min(data.length - 1, index)));
@@ -128,6 +135,7 @@ export default function EditCustomAlarmModal({ visible, alarmId, onClose, onSave
   const [ampmIndex, setAmpmIndex] = useState(0);
   const [repeatMode, setRepeatMode] = useState<RepeatMode>("everyday");
   const [customDays, setCustomDays] = useState<number[]>([]);
+  const [editingEnabled, setEditingEnabled] = useState(true);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
 
@@ -142,6 +150,7 @@ export default function EditCustomAlarmModal({ visible, alarmId, onClose, onSave
       setAmpmIndex(0);
       setRepeatMode("everyday");
       setCustomDays([]);
+      setEditingEnabled(true);
       setLoading(false);
       return;
     }
@@ -155,6 +164,7 @@ export default function EditCustomAlarmModal({ visible, alarmId, onClose, onSave
         setAmpmIndex(alarm.hour >= 12 ? 1 : 0);
         setRepeatMode(alarm.repeatMode);
         setCustomDays(alarm.customDays);
+        setEditingEnabled(alarm.enabled);
       }
       setLoading(false);
     });
@@ -201,7 +211,9 @@ export default function EditCustomAlarmModal({ visible, alarmId, onClose, onSave
         name: name.trim(),
         hour: hour24,
         minute,
-        enabled: true,
+        // Preserve the existing enabled state when editing — saving a disabled alarm to rename
+        // it shouldn't silently re-enable it. New alarms always start enabled.
+        enabled: alarmId ? editingEnabled : true,
         repeatMode,
         customDays,
       };

@@ -1,5 +1,5 @@
-import { useCallback, useState } from "react";
-import { Pressable, StyleSheet, Switch, Text, View } from "react-native";
+import { useCallback, useEffect, useState } from "react";
+import { Pressable, ScrollView, StyleSheet, Switch, Text, View } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { Ionicons } from "@expo/vector-icons";
 import { useFocusEffect } from "@react-navigation/native";
@@ -56,6 +56,12 @@ export default function CustomAlarmScreen({}: Props) {
   const [alarms, setAlarms] = useState<CustomAlarm[]>([]);
   const [editModalAlarmId, setEditModalAlarmId] = useState<string | undefined>(undefined);
   const [editModalVisible, setEditModalVisible] = useState(false);
+  // Tick every minute so the "Next alarm in X" countdown stays current while the screen is open.
+  const [, forceUpdate] = useState(0);
+  useEffect(() => {
+    const timer = setInterval(() => forceUpdate((n) => n + 1), 60000);
+    return () => clearInterval(timer);
+  }, []);
 
   const refresh = useCallback(() => {
     getCustomAlarms()
@@ -86,7 +92,7 @@ export default function CustomAlarmScreen({}: Props) {
 
   return (
     <SafeAreaView style={styles.root} edges={["bottom"]}>
-      <View style={styles.content}>
+      <ScrollView style={styles.contentScroll} contentContainerStyle={styles.content}>
         <Text style={styles.title}>Your alarms</Text>
         <Text style={styles.subtitle}>
           {next !== null ? `Next alarm in ${formatCountdown(next - Date.now())}` : "No alarms set"}
@@ -124,7 +130,7 @@ export default function CustomAlarmScreen({}: Props) {
             ))}
           </View>
         )}
-      </View>
+      </ScrollView>
 
       <Pressable style={styles.fab} onPress={openNewAlarm} hitSlop={8}>
         <Ionicons name="add" size={28} color={colors.accentText} />
@@ -146,9 +152,12 @@ function createStyles(colors: ThemeColors) {
       flex: 1,
       backgroundColor: colors.background,
     },
-    content: {
+    contentScroll: {
       flex: 1,
+    },
+    content: {
       padding: spacing.xl,
+      paddingBottom: spacing.xxl * 3, // clear the FAB
     },
     title: {
       color: colors.textPrimary,

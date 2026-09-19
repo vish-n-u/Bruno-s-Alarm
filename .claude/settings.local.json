@@ -14,7 +14,8 @@
       "Bash(curl -s \"https://raw.githubusercontent.com/LonelyCpp/react-native-youtube-iframe/master/src/YoutubeIframe.js\")",
       "WebFetch(domain:developers.cloudflare.com)",
       "Bash(node -e ' *)",
-      "Bash(ffmpeg -y -f lavfi -i color=c=0x0f1115:s=1024x1024 -i 'C:\\\\Users\\\\vishn\\\\.claude\\\\uploads\\\\77c34bb0-4f3d-4a7c-a4cf-200367501d57\\\\d0abc602-image.png' -filter_complex '[1:v]crop=801:801:0:0,scale=820:820[dog];[0:v][dog]overlay=x=102:y=102:format=rgb' -update 1 -frames:v 1 'C:\\\\Users\\\\vishn\\\\Desktop\\\\Brunos Alarm\\\\mobile\\\\assets/icon.png')"
+      "Bash(ffmpeg -y -f lavfi -i color=c=0x0f1115:s=1024x1024 -i 'C:\\\\Users\\\\vishn\\\\.claude\\\\uploads\\\\77c34bb0-4f3d-4a7c-a4cf-200367501d57\\\\d0abc602-image.png' -filter_complex '[1:v]crop=801:801:0:0,scale=820:820[dog];[0:v][dog]overlay=x=102:y=102:format=rgb' -update 1 -frames:v 1 'C:\\\\Users\\\\vishn\\\\Desktop\\\\Brunos Alarm\\\\mobile\\\\assets/icon.png')",
+      "Bash(npx eas-cli:*)"
     ]
   }
 }

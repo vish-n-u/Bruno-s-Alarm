@@ -1,13 +1,17 @@
-import { Pressable, StyleSheet, Text, View } from "react-native";
+import { useState } from "react";
+import { ActivityIndicator, Pressable, StyleSheet, Text, View } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { Ionicons } from "@expo/vector-icons";
 import VideoPanel from "./VideoPanel";
 import { snoozeRingingAlarm, stopRingingAlarm } from "../lib/notifications";
+import { disableOnceAlarmIfFired } from "../lib/customAlarm";
 import { fonts, radius, spacing, useThemeColors, type ThemeColors } from "../lib/theme";
 
 export default function AlarmRingingScreen({ alarmId }: { alarmId: string }) {
   const colors = useThemeColors();
   const styles = createStyles(colors);
+  const [busy, setBusy] = useState(false);
+
   // bruno-session- alarms are a real, live howl; bruno-custom- alarms are a user-chosen
   // wake time that likely doesn't line up with an actual live session — say so honestly
   // rather than implying Bruno is howling right this second.
@@ -19,6 +23,27 @@ export default function AlarmRingingScreen({ alarmId }: { alarmId: string }) {
   const timeLabel = Number.isFinite(scheduledAt) && scheduledAt > 0
     ? new Date(scheduledAt).toLocaleString(undefined, { hour: "numeric", minute: "2-digit" })
     : null;
+
+  async function handleStop() {
+    if (busy) return;
+    setBusy(true);
+    try {
+      await stopRingingAlarm(alarmId);
+      await disableOnceAlarmIfFired(alarmId);
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  async function handleSnooze() {
+    if (busy) return;
+    setBusy(true);
+    try {
+      await snoozeRingingAlarm(alarmId);
+    } finally {
+      setBusy(false);
+    }
+  }
 
   return (
     <View style={styles.root}>
@@ -37,11 +62,13 @@ export default function AlarmRingingScreen({ alarmId }: { alarmId: string }) {
         </View>
 
         <View style={styles.bottomScrim}>
-          <Pressable style={styles.stopButton} onPress={() => stopRingingAlarm(alarmId)}>
-            <Text style={styles.stopButtonText}>Stop</Text>
+          <Pressable style={[styles.stopButton, busy && styles.buttonBusy]} onPress={handleStop} disabled={busy}>
+            {busy
+              ? <ActivityIndicator color={colors.accentText} />
+              : <Text style={styles.stopButtonText}>Stop</Text>}
           </Pressable>
 
-          <Pressable style={styles.snoozeButton} onPress={() => snoozeRingingAlarm(alarmId)}>
+          <Pressable style={[styles.snoozeButton, busy && styles.buttonBusy]} onPress={handleSnooze} disabled={busy}>
             <Ionicons name="moon-outline" size={16} color="#fff" />
             <Text style={styles.snoozeButtonText}>Snooze 10 min</Text>
           </Pressable>
@@ -117,6 +144,9 @@ function createStyles(colors: ThemeColors) {
       color: "#fff",
       fontFamily: fonts.bodyMedium,
       fontSize: 15,
+    },
+    buttonBusy: {
+      opacity: 0.5,
     },
   });
 }

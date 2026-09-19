@@ -86,11 +86,20 @@ export async function getWeatherCondition(): Promise<WeatherCondition | null> {
   return condition;
 }
 
-/** `null` while loading or if the lookup failed — callers should treat that the same as
- * "clear" (i.e. render their normal sky) rather than showing a loading state. */
+// Built and working, but held back for later — flip this to bring real weather back to the
+// Home screen sky. Kept as a flag (rather than deleting the code) so re-enabling later is a
+// one-line change, same convention as App.tsx's CHAT_ENABLED. The debug-only preview screen
+// (screens/WeatherPreviewScreen.tsx) doesn't call this hook at all, so it keeps working for
+// testing regardless of this flag — see docs/hidden-features.md.
+const WEATHER_HINTS_ENABLED = false;
+
+/** `null` while loading, if the lookup failed, or while the feature is held back via
+ * WEATHER_HINTS_ENABLED above — callers should treat that the same as "clear" (i.e. render
+ * their normal sky) rather than showing a loading state. */
 export function useWeatherCondition(): WeatherCondition | null {
   const [condition, setCondition] = useState<WeatherCondition | null>(null);
   useEffect(() => {
+    if (!WEATHER_HINTS_ENABLED) return;
     let cancelled = false;
     getWeatherCondition().then((result) => {
       if (!cancelled && result) setCondition(result);

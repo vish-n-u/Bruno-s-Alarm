@@ -234,6 +234,20 @@ export async function deleteCustomAlarm(id: string): Promise<void> {
   await saveAllCustomAlarms(all.filter((a) => a.id !== id));
 }
 
+/** After a "once" alarm rings and the user stops it, marks it disabled in storage. The
+ * OS-level alarm has already fired and removed itself; only the storage state needs updating.
+ * Matches by checking whether the OS alarm ID starts with the alarm's own scoped prefix, so
+ * it correctly handles both direct fires and iOS snooze re-fires (which use a derived ID that
+ * still starts with the same prefix). Silently no-ops for session alarms, repeat alarms, or
+ * IDs that don't match any saved alarm. */
+export async function disableOnceAlarmIfFired(osAlarmId: string): Promise<void> {
+  if (!osAlarmId.startsWith(ID_PREFIX)) return;
+  const all = await getCustomAlarms();
+  const alarm = all.find((a) => osAlarmId.startsWith(scopedPrefix(a.id)));
+  if (!alarm || alarm.repeatMode !== "once") return;
+  await saveAllCustomAlarms(all.map((a) => (a.id === alarm.id ? { ...a, enabled: false } : a)));
+}
+
 /** Earliest upcoming occurrence (ms) across every enabled alarm, for the list screen's
  * "Next alarm in..." header — null if nothing's enabled. */
 export function nextCustomAlarmOccurrence(alarms: CustomAlarm[]): number | null {

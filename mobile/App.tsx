@@ -27,7 +27,8 @@ import AlarmRingingScreen from "./components/AlarmRingingScreen";
 import SettingsScreen from "./screens/SettingsScreen";
 import CustomAlarmScreen from "./screens/CustomAlarmScreen";
 import LiveScreen from "./screens/LiveScreen";
-import MessagesPlaceholderScreen from "./screens/MessagesPlaceholderScreen";
+import BrunosPackScreen from "./screens/BrunosPackScreen";
+import WeatherPreviewScreen from "./screens/WeatherPreviewScreen";
 import { hasOnboarded, markOnboarded } from "./lib/onboarding";
 import { getActiveRingingAlarm, onAlarmRinging } from "./lib/notifications";
 import { registerBackgroundAlarmSoundRefresh } from "./lib/backgroundRefresh";
@@ -36,8 +37,9 @@ import { useThemeColors, useTimeOfDay } from "./lib/theme";
 
 type Screen = "checking" | "onboarding" | "home";
 
-// Chat isn't built yet — flip this to bring the tab back. Kept as a flag (rather than deleting
-// the screen/import) so re-enabling later is a one-line change.
+// Built and working (see docs/live-chat-setup.md), but held back for later — flip this to
+// bring the tab back. Kept as a flag (rather than deleting the screen/import) so re-enabling
+// later is a one-line change. See docs/hidden-features.md.
 const CHAT_ENABLED = false;
 
 // The Home tab's own internal stack — Settings/CustomAlarm are reached by pushing on top of
@@ -49,6 +51,7 @@ export type HomeStackParamList = {
   Settings: undefined;
   CustomAlarm: undefined;
   OnboardingPreview: undefined;
+  WeatherPreview: undefined;
 };
 
 type RootTabParamList = {
@@ -95,6 +98,7 @@ function HomeStack() {
         component={OnboardingPreviewScreen}
         options={{ headerShown: false }}
       />
+      <HomeStackNav.Screen name="WeatherPreview" component={WeatherPreviewScreen} options={{ headerShown: false }} />
     </HomeStackNav.Navigator>
   );
 }
@@ -196,15 +200,17 @@ export default function App() {
                 tabBarIcon: ({ color, size, focused }) => (
                   <Ionicons name={focused ? "home" : "home-outline"} size={size} color={color} />
                 ),
-                // OnboardingPreview is meant to be a full-screen takeover just like real
-                // onboarding — without this, the tab bar stays visible (and tappable)
-                // underneath it, since it's a route nested inside this same tab's stack.
-                // (Editing an alarm no longer needs this — it's an in-place popup, not a
-                // route, so it already renders over everything including the tab bar.)
-                tabBarStyle:
-                  getFocusedRouteNameFromRoute(route) === "OnboardingPreview"
-                    ? { display: "none" }
-                    : { backgroundColor: colors.surface, borderTopColor: colors.border },
+                // OnboardingPreview and WeatherPreview are both meant to be full-screen
+                // takeovers just like real onboarding — without this, the tab bar stays
+                // visible (and tappable) underneath them, since they're routes nested inside
+                // this same tab's stack. (Editing an alarm no longer needs this — it's an
+                // in-place popup, not a route, so it already renders over everything
+                // including the tab bar.)
+                tabBarStyle: ["OnboardingPreview", "WeatherPreview"].includes(
+                  getFocusedRouteNameFromRoute(route) ?? "",
+                )
+                  ? { display: "none" }
+                  : { backgroundColor: colors.surface, borderTopColor: colors.border },
               })}
             />
             <Tab.Screen
@@ -220,7 +226,7 @@ export default function App() {
             {CHAT_ENABLED && (
               <Tab.Screen
                 name="MessagesTab"
-                component={MessagesPlaceholderScreen}
+                component={BrunosPackScreen}
                 options={{
                   title: "Bruno's Pack",
                   tabBarIcon: ({ color, size, focused }) => (

@@ -12,6 +12,7 @@ import {
   useWindowDimensions,
 } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
+import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { requestPermission, scheduleUpcomingSessions } from "../lib/notifications";
 import { generateGuestName, setDisplayName } from "../lib/profile";
 import { todaysSessions } from "../lib/schedule";
@@ -30,12 +31,17 @@ type Slide = ImageSlide | IconSlide | NameInputSlide;
 // first thing a new user sees, and a real dog beats a stock paw glyph for making the point
 // that this app is about one specific, real animal. Slides 2, 4 stay icon-led since they're
 // about concepts (schedule, notifications), not "this is a real dog." Slide 3 collects an
-// optional display name for a chat feature that doesn't exist yet (deferred) — stored
-// locally now so there's nothing left to retrofit once it ships.
+// optional display name for the chat (hidden for now, see docs/hidden-features.md) — stored
+// locally now so there's nothing left to retrofit once it ships. Copy is deliberately short
+// and a little self-deprecating; keep it that way when editing.
 export default function Onboarding({ onDone }: { onDone: () => void }) {
   const colors = useThemeColors();
   const styles = createStyles(colors);
   const { width } = useWindowDimensions();
+  // Rendered full-screen outside any SafeAreaView/navigator, so the status bar and the system
+  // nav bar have to be padded for by hand — otherwise Skip sits under the status bar (and its
+  // taps get swallowed) and the footer buttons touch the nav bar.
+  const insets = useSafeAreaInsets();
   const scrollRef = useRef<ScrollView>(null);
   const [index, setIndex] = useState(0);
   const [nameInput, setNameInput] = useState("");
@@ -49,25 +55,25 @@ export default function Onboarding({ onDone }: { onDone: () => void }) {
       {
         kind: "image",
         image: require("../assets/icon.png"),
-        title: "This app is one dog.",
-        body: "Bruno hears a real church bell and loses it, twice a day: once at dawn, once at dusk. This app watches for it live and wakes you up with the actual howl. Bruno's Alarm is currently in beta, so expect a rough edge or two.",
+        title: "It's an alarm. Sort of.",
+        body: "A dog howls at a church bell twice a day. This wakes you up with it. It's a beta, so sorry in advance.",
       },
       {
         kind: "icon",
         icon: "time-outline",
-        title: `${formatLocalTime(first)}. ${formatLocalTime(second)}. Give or take.`,
-        body: "He's a good boy, not a Swiss watch. Most days he's dead on the bell. Some days a squirrel happens. That's the deal. Want a specific time instead? You can set your own custom alarm anytime from the Home screen.",
+        title: `Around ${formatLocalTime(first)} and ${formatLocalTime(second)}.`,
+        body: "He isn't punctual, sorry. You can set your own alarm time from Home instead.",
       },
       {
         kind: "name-input",
-        title: "What should we call you?",
-        body: "Just for when Bruno's Pack (group chat) launches. Totally optional, skip if you'd rather stay anonymous.",
+        title: "Got a name?",
+        body: "It's for the chat, whenever that exists. Skip if you like.",
       },
       {
         kind: "icon",
         icon: "notifications-outline",
-        title: "Let a dog wake you up.",
-        body: "Turn on notifications and we'll ping you when he goes off. Best effort, same as him.",
+        title: "Want a heads up?",
+        body: "We'll notify you when he starts. Probably.",
       },
     ];
   }, []);
@@ -104,7 +110,7 @@ export default function Onboarding({ onDone }: { onDone: () => void }) {
 
   return (
     <View style={styles.container}>
-      <Pressable style={styles.skip} onPress={handleDone} hitSlop={12}>
+      <Pressable style={[styles.skip, { top: insets.top + spacing.sm }]} onPress={handleDone} hitSlop={12}>
         <Text style={styles.skipText}>Skip</Text>
       </Pressable>
 
@@ -149,14 +155,14 @@ export default function Onboarding({ onDone }: { onDone: () => void }) {
         ))}
       </View>
 
-      <View style={styles.footer}>
+      <View style={[styles.footer, { paddingBottom: insets.bottom + spacing.xl }]}>
         {isLast ? (
           <>
             <Pressable style={styles.primaryButton} onPress={finishWithNotifications}>
-              <Text style={styles.primaryButtonText}>Wake me up with Bruno</Text>
+              <Text style={styles.primaryButtonText}>Okay, notify me</Text>
             </Pressable>
             <Pressable style={styles.secondaryButton} onPress={handleDone}>
-              <Text style={styles.secondaryButtonText}>Nah, I'll risk it</Text>
+              <Text style={styles.secondaryButtonText}>No thanks</Text>
             </Pressable>
           </>
         ) : (

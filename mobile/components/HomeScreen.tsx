@@ -2,6 +2,7 @@ import { useCallback, useState } from "react";
 import { Pressable, ScrollView, StyleSheet, Switch, Text, View } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { Ionicons } from "@expo/vector-icons";
+import LottieView from "lottie-react-native";
 import { useFocusEffect } from "@react-navigation/native";
 import type { NativeStackScreenProps } from "@react-navigation/native-stack";
 import EditCustomAlarmModal from "./EditCustomAlarmModal";
@@ -111,10 +112,7 @@ export default function HomeScreen({ navigation }: Props) {
         <View>
           <View style={styles.header}>
             <View style={styles.headerTitleWrap}>
-              <View style={styles.titleRow}>
-                <Text style={styles.title}>Bruno's Alarm</Text>
-                <Text style={styles.titleEmoji}>🐕🌙</Text>
-              </View>
+              <Text style={styles.title}>Bruno's Alarm</Text>
               <Text style={styles.subtitle}>A real dog. Two alarms a day. Never once late.</Text>
             </View>
             <Pressable
@@ -136,6 +134,18 @@ export default function HomeScreen({ navigation }: Props) {
                 <Text style={styles.brunoTagText}>BRUNO</Text>
               </View>
             </Pressable>
+          )}
+
+          {!brunoSubscribed && customAlarms.length === 0 && (
+            <View style={styles.emptyState}>
+              <LottieView
+                source={require("../assets/animations/dog-saxophone.json")}
+                autoPlay
+                loop
+                style={styles.emptyLottie}
+              />
+              <Text style={styles.emptyText}>Nothing scheduled. Tap + and he'll do his best.</Text>
+            </View>
           )}
 
           {customAlarms.length > 0 && (
@@ -177,7 +187,6 @@ export default function HomeScreen({ navigation }: Props) {
         <View style={styles.footer}>
           <View style={styles.footerDivider} />
           <Ionicons name="paw" size={14} color={colors.textSecondary} />
-          <Text style={styles.footerText}>No filters. No edits. Just Bruno.</Text>
         </View>
       </ScrollView>
 
@@ -216,21 +225,12 @@ function createStyles(colors: ThemeColors) {
     headerTitleWrap: {
       flex: 1,
     },
-    titleRow: {
-      flexDirection: "row",
-      alignItems: "center",
-      gap: spacing.xs,
-    },
     title: {
       color: colors.textPrimary,
       fontFamily: fonts.display,
       fontSize: 26,
       textTransform: "uppercase",
       letterSpacing: 0.5,
-      marginBottom: 3,
-    },
-    titleEmoji: {
-      fontSize: 22,
       marginBottom: 3,
     },
     subtitle: {
@@ -284,6 +284,21 @@ function createStyles(colors: ThemeColors) {
       fontFamily: fonts.bodyBold,
       fontSize: 11,
       letterSpacing: 0.5,
+    },
+    emptyState: {
+      alignItems: "center",
+      gap: spacing.sm,
+      paddingVertical: spacing.xl,
+    },
+    emptyLottie: {
+      width: 180,
+      height: 180,
+    },
+    emptyText: {
+      color: colors.textSecondary,
+      fontFamily: fonts.hand,
+      fontSize: 17,
+      textAlign: "center",
     },
     yourAlarmsSection: {
       marginBottom: spacing.lg,
@@ -367,11 +382,6 @@ function createStyles(colors: ThemeColors) {
       height: 1,
       backgroundColor: colors.border,
       marginBottom: spacing.xs,
-    },
-    footerText: {
-      color: colors.textSecondary,
-      fontFamily: fonts.hand,
-      fontSize: 16,
     },
   });
 }

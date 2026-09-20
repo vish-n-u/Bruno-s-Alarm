@@ -13,6 +13,7 @@ import {
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { Ionicons } from "@expo/vector-icons";
+import LottieView from "lottie-react-native";
 import ChatTermsGate from "../components/ChatTermsGate";
 import ReportMessageModal from "../components/ReportMessageModal";
 import { ensureAnonymousAuth } from "../lib/firebase";
@@ -194,7 +195,12 @@ export default function BrunosPackScreen() {
           )}
           ListEmptyComponent={
             <View style={styles.emptyState}>
-              <Ionicons name="chatbubbles-outline" size={28} color={colors.textSecondary} />
+              <LottieView
+                source={require("../assets/animations/dog-saxophone.json")}
+                autoPlay
+                loop
+                style={styles.emptyLottie}
+              />
               <Text style={styles.emptyStateText}>No messages yet — be the first to say something.</Text>
             </View>
           }
@@ -290,6 +296,10 @@ function createStyles(colors: ThemeColors) {
       justifyContent: "center",
       gap: spacing.sm,
       paddingTop: spacing.xxl * 2,
+    },
+    emptyLottie: {
+      width: 160,
+      height: 160,
     },
     emptyStateText: {
       color: colors.textSecondary,

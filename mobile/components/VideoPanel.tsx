@@ -31,8 +31,12 @@ export default function VideoPanel({
   allowUnmute = true,
   paused = false,
   onLiveChange,
+  alwaysCheckLive = false,
 }: {
   allowUnmute?: boolean;
+  /** Skips the "only ask Cloudflare near a scheduled 6AM/6PM session" shortcut and always
+   * asks — for a go-live alarm, which by definition can happen at any time of day. */
+  alwaysCheckLive?: boolean;
   /** Pauses playback (video + audio) without unmounting the player — pass `!isFocused` from a
    * screen inside a tab navigator, since switching tabs doesn't unmount by default and a
    * playing/unmuted video would otherwise keep making sound in the background. */
@@ -122,7 +126,7 @@ export default function VideoPanel({
       // Cloudflare's API the other ~23 hours of the day — only actually ask once we're
       // close enough to a scheduled session for the answer to possibly be "yes" (a little
       // before it, too, since Bruno doesn't always start exactly on schedule).
-      if (!isNearLiveWindow()) {
+      if (!alwaysCheckLive && !isNearLiveWindow()) {
         if (!cancelled) setLive(false);
         return;
       }

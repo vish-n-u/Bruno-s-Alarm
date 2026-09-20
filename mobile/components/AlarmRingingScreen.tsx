@@ -15,7 +15,7 @@ export default function AlarmRingingScreen({ alarmId }: { alarmId: string }) {
   // bruno-session- alarms are a real, live howl; bruno-custom- alarms are a user-chosen
   // wake time that likely doesn't line up with an actual live session — say so honestly
   // rather than implying Bruno is howling right this second.
-  const isRealSession = alarmId.startsWith("bruno-session-");
+  const isRealSession = alarmId.startsWith("bruno-session-") || alarmId.startsWith("bruno-live-");
   // Android alarm ids end in the scheduled timestamp (bruno-session-<ms> / bruno-custom-
   // <ms>) — pull it out to show the exact scheduled time in the same mono "departure
   // board" language used on Home, rather than just a generic title.
@@ -50,7 +50,7 @@ export default function AlarmRingingScreen({ alarmId }: { alarmId: string }) {
       {/* Video fills the entire screen — the ringing take-over IS the video, not a card
           floating inside a UI. Text/buttons sit on solid scrim bands over it, since video
           content isn't theme-aware and can't guarantee contrast against arbitrary footage. */}
-      <VideoPanel allowUnmute={false} />
+      <VideoPanel allowUnmute={false} alwaysCheckLive={alarmId.startsWith("bruno-live-")} />
 
       <SafeAreaView style={styles.overlay} edges={["top", "bottom"]}>
         <View style={styles.topScrim}>

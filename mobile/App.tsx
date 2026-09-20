@@ -30,7 +30,9 @@ import LiveScreen from "./screens/LiveScreen";
 import BrunosPackScreen from "./screens/BrunosPackScreen";
 import WeatherPreviewScreen from "./screens/WeatherPreviewScreen";
 import { hasOnboarded, markOnboarded } from "./lib/onboarding";
-import { getActiveRingingAlarm, onAlarmRinging } from "./lib/notifications";
+import { getActiveRingingAlarm, isSubscribed, onAlarmRinging } from "./lib/notifications";
+import { joinLiveAlerts } from "./lib/liveAlerts";
+import { listenForLiveAlertsInForeground } from "./lib/liveAlertRinger";
 import { registerBackgroundAlarmSoundRefresh } from "./lib/backgroundRefresh";
 import { resumeIOSAlarmEngineIfNeeded } from "./lib/iosAlarmEngine";
 import { useThemeColors, useTimeOfDay } from "./lib/theme";
@@ -141,10 +143,16 @@ export default function App() {
 
   useEffect(() => {
     registerBackgroundAlarmSoundRefresh();
+    // Anyone who turned alarms on before live alerts existed hasn't joined the topic yet.
+    // Joining is idempotent, so just re-assert it on every launch while alarms are on.
+    isSubscribed()
+      .then((on) => (on ? joinLiveAlerts() : undefined))
+      .catch(() => {});
     // No-ops on Android. On iOS, re-establishes the keep-alive background audio session if
     // an alarm was still armed from before this app process started — e.g. the OS restarted
     // it, as opposed to the user force-quitting it (which this can't recover from).
     resumeIOSAlarmEngineIfNeeded();
+    return listenForLiveAlertsInForeground();
   }, []);
 
   // Only dismiss the splash once there's real content ready to replace it with — fonts

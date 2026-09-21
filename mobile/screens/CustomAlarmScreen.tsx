@@ -13,6 +13,7 @@ import {
   type CustomAlarm,
   type RepeatMode,
 } from "../lib/customAlarm";
+import { ensureAlarmPermissions } from "../lib/alarmPermissions";
 import { fonts, radius, shadow, spacing, useThemeColors, type ThemeColors } from "../lib/theme";
 
 const REPEAT_LABEL: Record<RepeatMode, string> = {
@@ -74,6 +75,7 @@ export default function CustomAlarmScreen({}: Props) {
   const next = nextCustomAlarmOccurrence(alarms);
 
   async function toggle(alarm: CustomAlarm, value: boolean) {
+    if (value && !(await ensureAlarmPermissions())) return;
     // Update immediately so the switch doesn't visually snap back while scheduling runs.
     setAlarms((prev) => prev.map((a) => (a.id === alarm.id ? { ...a, enabled: value } : a)));
     await setCustomAlarmEnabled(alarm.id, value);

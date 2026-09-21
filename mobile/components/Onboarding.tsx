@@ -13,7 +13,8 @@ import {
 } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
-import { requestPermission, scheduleUpcomingSessions } from "../lib/notifications";
+import { ensureAlarmPermissions } from "../lib/alarmPermissions";
+import { scheduleUpcomingSessions } from "../lib/notifications";
 import { generateGuestName, setDisplayName } from "../lib/profile";
 import { todaysSessions } from "../lib/schedule";
 import { fonts, radius, spacing, useThemeColors, type ThemeColors } from "../lib/theme";
@@ -103,7 +104,7 @@ export default function Onboarding({ onDone }: { onDone: () => void }) {
 
   async function finishWithNotifications() {
     await persistDisplayName();
-    const granted = await requestPermission();
+    const granted = await ensureAlarmPermissions();
     if (granted) await scheduleUpcomingSessions();
     onDone();
   }

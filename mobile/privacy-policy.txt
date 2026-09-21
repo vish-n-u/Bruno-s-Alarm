@@ -1,5 +1,5 @@
 BRUNO'S ALARM — PRIVACY POLICY
-Effective September 18, 2026
+Effective September 21, 2026
 Package: com.brunosalarm.app
 
 Bruno's Alarm wakes you up with a real dog's twice-daily howl, and lets you chat with
@@ -26,13 +26,20 @@ deliver the video. No ads, nothing sold to third parties.
   viewing that session's chat, since that's the point of a public chat.
 - If you report a chat message: the message you reported, your reason, and your
   anonymous device ID, so we can review it.
+- If you turn on the optional "Ring when Bruno goes live" alarm: Firebase Cloud
+  Messaging gives your device a push identifier, and the app subscribes it to a
+  "live" topic so it can be told when Bruno starts streaming. No name, email, or
+  phone number is attached, and turning the option off unsubscribes it.
+- On Android, Firebase Analytics may read your device's advertising ID (where your
+  device provides one) to measure usage. We do not use it to show ads.
 - We do not collect your real name, email address, phone number, or precise
   location, and there is no account or sign-up anywhere in the app.
 
 2. WHAT'S STORED ONLY ON YOUR DEVICE
 Never transmitted anywhere:
 - Your scheduled alarm times, held by Android's own AlarmManager.
-- Whether you've completed the app's one-time onboarding screen.
+- Whether you've completed the app's one-time onboarding screen, and whether you
+  turned on the optional live alarm.
 - A nickname you can optionally type during onboarding — currently unused by any
   feature (live chat generates its own display name instead), kept only in case a
   future feature uses it.
@@ -60,33 +67,43 @@ Two tools if something in chat bothers you:
 
 4. SERVICES WE USE
 - Firebase (Google): Anonymous Authentication, Cloud Firestore, and Cloud Functions
-  power live chat; Analytics and Crashlytics provide basic usage and crash data.
+  power live chat; Cloud Messaging delivers the optional live alerts; Analytics and
+  Crashlytics provide basic usage and crash data.
   Governed by Google's Privacy Policy: https://policies.google.com/privacy
-- Cloudflare Stream: delivers the live and recorded video. Loading video means your
-  device's IP address and standard request data reach Cloudflare's servers, the
-  same as loading video from any CDN. Governed by Cloudflare's Privacy Policy:
-  https://www.cloudflare.com/privacypolicy/
+- Cloudflare Stream and R2: Stream delivers the live video, and R2 stores the saved
+  recording your phone downloads for the alarm. Loading video or downloading the
+  recording means your device's IP address and standard request data reach
+  Cloudflare's servers, the same as loading anything from a CDN. Governed by
+  Cloudflare's Privacy Policy: https://www.cloudflare.com/privacypolicy/
+- Vercel: hosts the small server the app asks for the link to Bruno's latest
+  recording. Your device's IP address and standard request data reach it, and we do
+  not keep them. Governed by Vercel's Privacy Policy:
+  https://vercel.com/legal/privacy-policy
 None of these services are used to serve you ads, and Bruno's Alarm doesn't run any
 ad network of its own.
 
 5. PERMISSIONS THIS APP REQUESTS, AND WHY
 - POST_NOTIFICATIONS — lets the app show you anything at all, required on
   Android 13+ for any notification, including the alarm itself.
-- SCHEDULE_EXACT_ALARM — lets Bruno's alarm fire at the exact scheduled second,
-  the same permission every alarm-clock app uses.
+- SCHEDULE_EXACT_ALARM, USE_EXACT_ALARM — let Bruno's alarm fire at the exact
+  scheduled minute, the same permissions every alarm-clock app uses.
 - USE_FULL_SCREEN_INTENT — lets the alarm screen wake your phone and show over
   the lock screen when it goes off.
+- WAKE_LOCK — keeps the phone awake while the alarm is ringing.
 - RECEIVE_BOOT_COMPLETED — lets your alarms survive a phone restart.
-- SYSTEM_ALERT_WINDOW — lets the ringing alarm screen draw over other apps if
-  needed when it fires.
 - MODIFY_AUDIO_SETTINGS, FOREGROUND_SERVICE, FOREGROUND_SERVICE_MEDIA_PLAYBACK —
   let the alarm sound play reliably, including while the app isn't in the
-  foreground.
-- RECORD_AUDIO — declared by the video-playback library the app uses; Bruno's
-  Alarm never accesses your microphone or records audio.
+  foreground, and keep it audible while it rings.
 - VIBRATE — lets the alarm vibrate your phone alongside the sound.
-- READ_EXTERNAL_STORAGE / WRITE_EXTERNAL_STORAGE (older Android versions only) —
-  used to cache the downloaded recording of Bruno's howl for offline playback.
+- INTERNET, ACCESS_NETWORK_STATE — download Bruno's latest recording and play the
+  live video.
+- com.google.android.c2dm.permission.RECEIVE — lets the optional live alerts
+  reach your phone (Firebase Cloud Messaging).
+- AD_ID (com.google.android.gms.permission.AD_ID, ACCESS_ADSERVICES_*) — declared
+  by Firebase Analytics; not used to show ads.
+
+The app does not request access to your microphone, contacts, photos, files, or
+location.
 
 6. CHILDREN'S PRIVACY
 Bruno's Alarm isn't directed at children. Live chat's public, moderated nature

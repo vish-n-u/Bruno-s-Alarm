@@ -1,7 +1,8 @@
 import { useEffect, useState } from "react";
 import { ActivityIndicator, StyleSheet, Switch, Text, View } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
-import { isSubscribed, requestPermission, scheduleUpcomingSessions, unsubscribe } from "../lib/notifications";
+import { ensureAlarmPermissions } from "../lib/alarmPermissions";
+import { isSubscribed, scheduleUpcomingSessions, unsubscribe } from "../lib/notifications";
 import { fonts, radius, spacing, useThemeColors, type ThemeColors } from "../lib/theme";
 
 type Status = "checking" | "idle" | "subscribed" | "denied" | "unsupported";
@@ -29,7 +30,7 @@ export default function NotifyToggle() {
     setBusy(true);
     try {
       if (value) {
-        const granted = await requestPermission();
+        const granted = await ensureAlarmPermissions();
         if (!granted) {
           setStatus("denied");
           return;

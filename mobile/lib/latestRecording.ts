@@ -9,22 +9,30 @@ export type LatestRecording = {
   recordedAt: string;
 };
 
+export type LatestRecordingResult =
+  | { status: "ready"; recording: LatestRecording }
+  // The backend answered 202: a newer recording exists but Cloudflare is still preparing its
+  // downloadable file. Worth asking again in a minute or two, unlike the cases below.
+  | { status: "not_ready" }
+  // Unconfigured, offline, backend error, or nothing has ever been recorded.
+  | { status: "unavailable" };
+
 export function isLatestRecordingConfigured(): boolean {
   return Boolean(BACKEND_URL);
 }
 
-/** Returns the latest recording's URL, or null if unconfigured, unreachable, or nothing has
- * been recorded yet — every failure mode collapses to the same "nothing to use" signal so
- * callers can fall back without needing to distinguish why. */
-export async function fetchLatestRecording(): Promise<LatestRecording | null> {
-  if (!BACKEND_URL) return null;
+export async function fetchLatestRecording(): Promise<LatestRecordingResult> {
+  if (!BACKEND_URL) return { status: "unavailable" };
   try {
     const res = await fetch(`${BACKEND_URL}/api/latest-recording`);
-    if (!res.ok) return null;
+    if (res.status === 202) return { status: "not_ready" };
+    if (!res.ok) return { status: "unavailable" };
     const data = await res.json();
-    if (typeof data?.url !== "string" || typeof data?.recordedAt !== "string") return null;
-    return { url: data.url, recordedAt: data.recordedAt };
+    if (typeof data?.url !== "string" || typeof data?.recordedAt !== "string") {
+      return { status: "unavailable" };
+    }
+    return { status: "ready", recording: { url: data.url, recordedAt: data.recordedAt } };
   } catch {
-    return null;
+    return { status: "unavailable" };
   }
 }

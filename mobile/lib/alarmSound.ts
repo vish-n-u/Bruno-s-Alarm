@@ -61,27 +61,87 @@ export async function getCachedAlarmVideoUri(): Promise<string | undefined> {
   return record.path;
 }
 
+// A "not ready yet" answer (Cloudflare still preparing the file) or a failed download is worth
+// another try shortly; anything else (offline, unconfigured, nothing recorded) is not, and the
+// next trigger — the app coming to the foreground, a schedule change, the background task —
+// will simply try again on its own.
+const RETRY_DELAYS_MS = [60_000, 120_000, 300_000];
+// Opening the app or returning to it can happen many times an hour; asking the backend that often
+// buys nothing, since a new recording appears at most a couple of times a day.
+const FOREGROUND_MIN_GAP_MS = 5 * 60 * 1000;
+
+let inFlight: Promise<boolean> | null = null;
+let retryTimer: ReturnType<typeof setTimeout> | null = null;
+let lastAttemptAt = 0;
+
+/** One refresh attempt. Resolves true if it failed in a way that is worth retrying soon. */
+async function attemptRefresh(): Promise<boolean> {
+  try {
+    const result = await fetchLatestRecording();
+    if (result.status === "not_ready") return true;
+    if (result.status !== "ready") return false;
+
+    const latest = result.recording;
+    const existing = await getCacheRecord();
+    if (existing?.recordedAt === latest.recordedAt) return false; // already have this one cached
+
+    try {
+      const download = await FileSystem.downloadAsync(latest.url, TEMP_PATH);
+      if (download.status !== 200) return true;
+      await FileSystem.deleteAsync(FINAL_PATH, { idempotent: true });
+      await FileSystem.moveAsync({ from: TEMP_PATH, to: FINAL_PATH });
+      await AsyncStorage.setItem(CACHE_KEY, JSON.stringify({ path: FINAL_PATH, recordedAt: latest.recordedAt }));
+      return false;
+    } catch {
+      // Network failure, storage full, etc. — leave whatever was cached before untouched.
+      return true;
+    } finally {
+      FileSystem.deleteAsync(TEMP_PATH, { idempotent: true }).catch(() => {});
+    }
+  } catch {
+    return false;
+  }
+}
+
+/** Shares one attempt between callers that overlap (e.g. the foreground trigger and the ringing
+ * screen both asking at once) instead of downloading the same file twice. */
+function runRefresh(): Promise<boolean> {
+  if (inFlight) return inFlight;
+  lastAttemptAt = Date.now();
+  inFlight = attemptRefresh().finally(() => {
+    inFlight = null;
+  });
+  return inFlight;
+}
+
+function scheduleRetry(attempt: number): void {
+  if (attempt >= RETRY_DELAYS_MS.length) return;
+  retryTimer = setTimeout(async () => {
+    retryTimer = null;
+    const stillFailing = await runRefresh();
+    if (stillFailing) scheduleRetry(attempt + 1);
+  }, RETRY_DELAYS_MS[attempt]);
+}
+
 /** Fetches the latest recording and downloads it, replacing the cached sound only once the
  * new download actually finishes — a failed or partial refresh always leaves whatever was
  * cached before untouched, never a half-written file. Safe to call opportunistically (e.g.
  * every time alarms are (re)scheduled); silently no-ops on any failure — no backend
- * configured, no network, nothing recorded yet, download failure. */
+ * configured, no network, nothing recorded yet, download failure. If the recording exists but
+ * isn't ready to download yet, it retries a few times over the next several minutes. */
 export async function refreshAlarmSound(): Promise<void> {
-  const latest = await fetchLatestRecording();
-  if (!latest) return;
-
-  const existing = await getCacheRecord();
-  if (existing?.recordedAt === latest.recordedAt) return; // already have this one cached
-
-  try {
-    const result = await FileSystem.downloadAsync(latest.url, TEMP_PATH);
-    if (result.status !== 200) return;
-    await FileSystem.deleteAsync(FINAL_PATH, { idempotent: true });
-    await FileSystem.moveAsync({ from: TEMP_PATH, to: FINAL_PATH });
-    await AsyncStorage.setItem(CACHE_KEY, JSON.stringify({ path: FINAL_PATH, recordedAt: latest.recordedAt }));
-  } catch {
-    // Network failure, storage full, etc. — leave whatever was cached before untouched.
-  } finally {
-    FileSystem.deleteAsync(TEMP_PATH, { idempotent: true }).catch(() => {});
+  // An explicit new request supersedes any retry still waiting from an earlier one.
+  if (retryTimer) {
+    clearTimeout(retryTimer);
+    retryTimer = null;
   }
+  const needsRetry = await runRefresh();
+  if (needsRetry) scheduleRetry(0);
+}
+
+/** For app-open / return-to-foreground: same as refreshAlarmSound(), but skipped if an attempt
+ * already happened in the last few minutes. */
+export async function refreshAlarmSoundIfStale(): Promise<void> {
+  if (Date.now() - lastAttemptAt < FOREGROUND_MIN_GAP_MS) return;
+  await refreshAlarmSound();
 }

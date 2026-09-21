@@ -11,7 +11,7 @@ import {
   snoozeIOSRingingAlarm,
   stopIOSRingingAlarm,
 } from "./iosAlarmEngine";
-import { joinLiveAlerts, leaveLiveAlerts } from "./liveAlerts";
+import { isLiveAlarmEnabled } from "./liveAlerts";
 import { nextSessions } from "./schedule";
 
 const ID_PREFIX = "bruno-session-";
@@ -88,7 +88,6 @@ export async function scheduleUpcomingSessions(): Promise<void> {
         ...(soundPath ? { soundPath } : {}),
       });
     }
-    joinLiveAlerts();
     return;
   }
 
@@ -118,7 +117,6 @@ export async function scheduleUpcomingSessions(): Promise<void> {
 
 export async function unsubscribe(): Promise<void> {
   await clearScheduled();
-  leaveLiveAlerts();
 }
 
 /** TEMPORARY test hook — schedules one real alarm ~90s out via the exact same path as a
@@ -146,7 +144,9 @@ export async function scheduleTestAlarmSoon(): Promise<void> {
 const LIVE_PREFIX = "bruno-live-";
 const LIVE_LEAD_MS = 5000; // the native scheduler needs a moment in the future, not "now"
 const SCHEDULED_SESSION_OVERLAP_MS = 2 * 60 * 1000;
-const LIVE_REPEAT_GUARD_MS = 10 * 60 * 1000;
+// Just enough to swallow a stream that drops and reconnects; long enough windows made back-to-back
+// real streams (or tests) silently skip the second ring.
+const LIVE_REPEAT_GUARD_MS = 2 * 60 * 1000;
 
 function alarmTimestamp(id: string): number {
   return Number(id.slice(id.lastIndexOf("-") + 1));
@@ -154,8 +154,8 @@ function alarmTimestamp(id: string): number {
 
 /** Rings a real alarm right now because Bruno just went live — same engine, sound, ringing
  * screen and Stop/Snooze as a scheduled session (see functions/src/index.ts's
- * cloudflareLiveWebhook, which triggers this via a data push). Only for someone who has
- * "Wake me up with Bruno" on. Skips if a scheduled 6AM/6PM alarm is about to ring anyway (no
+ * cloudflareLiveWebhook, which triggers this via a data push). Only for someone who turned on
+ * the separate "Live alarm" opt-in (lib/liveAlerts.ts) — NOT tied to the 6AM/6PM toggle. Skips if a scheduled 6AM/6PM alarm is about to ring anyway (no
  * double ring) or a live alarm already went off in the last few minutes (a reconnect).
  * Android only. */
 export async function ringForLiveStart(): Promise<void> {
@@ -163,8 +163,7 @@ export async function ringForLiveStart(): Promise<void> {
   const alarms = await RNAlarmModule.listAlarms();
   const now = Date.now();
 
-  const subscribed = alarms.some((a) => a.id.startsWith(ID_PREFIX));
-  if (!subscribed) return;
+  if (!(await isLiveAlarmEnabled())) return;
 
   const alreadyCovered = alarms.some((a) => {
     const at = alarmTimestamp(a.id);
@@ -222,6 +221,16 @@ export async function snoozeRingingAlarm(alarmId: string): Promise<void> {
 export async function openAlarmPermissionSettings(): Promise<void> {
   if (Platform.OS !== "android") return;
   await IntentLauncher.startActivityAsync(IntentLauncher.ActivityAction.REQUEST_SCHEDULE_EXACT_ALARM, {
+    data: `package:${ANDROID_PACKAGE_NAME}`,
+  });
+}
+
+/** Opens this app's system settings page (Android) — where battery usage and, on phones that
+ * have it, auto-start live. The live alarm depends on the app being allowed to wake in the
+ * background, which is a per-phone setting the app itself can't change. */
+export async function openAppSettings(): Promise<void> {
+  if (Platform.OS !== "android") return;
+  await IntentLauncher.startActivityAsync(IntentLauncher.ActivityAction.APPLICATION_DETAILS_SETTINGS, {
     data: `package:${ANDROID_PACKAGE_NAME}`,
   });
 }

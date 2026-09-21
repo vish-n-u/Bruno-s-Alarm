@@ -14,7 +14,7 @@ import {
   type NativeScrollEvent,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
-import { requestPermission } from "../lib/notifications";
+import { ensureAlarmPermissions } from "../lib/alarmPermissions";
 import {
   deleteCustomAlarm,
   getCustomAlarm,
@@ -196,11 +196,9 @@ export default function EditCustomAlarmModal({ visible, alarmId, onClose, onSave
 
     setSaving(true);
     try {
-      const granted = await requestPermission();
-      if (!granted) {
-        Alert.alert("Permission needed", "Grant notification permission first (from the Home screen or Settings).");
-        return;
-      }
+      // Asks for whatever is still missing (notifications, exact alarms, lock-screen display)
+      // and explains it; false means it already told them why, so just stop here.
+      if (!(await ensureAlarmPermissions())) return;
 
       const hour12 = HOURS[hourIndex];
       const hour24 = ampmIndex === 1 ? (hour12 === 12 ? 12 : hour12 + 12) : hour12 === 12 ? 0 : hour12;

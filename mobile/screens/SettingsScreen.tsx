@@ -5,13 +5,12 @@ import { Ionicons } from "@expo/vector-icons";
 import { useFocusEffect } from "@react-navigation/native";
 import type { NativeStackScreenProps } from "@react-navigation/native-stack";
 import appConfig from "../app.json";
+import LiveAlarmToggle from "../components/LiveAlarmToggle";
 import NotifyToggle from "../components/NotifyToggle";
 import type { HomeStackParamList } from "../App";
 import {
   cancelAllScheduledAlarms,
   getAllScheduledAlarms,
-  openAlarmPermissionSettings,
-  openFullScreenIntentSettings,
   requestPermission,
   scheduleTestAlarmSoon,
   type ScheduledAlarmKind,
@@ -182,28 +181,9 @@ export default function SettingsScreen({ navigation }: Props) {
       </View>
 
       {Platform.OS === "android" && (
-        <>
-          <SectionLabel variant="secondary">Real alarm permissions</SectionLabel>
-          <View style={styles.card}>
-            <SettingsRow
-              icon="alarm-outline"
-              title="Exact alarms"
-              subtitle="Rings exactly on time"
-              onPress={openAlarmPermissionSettings}
-              colors={colors}
-              styles={styles}
-            />
-            <View style={styles.rowDivider} />
-            <SettingsRow
-              icon="phone-portrait-outline"
-              title="Full-screen alerts"
-              subtitle="Shows over the lock screen"
-              onPress={openFullScreenIntentSettings}
-              colors={colors}
-              styles={styles}
-            />
-          </View>
-        </>
+        <View style={[styles.card, { marginTop: spacing.md }]}>
+          <LiveAlarmToggle />
+        </View>
       )}
 
       <SectionLabel variant="secondary">About</SectionLabel>

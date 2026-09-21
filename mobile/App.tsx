@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { StyleSheet } from "react-native";
+import { AppState, StyleSheet } from "react-native";
 import { StatusBar } from "expo-status-bar";
 import * as SplashScreen from "expo-splash-screen";
 import { useFonts } from "expo-font";
@@ -30,8 +30,9 @@ import LiveScreen from "./screens/LiveScreen";
 import BrunosPackScreen from "./screens/BrunosPackScreen";
 import WeatherPreviewScreen from "./screens/WeatherPreviewScreen";
 import { hasOnboarded, markOnboarded } from "./lib/onboarding";
-import { getActiveRingingAlarm, isSubscribed, onAlarmRinging } from "./lib/notifications";
-import { joinLiveAlerts } from "./lib/liveAlerts";
+import { getActiveRingingAlarm, onAlarmRinging } from "./lib/notifications";
+import { refreshAlarmSoundIfStale } from "./lib/alarmSound";
+import { syncLiveAlarmOnLaunch } from "./lib/liveAlerts";
 import { listenForLiveAlertsInForeground } from "./lib/liveAlertRinger";
 import { registerBackgroundAlarmSoundRefresh } from "./lib/backgroundRefresh";
 import { resumeIOSAlarmEngineIfNeeded } from "./lib/iosAlarmEngine";
@@ -143,16 +144,24 @@ export default function App() {
 
   useEffect(() => {
     registerBackgroundAlarmSoundRefresh();
-    // Anyone who turned alarms on before live alerts existed hasn't joined the topic yet.
-    // Joining is idempotent, so just re-assert it on every launch while alarms are on.
-    isSubscribed()
-      .then((on) => (on ? joinLiveAlerts() : undefined))
-      .catch(() => {});
+    // Re-asserts the live-alarm topic membership if the user opted in, and drops it otherwise
+    // (also cleans up anyone who joined under the earlier, 6AM-toggle-tied version).
+    syncLiveAlarmOnLaunch().catch(() => {});
     // No-ops on Android. On iOS, re-establishes the keep-alive background audio session if
     // an alarm was still armed from before this app process started — e.g. the OS restarted
     // it, as opposed to the user force-quitting it (which this can't recover from).
     resumeIOSAlarmEngineIfNeeded();
     return listenForLiveAlertsInForeground();
+  }, []);
+
+  // Keeps the saved alarm recording current without needing a schedule change: once when the app
+  // opens and again each time it returns to the foreground (throttled inside, so this is cheap).
+  useEffect(() => {
+    refreshAlarmSoundIfStale().catch(() => {});
+    const subscription = AppState.addEventListener("change", (state) => {
+      if (state === "active") refreshAlarmSoundIfStale().catch(() => {});
+    });
+    return () => subscription.remove();
   }, []);
 
   // Only dismiss the splash once there's real content ready to replace it with — fonts

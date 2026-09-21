@@ -1,5 +1,5 @@
 diff --git a/node_modules/react-native-alarmageddon/android/src/main/java/com/rnalarmmodule/AlarmModule.kt b/node_modules/react-native-alarmageddon/android/src/main/java/com/rnalarmmodule/AlarmModule.kt
-index 84502ce..7ba8789 100644
+index 84502ce..88e3df8 100644
 --- a/node_modules/react-native-alarmageddon/android/src/main/java/com/rnalarmmodule/AlarmModule.kt
 +++ b/node_modules/react-native-alarmageddon/android/src/main/java/com/rnalarmmodule/AlarmModule.kt
 @@ -67,6 +67,7 @@ class AlarmModule(reactContext: ReactApplicationContext) : ReactContextBaseJavaM
@@ -18,7 +18,30 @@ index 84502ce..7ba8789 100644
              }
              reactApplicationContext.sendBroadcast(intent)
              promise.resolve(null)
-@@ -104,6 +106,7 @@ class AlarmModule(reactContext: ReactApplicationContext) : ReactContextBaseJavaM
+@@ -85,6 +87,22 @@ class AlarmModule(reactContext: ReactApplicationContext) : ReactContextBaseJavaM
+         }
+     }
+ 
++    @ReactMethod
++    fun canScheduleExactAlarms(promise: Promise) {
++        val alarmManager = reactApplicationContext.getSystemService(Context.ALARM_SERVICE) as AlarmManager
++        val ok = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) alarmManager.canScheduleExactAlarms() else true
++        promise.resolve(ok)
++    }
++
++    @ReactMethod
++    fun canUseFullScreenIntent(promise: Promise) {
++        val ok = if (Build.VERSION.SDK_INT >= 34) {
++            val manager = reactApplicationContext.getSystemService(Context.NOTIFICATION_SERVICE) as android.app.NotificationManager
++            manager.canUseFullScreenIntent()
++        } else true
++        promise.resolve(ok)
++    }
++
+     @ReactMethod
+     fun requestPermissions(promise: Promise) {
+         val granted = if (Build.VERSION.SDK_INT >= 33) {
+@@ -104,6 +122,7 @@ class AlarmModule(reactContext: ReactApplicationContext) : ReactContextBaseJavaM
              val body = alarm.getString("body") ?: ""
              val snoozeEnabled = if (alarm.hasKey("snoozeEnabled")) alarm.getBoolean("snoozeEnabled") else true
              val snoozeInterval = if (alarm.hasKey("snoozeInterval")) alarm.getInt("snoozeInterval") else 5
@@ -26,7 +49,7 @@ index 84502ce..7ba8789 100644
  
              val sdf = SimpleDateFormat(DATE_PATTERN, Locale.getDefault())
              val date = sdf.parse(datetimeISO) ?: throw Exception("Invalid date format")
-@@ -121,6 +124,7 @@ class AlarmModule(reactContext: ReactApplicationContext) : ReactContextBaseJavaM
+@@ -121,6 +140,7 @@ class AlarmModule(reactContext: ReactApplicationContext) : ReactContextBaseJavaM
                  putExtra("body", body)
                  putExtra("snoozeEnabled", snoozeEnabled)
                  putExtra("snoozeInterval", snoozeInterval)
@@ -34,7 +57,7 @@ index 84502ce..7ba8789 100644
              }
  
              val pendingIntent = PendingIntent.getBroadcast(
-@@ -137,7 +141,7 @@ class AlarmModule(reactContext: ReactApplicationContext) : ReactContextBaseJavaM
+@@ -137,7 +157,7 @@ class AlarmModule(reactContext: ReactApplicationContext) : ReactContextBaseJavaM
                  alarmManager.setExact(AlarmManager.RTC_WAKEUP, triggerAt, pendingIntent)
              }
  
@@ -43,7 +66,7 @@ index 84502ce..7ba8789 100644
              Log.d(TAG, "Scheduled alarm id=$id at=$datetimeISO")
              promise.resolve(null)
          } catch (e: Exception) {
-@@ -186,6 +190,7 @@ class AlarmModule(reactContext: ReactApplicationContext) : ReactContextBaseJavaM
+@@ -186,6 +206,7 @@ class AlarmModule(reactContext: ReactApplicationContext) : ReactContextBaseJavaM
              map.putString("body", obj.optString("body"))
              map.putBoolean("snoozeEnabled", obj.optBoolean("snoozeEnabled", true))
              map.putInt("snoozeInterval", obj.optInt("snoozeInterval", 5))
@@ -51,7 +74,7 @@ index 84502ce..7ba8789 100644
              arr.pushMap(map)
          }
          promise.resolve(arr)
-@@ -232,7 +237,7 @@ class AlarmModule(reactContext: ReactApplicationContext) : ReactContextBaseJavaM
+@@ -232,7 +253,7 @@ class AlarmModule(reactContext: ReactApplicationContext) : ReactContextBaseJavaM
          // Required for NativeEventEmitter
      }
  
@@ -60,7 +83,7 @@ index 84502ce..7ba8789 100644
          val obj = JSONObject()
              .put("id", id)
              .put("datetimeISO", datetimeISO)
-@@ -240,6 +245,7 @@ class AlarmModule(reactContext: ReactApplicationContext) : ReactContextBaseJavaM
+@@ -240,6 +261,7 @@ class AlarmModule(reactContext: ReactApplicationContext) : ReactContextBaseJavaM
              .put("body", body)
              .put("snoozeEnabled", snoozeEnabled)
              .put("snoozeInterval", snoozeInterval)
@@ -69,10 +92,56 @@ index 84502ce..7ba8789 100644
          prefs.edit().putString(id, obj.toString()).apply()
      }
 diff --git a/node_modules/react-native-alarmageddon/android/src/main/java/com/rnalarmmodule/AlarmReceiver.kt b/node_modules/react-native-alarmageddon/android/src/main/java/com/rnalarmmodule/AlarmReceiver.kt
-index 8eb109e..cbea586 100644
+index 8eb109e..b14b88c 100644
 --- a/node_modules/react-native-alarmageddon/android/src/main/java/com/rnalarmmodule/AlarmReceiver.kt
 +++ b/node_modules/react-native-alarmageddon/android/src/main/java/com/rnalarmmodule/AlarmReceiver.kt
-@@ -64,13 +64,14 @@ class AlarmReceiver : BroadcastReceiver() {
+@@ -6,11 +6,17 @@ import android.app.*
+ import android.content.BroadcastReceiver
+ import android.content.Context
+ import android.content.Intent
++import android.content.IntentFilter
++import android.database.ContentObserver
+ import android.media.*
+ import android.os.Build
++import android.os.Handler
++import android.os.Looper
+ import android.os.PowerManager
++import android.provider.Settings
+ import android.widget.Toast
+ import androidx.core.app.NotificationCompat
++import androidx.core.content.ContextCompat
+ import android.util.Log
+ 
+ class AlarmReceiver : BroadcastReceiver() {
+@@ -22,7 +28,9 @@ class AlarmReceiver : BroadcastReceiver() {
+         private const val CHANNEL_ID = "rn_alarm_module_channel"
+         private const val RAW_RES = "alarm_default"
+         private const val SNOOZE_MINUTES = 5
+-        private const val AUTO_STOP_SECONDS = 60
++        // A safety cap, not the normal way an alarm ends: it rings until Stop/Snooze. The stock
++        // library stopped every alarm after 60s, which cut the recording off mid-wake-up.
++        private const val AUTO_STOP_SECONDS = 600
+ 
+         @Volatile
+         private var player: MediaPlayer? = null
+@@ -36,6 +44,16 @@ class AlarmReceiver : BroadcastReceiver() {
+         @Volatile
+         var activeAlarmId: String? = null
+ 
++        // While an alarm rings, anything that lowers the alarm volume is put straight back to max.
++        @Volatile
++        private var volumeReceiver: BroadcastReceiver? = null
++
++        @Volatile
++        private var volumeObserver: ContentObserver? = null
++
++        @Volatile
++        private var volumeGuardContext: Context? = null
++
+         @Volatile
+         private var wakeLock: PowerManager.WakeLock? = null
+     }
+@@ -64,13 +82,14 @@ class AlarmReceiver : BroadcastReceiver() {
          val body = intent.getStringExtra("body") ?: ""
          val snoozeEnabled = intent.getBooleanExtra("snoozeEnabled", true)
          val snoozeInterval = intent.getIntExtra("snoozeInterval", SNOOZE_MINUTES)
@@ -88,16 +157,84 @@ index 8eb109e..cbea586 100644
          showNotificationWithActions(context, id, title, body, snoozeEnabled, snoozeInterval)
      }
  
-@@ -126,7 +127,7 @@ class AlarmReceiver : BroadcastReceiver() {
+@@ -97,13 +116,16 @@ class AlarmReceiver : BroadcastReceiver() {
+             audioManager = context.getSystemService(Context.AUDIO_SERVICE) as AudioManager
+         }
+         audioManager?.let { am ->
+-            originalVolume = am.getStreamVolume(AudioManager.STREAM_ALARM)
++            // Only remember the volume the person had set BEFORE the first alarm raised it — a second
++            // alarm arriving while one is still ringing would otherwise remember the raised max.
++            if (volumeReceiver == null) originalVolume = am.getStreamVolume(AudioManager.STREAM_ALARM)
+             val maxVolume = am.getStreamMaxVolume(AudioManager.STREAM_ALARM)
+             am.setStreamVolume(
+                 AudioManager.STREAM_ALARM,
+                 maxVolume,
+                 AudioManager.FLAG_SHOW_UI or AudioManager.FLAG_PLAY_SOUND
+             )
++            startVolumeGuard(context, am, maxVolume)
+ 
+             val attributes = AudioAttributes.Builder()
+                 .setUsage(AudioAttributes.USAGE_ALARM)
+@@ -126,7 +148,57 @@ class AlarmReceiver : BroadcastReceiver() {
          }
      }
  
 -    private fun playAlarm(context: Context, id: String) {
++    private fun startVolumeGuard(context: Context, am: AudioManager, maxVolume: Int) {
++        if (volumeReceiver != null) return
++        val appContext = context.applicationContext
++        val restore = {
++            if (activeAlarmId != null) {
++                try {
++                    if (am.getStreamVolume(AudioManager.STREAM_ALARM) < maxVolume) {
++                        am.setStreamVolume(AudioManager.STREAM_ALARM, maxVolume, 0)
++                    }
++                } catch (_: Exception) {
++                }
++            }
++        }
++
++        // Fires the instant a volume key is pressed. Undocumented but long-stable system broadcast.
++        val receiver = object : BroadcastReceiver() {
++            override fun onReceive(c: Context?, i: Intent?) {
++                restore()
++            }
++        }
++        ContextCompat.registerReceiver(
++            appContext,
++            receiver,
++            IntentFilter("android.media.VOLUME_CHANGED_ACTION"),
++            ContextCompat.RECEIVER_EXPORTED
++        )
++        volumeReceiver = receiver
++
++        // Backup for phones that change the volume without that broadcast (slower, but catches it).
++        val observer = object : ContentObserver(Handler(Looper.getMainLooper())) {
++            override fun onChange(selfChange: Boolean) {
++                restore()
++            }
++        }
++        appContext.contentResolver.registerContentObserver(Settings.System.CONTENT_URI, true, observer)
++        volumeObserver = observer
++        volumeGuardContext = appContext
++    }
++
++    private fun stopVolumeGuard() {
++        val ctx = volumeGuardContext
++        if (ctx != null) {
++            try { volumeReceiver?.let { ctx.unregisterReceiver(it) } } catch (_: Exception) {}
++            try { volumeObserver?.let { ctx.contentResolver.unregisterContentObserver(it) } } catch (_: Exception) {}
++        }
++        volumeReceiver = null
++        volumeObserver = null
++        volumeGuardContext = null
++    }
++
 +    private fun playAlarm(context: Context, id: String, soundPath: String? = null) {
          player?.let {
              try {
                  if (it.isPlaying) it.stop()
-@@ -136,7 +137,7 @@ class AlarmReceiver : BroadcastReceiver() {
+@@ -136,7 +208,7 @@ class AlarmReceiver : BroadcastReceiver() {
          }
  
          player = MediaPlayer().apply {
@@ -106,12 +243,12 @@ index 8eb109e..cbea586 100644
                  // Try to use custom alarm sound from host app's res/raw folder
                  val resId = context.resources.getIdentifier(RAW_RES, "raw", context.packageName)
                  if (resId != 0) {
-@@ -150,22 +151,63 @@ class AlarmReceiver : BroadcastReceiver() {
+@@ -150,22 +222,63 @@ class AlarmReceiver : BroadcastReceiver() {
                          ?: android.media.RingtoneManager.getDefaultUri(android.media.RingtoneManager.TYPE_NOTIFICATION)
                      setDataSource(context, alarmUri)
                  }
 +            }
- 
+                 
 -                setAudioAttributes(
 -                    AudioAttributes.Builder()
 -                        .setUsage(AudioAttributes.USAGE_ALARM)
@@ -185,7 +322,15 @@ index 8eb109e..cbea586 100644
              }
          }
  
-@@ -310,11 +352,13 @@ class AlarmReceiver : BroadcastReceiver() {
+@@ -265,6 +378,7 @@ class AlarmReceiver : BroadcastReceiver() {
+ 
+     private fun stopAlarm(context: Context, id: String?) {
+         Log.d(TAG, "Stopping alarm id=$id")
++        stopVolumeGuard()
+         
+         player?.apply {
+             try {
+@@ -310,11 +424,13 @@ class AlarmReceiver : BroadcastReceiver() {
          val title = originalIntent.getStringExtra("title") ?: "Alarm"
          val body = originalIntent.getStringExtra("body") ?: ""
          val minutes = originalIntent.getIntExtra("snoozeMinutes", SNOOZE_MINUTES)

@@ -215,7 +215,7 @@
     <div class="mark">🐕</div>
     <div class="header-text">
       <h1>Bruno's Alarm — Privacy Policy</h1>
-      <div class="meta">Effective September 18, 2026 · com.brunosalarm.app</div>
+      <div class="meta">Effective September 21, 2026 · com.brunosalarm.app</div>
     </div>
   </header>
 
@@ -252,6 +252,16 @@
       that session's chat, since that's the point of a public chat.
     </li>
     <li>
+        If you turn on the optional <strong>"Ring when Bruno goes live"</strong> alarm: Firebase Cloud Messaging
+        gives your device a push identifier, and the app subscribes it to a "live" topic so it can be told when
+        Bruno starts streaming. No name, email, or phone number is attached, and turning the option off
+        unsubscribes it.
+      </li>
+      <li>
+        On Android, Firebase Analytics may read your device's advertising ID (where your device provides one)
+        to measure usage. We do not use it to show ads.
+      </li>
+      <li>
       If you report a chat message: the message you reported, your reason, and your
       anonymous device ID, so we can review it.
     </li>
@@ -265,7 +275,7 @@
   <p>Never transmitted anywhere:</p>
   <ul>
     <li>Your scheduled alarm times, held by Android's own <code>AlarmManager</code>.</li>
-    <li>Whether you've completed the app's one-time onboarding screen.</li>
+    <li>Whether you've completed the app's one-time onboarding screen, and whether you turned on the optional live alarm.</li>
     <li>
       A nickname you can optionally type during onboarding — currently unused by any feature
       (live chat generates its own display name instead), kept only in case a future feature
@@ -300,15 +310,22 @@
   <ul>
     <li>
       <strong>Firebase (Google)</strong>: Anonymous Authentication, Cloud Firestore, and
-      Cloud Functions power live chat; Analytics and Crashlytics provide basic usage and
-      crash data. Governed by
+      Cloud Functions power live chat; Cloud Messaging delivers the optional live alerts;
+      Analytics and Crashlytics provide basic usage and crash data. Governed by
       <a href="https://policies.google.com/privacy" target="_blank" rel="noopener">Google's Privacy Policy</a>.
     </li>
     <li>
-      <strong>Cloudflare Stream</strong>: delivers the live and recorded video. Loading video
-      means your device's IP address and standard request data reach Cloudflare's servers,
-      the same as loading video from any CDN. Governed by
+      <strong>Cloudflare Stream and R2</strong>: Stream delivers the live video, and R2 stores the
+      saved recording your phone downloads for the alarm. Loading video or downloading the
+      recording means your device's IP address and standard request data reach Cloudflare's
+      servers, the same as loading anything from a CDN. Governed by
       <a href="https://www.cloudflare.com/privacypolicy/" target="_blank" rel="noopener">Cloudflare's Privacy Policy</a>.
+    </li>
+    <li>
+      <strong>Vercel</strong>: hosts the small server the app asks for the link to Bruno's latest
+      recording. Your device's IP address and standard request data reach it, and we do not
+      keep them. Governed by
+      <a href="https://vercel.com/legal/privacy-policy" target="_blank" rel="noopener">Vercel's Privacy Policy</a>.
     </li>
   </ul>
   <p>
@@ -323,38 +340,43 @@
       <span class="perm-why">Lets the app show you anything at all — required on Android 13+ for any notification, including the alarm itself.</span>
     </li>
     <li>
-      <span class="perm-name">SCHEDULE_EXACT_ALARM</span>
-      <span class="perm-why">Lets Bruno's alarm fire at the exact scheduled second, the same permission every alarm-clock app uses.</span>
+      <span class="perm-name">SCHEDULE_EXACT_ALARM · USE_EXACT_ALARM</span>
+      <span class="perm-why">Let Bruno's alarm fire at the exact scheduled minute, the same permissions every alarm-clock app uses.</span>
     </li>
     <li>
       <span class="perm-name">USE_FULL_SCREEN_INTENT</span>
       <span class="perm-why">Lets the alarm screen wake your phone and show over the lock screen when it goes off.</span>
     </li>
     <li>
+      <span class="perm-name">WAKE_LOCK</span>
+      <span class="perm-why">Keeps the phone awake while the alarm is ringing.</span>
+    </li>
+    <li>
       <span class="perm-name">RECEIVE_BOOT_COMPLETED</span>
       <span class="perm-why">Lets your alarms survive a phone restart, so a reboot overnight doesn't silently cancel tomorrow's wake-up.</span>
     </li>
     <li>
-      <span class="perm-name">SYSTEM_ALERT_WINDOW</span>
-      <span class="perm-why">Lets the ringing alarm screen draw over other apps if needed when it fires.</span>
-    </li>
-    <li>
       <span class="perm-name">MODIFY_AUDIO_SETTINGS · FOREGROUND_SERVICE · FOREGROUND_SERVICE_MEDIA_PLAYBACK</span>
-      <span class="perm-why">Let the alarm sound play reliably, including while the app isn't in the foreground.</span>
-    </li>
-    <li>
-      <span class="perm-name">RECORD_AUDIO</span>
-      <span class="perm-why">Declared by the video-playback library the app uses; Bruno's Alarm never accesses your microphone or records audio.</span>
+      <span class="perm-why">Let the alarm sound play reliably, including while the app isn't in the foreground, and keep it audible while it rings.</span>
     </li>
     <li>
       <span class="perm-name">VIBRATE</span>
       <span class="perm-why">Lets the alarm vibrate your phone alongside the sound.</span>
     </li>
     <li>
-      <span class="perm-name">READ_EXTERNAL_STORAGE · WRITE_EXTERNAL_STORAGE</span>
-      <span class="perm-why">Older Android versions only — used to cache the downloaded recording of Bruno's howl for offline playback.</span>
+      <span class="perm-name">INTERNET · ACCESS_NETWORK_STATE</span>
+      <span class="perm-why">Download Bruno's latest recording and play the live video.</span>
+    </li>
+    <li>
+      <span class="perm-name">com.google.android.c2dm.permission.RECEIVE</span>
+      <span class="perm-why">Lets the optional live alerts reach your phone (Firebase Cloud Messaging).</span>
+    </li>
+    <li>
+      <span class="perm-name">AD_ID</span>
+      <span class="perm-why">Declared by Firebase Analytics; not used to show ads.</span>
     </li>
   </ul>
+  <p>The app does not request access to your microphone, contacts, photos, files, or location.</p>
 
   <h2><span class="num">6</span> Children's privacy</h2>
   <p>

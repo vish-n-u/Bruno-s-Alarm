@@ -18,7 +18,7 @@
     },
     "android": {
       "package": "com.brunosalarm.app",
-      "versionCode": 5,
+      "versionCode": 8,
       "googleServicesFile": "./google-services.json",
       "adaptiveIcon": {
         "backgroundColor": "#0f1a14",
@@ -31,10 +31,15 @@
         "RECEIVE_BOOT_COMPLETED",
         "POST_NOTIFICATIONS",
         "USE_FULL_SCREEN_INTENT",
-        "android.permission.RECORD_AUDIO",
         "android.permission.MODIFY_AUDIO_SETTINGS",
         "android.permission.FOREGROUND_SERVICE",
         "android.permission.FOREGROUND_SERVICE_MEDIA_PLAYBACK"
+      ],
+      "blockedPermissions": [
+        "android.permission.RECORD_AUDIO",
+        "android.permission.SYSTEM_ALERT_WINDOW",
+        "android.permission.READ_EXTERNAL_STORAGE",
+        "android.permission.WRITE_EXTERNAL_STORAGE"
       ]
     },
     "web": {
@@ -49,6 +54,7 @@
       ],
       "./plugins/withLockScreenAlarmActivity",
       "./plugins/withFirebaseMessagingColorFix",
+      "./plugins/withVolumeKeyBlock",
       "./plugins/withIPv4GradleFix",
       "./plugins/withAlarmSound",
       "./plugins/withReleaseSigning",

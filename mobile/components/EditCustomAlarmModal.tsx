@@ -1,8 +1,8 @@
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import {
   ActivityIndicator,
   Alert,
-  FlatList,
+  Animated,
   Modal,
   Pressable,
   ScrollView,
@@ -10,11 +10,14 @@ import {
   Text,
   TextInput,
   View,
+  type FlatList,
   type NativeSyntheticEvent,
   type NativeScrollEvent,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { ensureAlarmPermissions } from "../lib/alarmPermissions";
+import { success, tapLight, tick, warning } from "../lib/haptics";
+import { playDeleteSound } from "../lib/uiSound";
 import {
   deleteCustomAlarm,
   getCustomAlarm,
@@ -30,9 +33,20 @@ const VISIBLE_ROWS = 5;
 const WHEEL_HEIGHT = ROW_HEIGHT * VISIBLE_ROWS;
 const PADDING = ROW_HEIGHT * Math.floor(VISIBLE_ROWS / 2);
 
-const HOURS = Array.from({ length: 12 }, (_, i) => i + 1); // 1..12
+const HOURS = Array.from({ length: 24 }, (_, i) => i); // 0..23
 const MINUTES = Array.from({ length: 60 }, (_, i) => i); // 0..59
-const AMPM = ["AM", "PM"] as const;
+
+// How many copies of the real data a looping wheel renders back-to-back, so it can be spun
+// past either end and land back on 0 (or 23/59) exactly like a real clock, instead of hitting
+// a hard stop. Enough copies that a normal fling never reaches either physical edge of the
+// list; if one somehow did, it'd just stop there rather than crash — an acceptable fallback
+// for a case that shouldn't happen in practice, not a true infinite list.
+const LOOP_COPIES = 15;
+
+// A numeric rate (rather than the "fast"/"normal" presets) so both platforms glide with the
+// same weight — heavier than "fast" (which stops almost the instant your finger lifts) but
+// short of "normal"'s floaty coast, closer to how a real clicking dial carries its own momentum.
+const WHEEL_DECELERATION = 0.985;
 
 const REPEAT_MODES: RepeatMode[] = ["once", "everyday", "weekdays", "custom"];
 const REPEAT_LABEL: Record<RepeatMode, string> = {
@@ -48,13 +62,47 @@ const DAY_LETTERS = ["S", "M", "T", "W", "T", "F", "S"]; // index = Date.getDay(
 function liveMoments() {
   return todaysSessions().map((ts) => {
     const d = new Date(ts);
-    const h24 = d.getHours();
-    const hour12 = h24 % 12 === 0 ? 12 : h24 % 12;
-    return { hour12, minute: d.getMinutes(), ampm: h24 >= 12 ? "PM" : "AM" };
+    return { hour: d.getHours(), minute: d.getMinutes() };
   });
 }
 
 type Styles = ReturnType<typeof createStyles>;
+
+// Animated.FlatList's own TS typing assumes `data` is itself animatable (it's meant for
+// style-driven lists), which doesn't fit this plain typed data list — recast it once to a
+// properly generic component instead of fighting those typings at every call site.
+const AnimatedFlatList = Animated.FlatList as unknown as new <T>() => FlatList<T>;
+
+// How far (in rows) a row's depth falloff reaches — rows further than this from center are
+// fully faded/shrunk and don't need their own interpolation stops.
+const DEPTH_SPREAD = 2;
+
+/** Wraps a single row so it fades and shrinks the further it sits from the centered
+ * (selected) row — the same cylindrical illusion a real mechanical wheel picker gives, instead
+ * of a flat, uniform list where every row looks equally "in focus". Driven by the wheel's own
+ * scrollY (native-driven, so this costs nothing on the JS thread while spinning). */
+function WheelRow({
+  index,
+  scrollY,
+  rowStyle,
+  children,
+}: {
+  index: number;
+  scrollY: Animated.Value;
+  rowStyle: object;
+  children: ReactNode;
+}) {
+  const inputRange = [
+    (index - DEPTH_SPREAD) * ROW_HEIGHT,
+    (index - 1) * ROW_HEIGHT,
+    index * ROW_HEIGHT,
+    (index + 1) * ROW_HEIGHT,
+    (index + DEPTH_SPREAD) * ROW_HEIGHT,
+  ];
+  const opacity = scrollY.interpolate({ inputRange, outputRange: [0.22, 0.55, 1, 0.55, 0.22], extrapolate: "clamp" });
+  const scale = scrollY.interpolate({ inputRange, outputRange: [0.72, 0.88, 1, 0.88, 0.72], extrapolate: "clamp" });
+  return <Animated.View style={[rowStyle, { opacity, transform: [{ scale }] }]}>{children}</Animated.View>;
+}
 
 function Wheel<T extends string | number>({
   data,
@@ -63,6 +111,10 @@ function Wheel<T extends string | number>({
   onSettle,
   isLive,
   styles,
+  /** Renders several back-to-back copies of `data` so scrolling past either end lands back on
+   * the other side (23 → 0, 59 → 0) instead of stopping dead — a real clock wheel, not a
+   * bounded list. */
+  loop = false,
 }: {
   data: T[];
   format: (value: T) => string;
@@ -70,41 +122,86 @@ function Wheel<T extends string | number>({
   onSettle: (index: number) => void;
   isLive: (value: T) => boolean;
   styles: Styles;
+  loop?: boolean;
 }) {
   const listRef = useRef<FlatList<T>>(null);
+  // Which copy of the data a looping wheel starts centered on — picked once so there's equal
+  // room to spin in either direction before ever reaching a physical end of the list.
+  const middleOffset = loop ? Math.floor(LOOP_COPIES / 2) * data.length : 0;
+  const virtualData = useMemo(
+    () => (loop ? Array.from({ length: data.length * LOOP_COPIES }, (_, i) => data[i % data.length]) : data),
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [loop, data.length],
+  );
+  const selectedValue = data[selectedIndex];
+
+  // Drives both the per-row depth effect (native-driven, so it stays smooth regardless of what
+  // the JS thread is doing) and, via the listener below, the row-crossing haptic tick.
+  const scrollY = useRef(new Animated.Value(0)).current;
+
+  // Fires a light "tick" once per row crossed while spinning, the way a real clicking dial
+  // would — not just once when it finally settles. Tracked in a ref (not state) since it only
+  // needs to suppress duplicate calls for the same row, never trigger a re-render itself.
+  const lastHapticRow = useRef<number | null>(null);
+
+  function rowAt(offsetY: number): number {
+    return Math.round(offsetY / ROW_HEIGHT);
+  }
+
+  function handleScroll(e: NativeSyntheticEvent<NativeScrollEvent>) {
+    const row = rowAt(e.nativeEvent.contentOffset.y);
+    if (row !== lastHapticRow.current) {
+      lastHapticRow.current = row;
+      tick();
+    }
+  }
+
+  const onScroll = Animated.event([{ nativeEvent: { contentOffset: { y: scrollY } } }], {
+    useNativeDriver: true,
+    listener: handleScroll,
+  });
 
   // Scroll the wheel to the correct position whenever selectedIndex changes — covers the
   // edit-existing-alarm case where state updates after mount, since initialScrollIndex only
-  // positions the FlatList at first render and doesn't react to later prop changes.
+  // positions the FlatList at first render and doesn't react to later prop changes. For a
+  // looping wheel this also re-fires after every settle, recentering back onto the middle
+  // copy — imperceptible, since every copy shows the exact same values, so nothing visibly
+  // moves; it just quietly stops the wheel from ever drifting toward either physical end.
   useEffect(() => {
-    listRef.current?.scrollToIndex({ index: selectedIndex, animated: false });
-  }, [selectedIndex]);
+    listRef.current?.scrollToIndex({ index: middleOffset + selectedIndex, animated: false });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [selectedIndex, loop]);
 
   function handleScrollEnd(e: NativeSyntheticEvent<NativeScrollEvent>) {
-    const index = Math.round(e.nativeEvent.contentOffset.y / ROW_HEIGHT);
-    onSettle(Math.max(0, Math.min(data.length - 1, index)));
+    const row = rowAt(e.nativeEvent.contentOffset.y);
+    const real = loop
+      ? ((row % data.length) + data.length) % data.length
+      : Math.max(0, Math.min(data.length - 1, row));
+    onSettle(real);
   }
 
   return (
     <View style={styles.wheelWrap}>
       <View pointerEvents="none" style={styles.wheelSelectionBand} />
-      <FlatList
+      <AnimatedFlatList<T>
         ref={listRef}
-        data={data}
-        keyExtractor={(item) => String(item)}
+        data={virtualData}
+        keyExtractor={(_, index) => String(index)}
         showsVerticalScrollIndicator={false}
         snapToInterval={ROW_HEIGHT}
-        decelerationRate="fast"
+        decelerationRate={WHEEL_DECELERATION}
         contentContainerStyle={{ paddingVertical: PADDING }}
         getItemLayout={(_, index) => ({ length: ROW_HEIGHT, offset: ROW_HEIGHT * index, index })}
-        initialScrollIndex={selectedIndex}
+        initialScrollIndex={middleOffset + selectedIndex}
+        onScroll={onScroll}
+        scrollEventThrottle={16}
         onMomentumScrollEnd={handleScrollEnd}
         renderItem={({ item, index }) => (
-          <View style={styles.wheelRow}>
-            <Text style={[styles.wheelText, isLive(item) && styles.wheelTextLive, index === selectedIndex && styles.wheelTextSelected]}>
+          <WheelRow index={index} scrollY={scrollY} rowStyle={styles.wheelRow}>
+            <Text style={[styles.wheelText, isLive(item) && styles.wheelTextLive, item === selectedValue && styles.wheelTextSelected]}>
               {format(item)}
             </Text>
-          </View>
+          </WheelRow>
         )}
       />
     </View>
@@ -130,9 +227,8 @@ export default function EditCustomAlarmModal({ visible, alarmId, onClose, onSave
   const isEditing = Boolean(alarmId);
 
   const [name, setName] = useState("");
-  const [hourIndex, setHourIndex] = useState(6); // default 7 (index 6 -> HOURS[6] = 7)
+  const [hourIndex, setHourIndex] = useState(7); // default 7 AM — HOURS[7] = 7 in 24hr form
   const [minuteIndex, setMinuteIndex] = useState(0);
-  const [ampmIndex, setAmpmIndex] = useState(0);
   const [repeatMode, setRepeatMode] = useState<RepeatMode>("everyday");
   const [customDays, setCustomDays] = useState<number[]>([]);
   const [editingEnabled, setEditingEnabled] = useState(true);
@@ -145,9 +241,8 @@ export default function EditCustomAlarmModal({ visible, alarmId, onClose, onSave
     if (!visible) return;
     if (!alarmId) {
       setName("");
-      setHourIndex(6);
+      setHourIndex(7);
       setMinuteIndex(0);
-      setAmpmIndex(0);
       setRepeatMode("everyday");
       setCustomDays([]);
       setEditingEnabled(true);
@@ -158,10 +253,8 @@ export default function EditCustomAlarmModal({ visible, alarmId, onClose, onSave
     getCustomAlarm(alarmId).then((alarm) => {
       if (alarm) {
         setName(alarm.name);
-        const hour12 = alarm.hour % 12 === 0 ? 12 : alarm.hour % 12;
-        setHourIndex(HOURS.indexOf(hour12));
-        setMinuteIndex(MINUTES.indexOf(alarm.minute));
-        setAmpmIndex(alarm.hour >= 12 ? 1 : 0);
+        setHourIndex(alarm.hour);
+        setMinuteIndex(alarm.minute);
         setRepeatMode(alarm.repeatMode);
         setCustomDays(alarm.customDays);
         setEditingEnabled(alarm.enabled);
@@ -171,16 +264,16 @@ export default function EditCustomAlarmModal({ visible, alarmId, onClose, onSave
   }, [visible, alarmId]);
 
   function toggleDay(day: number) {
+    tapLight();
     setCustomDays((prev) => (prev.includes(day) ? prev.filter((d) => d !== day) : [...prev, day].sort()));
   }
 
   const moments = useMemo(() => liveMoments(), []);
-  const liveHourSet = useMemo(() => new Set(moments.map((m) => m.hour12)), [moments]);
+  const liveHourSet = useMemo(() => new Set(moments.map((m) => m.hour)), [moments]);
   const liveMinuteSet = useMemo(() => new Set(moments.map((m) => m.minute)), [moments]);
-  const liveAmpmSet = useMemo(() => new Set(moments.map((m) => m.ampm)), [moments]);
 
   const liveLabel = moments
-    .map((m) => `${m.hour12}:${String(m.minute).padStart(2, "0")} ${m.ampm}`)
+    .map((m) => `${String(m.hour).padStart(2, "0")}:${String(m.minute).padStart(2, "0")}`)
     .join(" and ");
 
   async function handleDone() {
@@ -200,14 +293,13 @@ export default function EditCustomAlarmModal({ visible, alarmId, onClose, onSave
       // and explains it; false means it already told them why, so just stop here.
       if (!(await ensureAlarmPermissions())) return;
 
-      const hour12 = HOURS[hourIndex];
-      const hour24 = ampmIndex === 1 ? (hour12 === 12 ? 12 : hour12 + 12) : hour12 === 12 ? 0 : hour12;
+      const hour = HOURS[hourIndex];
       const minute = MINUTES[minuteIndex];
 
       const alarm: CustomAlarm = {
         id: alarmId ?? `custom-${Date.now()}`,
         name: name.trim(),
-        hour: hour24,
+        hour,
         minute,
         // Preserve the existing enabled state when editing — saving a disabled alarm to rename
         // it shouldn't silently re-enable it. New alarms always start enabled.
@@ -216,6 +308,7 @@ export default function EditCustomAlarmModal({ visible, alarmId, onClose, onSave
         customDays,
       };
       await saveCustomAlarm(alarm);
+      success();
       onSaved();
       onClose();
     } finally {
@@ -223,20 +316,13 @@ export default function EditCustomAlarmModal({ visible, alarmId, onClose, onSave
     }
   }
 
-  function handleDelete() {
+  async function handleDelete() {
     if (!alarmId) return;
-    Alert.alert("Delete this alarm?", "This can't be undone.", [
-      { text: "Cancel", style: "cancel" },
-      {
-        text: "Delete",
-        style: "destructive",
-        onPress: async () => {
-          await deleteCustomAlarm(alarmId);
-          onSaved();
-          onClose();
-        },
-      },
-    ]);
+    warning();
+    playDeleteSound();
+    await deleteCustomAlarm(alarmId);
+    onSaved();
+    onClose();
   }
 
   return (
@@ -270,11 +356,12 @@ export default function EditCustomAlarmModal({ visible, alarmId, onClose, onSave
               <View style={styles.wheelsRow}>
                 <Wheel
                   data={HOURS}
-                  format={(v) => String(v)}
+                  format={(v) => String(v).padStart(2, "0")}
                   selectedIndex={hourIndex}
                   onSettle={setHourIndex}
                   isLive={(v) => liveHourSet.has(v)}
                   styles={styles}
+                  loop
                 />
                 <Text style={styles.colon}>:</Text>
                 <Wheel
@@ -284,14 +371,7 @@ export default function EditCustomAlarmModal({ visible, alarmId, onClose, onSave
                   onSettle={setMinuteIndex}
                   isLive={(v) => liveMinuteSet.has(v)}
                   styles={styles}
-                />
-                <Wheel
-                  data={[...AMPM]}
-                  format={(v) => v}
-                  selectedIndex={ampmIndex}
-                  onSettle={setAmpmIndex}
-                  isLive={(v) => liveAmpmSet.has(v)}
-                  styles={styles}
+                  loop
                 />
               </View>
 
@@ -305,7 +385,10 @@ export default function EditCustomAlarmModal({ visible, alarmId, onClose, onSave
                   <Pressable
                     key={mode}
                     style={[styles.repeatChip, repeatMode === mode && styles.repeatChipActive]}
-                    onPress={() => setRepeatMode(mode)}
+                    onPress={() => {
+                      tapLight();
+                      setRepeatMode(mode);
+                    }}
                   >
                     <Text style={[styles.repeatChipText, repeatMode === mode && styles.repeatChipTextActive]}>
                       {REPEAT_LABEL[mode]}

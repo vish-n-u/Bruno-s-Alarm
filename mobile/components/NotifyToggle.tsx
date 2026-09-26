@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import { ActivityIndicator, StyleSheet, Switch, Text, View } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import { ensureAlarmPermissions } from "../lib/alarmPermissions";
+import { tapLight } from "../lib/haptics";
 import { isSubscribed, scheduleUpcomingSessions, unsubscribe } from "../lib/notifications";
 import { fonts, radius, spacing, useThemeColors, type ThemeColors } from "../lib/theme";
 
@@ -27,6 +28,7 @@ export default function NotifyToggle() {
 
   async function handleToggle(value: boolean) {
     if (busy) return;
+    tapLight();
     setBusy(true);
     try {
       if (value) {

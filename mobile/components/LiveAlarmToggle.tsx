@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import { StyleSheet, Switch, Text, View } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import LiveAlarmSetupSheet from "./LiveAlarmSetupSheet";
+import { tapLight } from "../lib/haptics";
 import { disableLiveAlarm, enableLiveAlarm, isLiveAlarmEnabled } from "../lib/liveAlerts";
 import { fonts, radius, spacing, useThemeColors, type ThemeColors } from "../lib/theme";
 
@@ -19,6 +20,7 @@ export default function LiveAlarmToggle() {
   }, []);
 
   async function handleToggle(value: boolean) {
+    tapLight();
     if (value) {
       setSheetVisible(true);
       return;
@@ -28,6 +30,7 @@ export default function LiveAlarmToggle() {
   }
 
   async function handleConfirm() {
+    tapLight();
     await enableLiveAlarm();
     setEnabled(true);
     setSheetVisible(false);

@@ -5,6 +5,7 @@ import { Ionicons } from "@expo/vector-icons";
 import VideoPanel from "./VideoPanel";
 import { snoozeRingingAlarm, stopRingingAlarm } from "../lib/notifications";
 import { disableOnceAlarmIfFired } from "../lib/customAlarm";
+import { success, tapMedium } from "../lib/haptics";
 import { fonts, radius, spacing, useThemeColors, type ThemeColors } from "../lib/theme";
 
 export default function AlarmRingingScreen({ alarmId }: { alarmId: string }) {
@@ -26,6 +27,10 @@ export default function AlarmRingingScreen({ alarmId }: { alarmId: string }) {
 
   async function handleStop() {
     if (busy) return;
+    // Fires the instant the tap lands, not after stopRingingAlarm() resolves — the whole point
+    // is confirming to a half-asleep thumb that it actually hit the target, which needs to be
+    // immediate to mean anything.
+    success();
     setBusy(true);
     try {
       await stopRingingAlarm(alarmId);
@@ -37,6 +42,7 @@ export default function AlarmRingingScreen({ alarmId }: { alarmId: string }) {
 
   async function handleSnooze() {
     if (busy) return;
+    tapMedium();
     setBusy(true);
     try {
       await snoozeRingingAlarm(alarmId);

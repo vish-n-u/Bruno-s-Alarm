@@ -22,6 +22,15 @@ const LIVE_SOURCE: VideoSource =
 // alarm sound) has been downloaded at least once.
 const FALLBACK_VOD_SOURCE: VideoSource = process.env.EXPO_PUBLIC_VOD_VIDEO_URL || SAMPLE_VIDEO;
 
+// A go-live alarm fires the instant Cloudflare's webhook sees the encoder connect — but
+// Cloudflare's own "is this input live" status, and the HLS segments actually being
+// fetchable, can lag a few seconds behind that. There's no legitimate "not live yet" outcome
+// for this alarm specifically (it only ever fired because Bruno just went live), so it gets a
+// short grace window of fast retries instead of the single check-and-concede the 6AM/6PM
+// alarms correctly use (where "not live yet" can be genuinely true — he's running late).
+const LIVE_ALARM_GRACE_MS = 90_000;
+const LIVE_ALARM_RETRY_MS = 3_000;
+
 // Only rendered on the alarm-ringing screen now (Home doesn't show video at all). Starts
 // muted (autoplay shouldn't blast sound the moment the alarm fires) — allowUnmute={false}
 // there because the actual alarm sound comes from the native alarm itself (see
@@ -59,6 +68,9 @@ export default function VideoPanel({
   // fixed placeholder clip so the VOD fallback shows the real thing, not one static video
   // forever.
   const [cachedVideoUri, setCachedVideoUri] = useState<string | undefined>(undefined);
+
+  // Computed once at mount: only a go-live alarm gets a grace window at all.
+  const graceDeadline = useRef(alwaysCheckLive ? Date.now() + LIVE_ALARM_GRACE_MS : 0);
 
   // Reels-style tap-to-mute: tapping anywhere on the video toggles mute and briefly flashes a
   // centered speaker icon that fades back out, instead of a small always-on corner button.
@@ -106,6 +118,7 @@ export default function VideoPanel({
 
   useEffect(() => {
     let cancelled = false;
+    let timer: ReturnType<typeof setTimeout>;
 
     const check = async () => {
       const forced = getDebugForceLive();
@@ -114,31 +127,41 @@ export default function VideoPanel({
         // forces the state rather than merely widening the window in which we're willing to
         // ask (which would still report "not live" for a genuinely offline camera).
         if (!cancelled) setLive(forced);
+        timer = setTimeout(check, 15000);
         return;
       }
       if (!isCloudflareConfigured()) {
         // Not wired up yet — fall back to trusting the clock window alone, same as
         // before this existed, so local testing/the debug toggle still work.
         if (!cancelled) setLive(isLiveWindow());
+        timer = setTimeout(check, 15000);
         return;
       }
+      const inGrace = Date.now() < graceDeadline.current;
       // The two sessions are fixed and known in advance, so there's no reason to hit
       // Cloudflare's API the other ~23 hours of the day — only actually ask once we're
       // close enough to a scheduled session for the answer to possibly be "yes" (a little
-      // before it, too, since Bruno doesn't always start exactly on schedule).
-      if (!alwaysCheckLive && !isNearLiveWindow()) {
+      // before it, too, since Bruno doesn't always start exactly on schedule), or while a
+      // go-live alarm's grace window (above) is still open.
+      if (!alwaysCheckLive && !inGrace && !isNearLiveWindow()) {
         if (!cancelled) setLive(false);
+        timer = setTimeout(check, 15000);
         return;
       }
       const actuallyLive = await isCloudflareStreamLive();
-      if (!cancelled) setLive(actuallyLive);
+      if (cancelled) return;
+      setLive(actuallyLive);
+      // Retry quickly while a go-live alarm's grace window is still open — even a "yes" here
+      // can still fail to actually play for a couple more seconds while HLS segments
+      // populate (see the playback-error handling below, which will bounce back to VOD and
+      // rely on this fast retry to recover) — then settle into the normal, cheaper cadence.
+      timer = setTimeout(check, inGrace ? LIVE_ALARM_RETRY_MS : 15000);
     };
 
     check();
-    const id = setInterval(check, 15000);
     return () => {
       cancelled = true;
-      clearInterval(id);
+      clearTimeout(timer);
     };
   }, []);
 

@@ -17,11 +17,26 @@ import { fetchLatestRecording } from "./latestRecording";
 // and plays only the audio track, dropping video frames — no server-side audio extraction
 // needed, and it's the same mechanism this library already relies on for the bundled
 // default sound.
-const CACHE_KEY = "bruno-alarm-sound-cache";
+// v2: bumped on purpose. Recordings were previously served from one fixed web address that
+// Cloudflare cached for hours, so a phone could save an OLD clip labelled as the new recording
+// and then never re-download it. A new key makes every phone drop that record and fetch fresh.
+const CACHE_KEY = "bruno-alarm-sound-cache-v2";
+const LEGACY_CACHE_KEY = "bruno-alarm-sound-cache";
+const STATUS_KEY = "bruno-alarm-sound-status";
 const FINAL_PATH = `${FileSystem.documentDirectory}alarm_sound_latest.mp4`;
 const TEMP_PATH = `${FileSystem.documentDirectory}alarm_sound_latest.download.mp4`;
 
-type CacheRecord = { path: string; recordedAt: string };
+type CacheRecord = { path: string; recordedAt: string; size?: number };
+
+type RefreshOutcome = "downloaded" | "up-to-date" | "not-ready" | "unavailable" | "download-failed" | "size-mismatch";
+
+async function recordOutcome(outcome: RefreshOutcome): Promise<void> {
+  try {
+    await AsyncStorage.setItem(STATUS_KEY, JSON.stringify({ at: Date.now(), outcome }));
+  } catch {
+    // Diagnostics only.
+  }
+}
 
 async function getCacheRecord(): Promise<CacheRecord | null> {
   const raw = await AsyncStorage.getItem(CACHE_KEY);
@@ -77,23 +92,51 @@ let lastAttemptAt = 0;
 /** One refresh attempt. Resolves true if it failed in a way that is worth retrying soon. */
 async function attemptRefresh(): Promise<boolean> {
   try {
+    AsyncStorage.removeItem(LEGACY_CACHE_KEY).catch(() => {});
+
     const result = await fetchLatestRecording();
-    if (result.status === "not_ready") return true;
-    if (result.status !== "ready") return false;
+    if (result.status === "not_ready") {
+      await recordOutcome("not-ready");
+      return true;
+    }
+    if (result.status !== "ready") {
+      await recordOutcome("unavailable");
+      return false;
+    }
 
     const latest = result.recording;
     const existing = await getCacheRecord();
-    if (existing?.recordedAt === latest.recordedAt) return false; // already have this one cached
+    if (existing?.recordedAt === latest.recordedAt) {
+      await recordOutcome("up-to-date");
+      return false; // already have this one cached
+    }
 
     try {
       const download = await FileSystem.downloadAsync(latest.url, TEMP_PATH);
-      if (download.status !== 200) return true;
+      if (download.status !== 200) {
+        await recordOutcome("download-failed");
+        return true;
+      }
+
+      // A download that ends up a different size than the server said it is (cut short, or the
+      // wrong file entirely) must not be saved as if it were fine.
+      const info = await FileSystem.getInfoAsync(TEMP_PATH);
+      const size = info.exists ? info.size : 0;
+      const expected = Number(download.headers?.["Content-Length"] ?? download.headers?.["content-length"]);
+      if (size <= 0 || (Number.isFinite(expected) && expected > 0 && size !== expected)) {
+        await recordOutcome("size-mismatch");
+        return true;
+      }
+
       await FileSystem.deleteAsync(FINAL_PATH, { idempotent: true });
       await FileSystem.moveAsync({ from: TEMP_PATH, to: FINAL_PATH });
-      await AsyncStorage.setItem(CACHE_KEY, JSON.stringify({ path: FINAL_PATH, recordedAt: latest.recordedAt }));
+      const record: CacheRecord = { path: FINAL_PATH, recordedAt: latest.recordedAt, size };
+      await AsyncStorage.setItem(CACHE_KEY, JSON.stringify(record));
+      await recordOutcome("downloaded");
       return false;
     } catch {
       // Network failure, storage full, etc. — leave whatever was cached before untouched.
+      await recordOutcome("download-failed");
       return true;
     } finally {
       FileSystem.deleteAsync(TEMP_PATH, { idempotent: true }).catch(() => {});
@@ -144,4 +187,41 @@ export async function refreshAlarmSound(): Promise<void> {
 export async function refreshAlarmSoundIfStale(): Promise<void> {
   if (Date.now() - lastAttemptAt < FOREGROUND_MIN_GAP_MS) return;
   await refreshAlarmSound();
+}
+
+const OUTCOME_LABEL: Record<RefreshOutcome, string> = {
+  downloaded: "downloaded a new recording",
+  "up-to-date": "already had the latest",
+  "not-ready": "recording still being prepared on the server",
+  unavailable: "server unreachable or nothing recorded",
+  "download-failed": "download failed",
+  "size-mismatch": "downloaded file didn't match the expected size",
+};
+
+/** Plain-language summary of which recording this phone has saved and how the last check went —
+ * for the hidden debug screen, since release builds keep no logs to look at. */
+export async function describeSavedRecording(): Promise<string> {
+  const record = await getCacheRecord();
+  let saved = "Saved recording: none yet (using the built-in sound)";
+  if (record) {
+    const info = await FileSystem.getInfoAsync(record.path);
+    if (info.exists) {
+      const when = new Date(record.recordedAt).toLocaleString();
+      const mb = ((info.size ?? record.size ?? 0) / (1024 * 1024)).toFixed(1);
+      saved = "Saved recording: made " + when + " · " + mb + " MB";
+    } else {
+      saved = "Saved recording: file missing from the phone";
+    }
+  }
+  let last = "Last check: not yet this session";
+  try {
+    const raw = await AsyncStorage.getItem(STATUS_KEY);
+    if (raw) {
+      const status = JSON.parse(raw) as { at: number; outcome: RefreshOutcome };
+      last = "Last check: " + new Date(status.at).toLocaleTimeString() + " · " + (OUTCOME_LABEL[status.outcome] ?? status.outcome);
+    }
+  } catch {
+    // Diagnostics only.
+  }
+  return saved + "\n" + last;
 }

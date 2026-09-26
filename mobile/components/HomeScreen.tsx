@@ -10,6 +10,7 @@ import Sky from "./Sky";
 import type { HomeStackParamList } from "../App";
 import { getCustomAlarms, setCustomAlarmEnabled, type CustomAlarm, type RepeatMode } from "../lib/customAlarm";
 import { ensureAlarmPermissions } from "../lib/alarmPermissions";
+import { tapLight } from "../lib/haptics";
 import { isSubscribed } from "../lib/notifications";
 import { todaysSessions } from "../lib/schedule";
 import { fonts, radius, shadow, spacing, useNow, useThemeColors, type ThemeColors } from "../lib/theme";
@@ -84,6 +85,7 @@ export default function HomeScreen({ navigation }: Props) {
   // Same optimistic-update-then-persist pattern as CustomAlarmScreen's own toggle — lets
   // someone flip an alarm on/off right from Home without opening the full list.
   async function toggleCustomAlarm(alarm: CustomAlarm, value: boolean) {
+    tapLight();
     if (value && !(await ensureAlarmPermissions())) return;
     setCustomAlarms((prev) => prev.map((a) => (a.id === alarm.id ? { ...a, enabled: value } : a)));
     await setCustomAlarmEnabled(alarm.id, value);

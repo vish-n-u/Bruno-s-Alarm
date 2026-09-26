@@ -16,7 +16,7 @@ import {
   type ScheduledAlarmKind,
   type ScheduledAlarmSummary,
 } from "../lib/notifications";
-import { getCachedAlarmSoundPath, refreshAlarmSound } from "../lib/alarmSound";
+import { describeSavedRecording, getCachedAlarmSoundPath, refreshAlarmSound } from "../lib/alarmSound";
 import { setDebugForceLive } from "../lib/schedule";
 import { fonts, radius, shadow, spacing, useThemeColors, type ThemeColors } from "../lib/theme";
 
@@ -284,15 +284,22 @@ export default function SettingsScreen({ navigation }: Props) {
                     // you're the one tapping this button).
                     await refreshAlarmSound();
                     const path = await getCachedAlarmSoundPath();
+                    const summary = await describeSavedRecording();
                     Alert.alert(
                       path ? "Refreshed" : "No cached sound",
                       path
-                        ? `Cached at:\n${path}`
-                        : "Refresh ran but nothing is cached. Check EXPO_PUBLIC_BACKEND_URL and network access."
+                        ? summary
+                        : summary + "\n\nNothing is cached. Check EXPO_PUBLIC_BACKEND_URL and network access."
                     );
                   }}
                 >
                   <Text style={styles.consoleText}>&gt; run background sound refresh now</Text>
+                </Pressable>
+                <Pressable
+                  style={styles.consoleRow}
+                  onPress={async () => Alert.alert("Saved recording", await describeSavedRecording())}
+                >
+                  <Text style={styles.consoleText}>&gt; saved recording status</Text>
                 </Pressable>
               </>
             )}

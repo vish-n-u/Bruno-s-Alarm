@@ -1,5 +1,11 @@
 import { NextResponse } from "next/server";
-import { HeadObjectCommand, PutObjectCommand, S3Client } from "@aws-sdk/client-s3";
+import {
+  DeleteObjectsCommand,
+  HeadObjectCommand,
+  ListObjectsV2Command,
+  PutObjectCommand,
+  S3Client,
+} from "@aws-sdk/client-s3";
 
 const { CLOUDFLARE_API_TOKEN, CLOUDFLARE_ACCOUNT_ID, CLOUDFLARE_LIVE_INPUT_UID } = process.env;
 const { R2_ACCOUNT_ID, R2_ACCESS_KEY_ID, R2_SECRET_ACCESS_KEY, R2_BUCKET_NAME, R2_PUBLIC_URL } = process.env;
@@ -28,11 +34,18 @@ function r2Client(): S3Client {
   });
 }
 
-// Only ever one object — there's only ever one "latest recording" that matters, mirroring
-// the mobile app's own single-cached-file approach (lib/alarmSound.ts). Which actual
-// recording this file currently holds is tracked via its own R2 object metadata rather than
-// a separate database, so there's nothing else to keep in sync.
-const R2_OBJECT_KEY = "alarm-recordings/latest.mp4";
+// One object PER recording, named after its Cloudflare video uid — never a fixed name like
+// "latest.mp4". A fixed name is served through Cloudflare's cache for hours, so after a new
+// recording overwrote it, phones kept getting the previous clip's bytes while being told it was
+// the new one (and then never re-downloaded, since the app skips a download it thinks it has).
+// A unique name per recording means a cached copy can only ever be the right one.
+const R2_PREFIX = "alarm-recordings/";
+// Only the newest few are kept: older ones are deleted after each mirror so storage stays tiny.
+const R2_KEEP_NEWEST = 3;
+
+function r2KeyFor(uid: string): string {
+  return `${R2_PREFIX}${uid}.mp4`;
+}
 
 async function cloudflareFetch(path: string, init?: RequestInit) {
   const res = await fetch(`https://api.cloudflare.com/client/v4/accounts/${CLOUDFLARE_ACCOUNT_ID}${path}`, {
@@ -48,20 +61,38 @@ async function cloudflareFetch(path: string, init?: RequestInit) {
 
 type CloudflareVideoSummary = { uid: string; created: string };
 
-/** Mirrors `latest` into R2 if it isn't already there (checked via the object's own
- * `recordedat` metadata, so a recording that's already mirrored costs nothing but a HEAD
- * request), and returns its public R2 URL. Returns null if Stream's downloadable MP4 for it
- * isn't ready yet — same "not ready, try again" signal the direct-from-Stream path used. */
-async function getOrMirrorToR2(latest: CloudflareVideoSummary): Promise<string | null> {
-  const client = r2Client();
-
+/** Deletes all but the newest few recordings (and the old fixed-name "latest.mp4" from before
+ * each recording got its own name). Best-effort — a failure here never affects the response. */
+async function pruneOldRecordings(client: S3Client): Promise<void> {
   try {
-    const head = await client.send(new HeadObjectCommand({ Bucket: R2_BUCKET_NAME, Key: R2_OBJECT_KEY }));
-    if (head.Metadata?.recordedat === latest.created) {
-      return `${R2_PUBLIC_URL}/${R2_OBJECT_KEY}`;
+    const listed = await client.send(new ListObjectsV2Command({ Bucket: R2_BUCKET_NAME, Prefix: R2_PREFIX }));
+    const objects = (listed.Contents ?? []).filter((o) => o.Key && o.LastModified);
+    objects.sort((a, b) => b.LastModified!.getTime() - a.LastModified!.getTime());
+    const stale = objects.slice(R2_KEEP_NEWEST).map((o) => ({ Key: o.Key! }));
+    const legacy = objects.slice(0, R2_KEEP_NEWEST).filter((o) => o.Key === `${R2_PREFIX}latest.mp4`);
+    const toDelete = [...stale, ...legacy.map((o) => ({ Key: o.Key! }))];
+    if (toDelete.length > 0) {
+      await client.send(new DeleteObjectsCommand({ Bucket: R2_BUCKET_NAME, Delete: { Objects: toDelete } }));
     }
   } catch {
-    // No object yet (first run) — fall through and mirror it for the first time.
+    // Cleanup is a nicety; stale files cost pennies.
+  }
+}
+
+/** Mirrors `latest` into R2 if it isn't already there (a HEAD on its own unique key, so a
+ * recording that's already mirrored costs nothing more), and returns its public R2 URL.
+ * Returns null if Stream's downloadable MP4 for it isn't ready yet — same "not ready, try
+ * again" signal the direct-from-Stream path used. */
+async function getOrMirrorToR2(latest: CloudflareVideoSummary): Promise<string | null> {
+  const client = r2Client();
+  const key = r2KeyFor(latest.uid);
+  const publicUrl = `${R2_PUBLIC_URL}/${key}`;
+
+  try {
+    await client.send(new HeadObjectCommand({ Bucket: R2_BUCKET_NAME, Key: key }));
+    return publicUrl;
+  } catch {
+    // Not mirrored yet — fall through and copy it.
   }
 
   // Same idempotent Stream call as the non-R2 path — the difference is this server fetches
@@ -79,14 +110,17 @@ async function getOrMirrorToR2(latest: CloudflareVideoSummary): Promise<string |
   await client.send(
     new PutObjectCommand({
       Bucket: R2_BUCKET_NAME,
-      Key: R2_OBJECT_KEY,
+      Key: key,
       Body: bytes,
       ContentType: "video/mp4",
+      // Safe to cache for a long time: this exact address will never hold different bytes.
+      CacheControl: "public, max-age=31536000, immutable",
       Metadata: { recordedat: latest.created },
     }),
   );
 
-  return `${R2_PUBLIC_URL}/${R2_OBJECT_KEY}`;
+  await pruneOldRecordings(client);
+  return publicUrl;
 }
 
 /**

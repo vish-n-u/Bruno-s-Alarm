@@ -120,7 +120,10 @@ export default function LiveScreen() {
           its own Cloudflare poll keeps running underneath — the moment it reports live, the
           no-signal screen disappears and real video is already loaded and ready, not started
           fresh from a cold mount. */}
-      <VideoPanel allowUnmute={true} paused={!playing} onLiveChange={handleLiveChange} />
+      {/* alwaysCheckLive: this tab's whole point is showing Bruno live, so it can't be limited
+          to only checking Cloudflare near the two fixed 6AM/6PM windows the way the default
+          shortcut assumes — an ad-hoc/off-schedule stream needs to be detected here too. */}
+      <VideoPanel allowUnmute={true} paused={!playing} onLiveChange={handleLiveChange} alwaysCheckLive={true} />
       {showNoSignal && <NoSignalScreen nextTime={nextTime} />}
       {/* Chat is scoped to the actual live session, not the post-live grace period's replay —
           the grace window is a viewing courtesy, not a real live moment to chat about. Skipped

@@ -1,5 +1,5 @@
 import { useCallback, useState } from "react";
-import { Alert, Linking, Platform, Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
+import { Alert, Linking, Platform, ScrollView, StyleSheet, Text, View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { Ionicons } from "@expo/vector-icons";
 import { useFocusEffect } from "@react-navigation/native";
@@ -7,6 +7,7 @@ import type { NativeStackScreenProps } from "@react-navigation/native-stack";
 import appConfig from "../app.json";
 import LiveAlarmToggle from "../components/LiveAlarmToggle";
 import NotifyToggle from "../components/NotifyToggle";
+import Touchable from "../components/Touchable";
 import type { HomeStackParamList } from "../App";
 import {
   cancelAllScheduledAlarms,
@@ -17,6 +18,8 @@ import {
   type ScheduledAlarmSummary,
 } from "../lib/notifications";
 import { describeSavedRecording, getCachedAlarmSoundPath, refreshAlarmSound } from "../lib/alarmSound";
+import { success, tapLight, warning } from "../lib/haptics";
+import { animateNextLayout } from "../lib/layoutAnim";
 import { setDebugForceLive } from "../lib/schedule";
 import { fonts, radius, shadow, spacing, useThemeColors, type ThemeColors } from "../lib/theme";
 
@@ -92,7 +95,7 @@ function SettingsRow({
   colors: ThemeColors;
   styles: ReturnType<typeof createStyles>;
 }) {
-  const Wrapper = onPress ? Pressable : View;
+  const Wrapper = onPress ? Touchable : View;
   return (
     <Wrapper style={styles.row} onPress={onPress}>
       <Ionicons name={icon} size={18} color={colors.textSecondary} style={styles.rowIcon} />
@@ -129,16 +132,24 @@ export default function SettingsScreen({ navigation }: Props) {
     if (debugUnlocked) return;
     const next = versionTapCount + 1;
     if (next >= 7) {
+      success();
+      animateNextLayout();
       setDebugUnlocked(true);
       Alert.alert("Debug tools unlocked", "Scroll down: a Debug section just appeared.");
       return;
     }
+    // A light tick per tap, same idea as Android's own hidden-developer-options easter egg
+    // giving escalating feedback — without it, the first six taps look like they do nothing.
+    tapLight();
     setVersionTapCount(next);
   }
 
   const refreshAlarms = useCallback(() => {
     getAllScheduledAlarms()
-      .then(setAlarms)
+      .then((fetched) => {
+        animateNextLayout();
+        setAlarms(fetched);
+      })
       .catch(() => setAlarms([]));
   }, []);
 
@@ -157,6 +168,7 @@ export default function SettingsScreen({ navigation }: Props) {
           text: "Clear all",
           style: "destructive",
           onPress: async () => {
+            warning();
             await cancelAllScheduledAlarms();
             refreshAlarms();
           },
@@ -191,7 +203,10 @@ export default function SettingsScreen({ navigation }: Props) {
         <SettingsRow
           icon="shield-checkmark-outline"
           title="Privacy Policy"
-          onPress={() => Linking.openURL(PRIVACY_POLICY_URL)}
+          onPress={() => {
+            tapLight();
+            Linking.openURL(PRIVACY_POLICY_URL);
+          }}
           colors={colors}
           styles={styles}
         />
@@ -220,7 +235,14 @@ export default function SettingsScreen({ navigation }: Props) {
                     icon={KIND_ICON[group.kind]}
                     title={KIND_LABEL[group.kind]}
                     subtitle={describeGroup(group.kind, group.items)}
-                    onPress={group.kind === "custom" ? () => navigation.navigate("CustomAlarm") : undefined}
+                    onPress={
+                      group.kind === "custom"
+                        ? () => {
+                            tapLight();
+                            navigation.navigate("CustomAlarm");
+                          }
+                        : undefined
+                    }
                     colors={colors}
                     styles={styles}
                   />
@@ -228,27 +250,40 @@ export default function SettingsScreen({ navigation }: Props) {
               ))
             )}
             {alarms.length > 0 && (
-              <Pressable style={styles.dangerButton} onPress={handleClearAll}>
+              <Touchable style={styles.dangerButton} onPress={handleClearAll}>
                 <Text style={styles.dangerButtonText}>Clear all scheduled alarms</Text>
-              </Pressable>
+              </Touchable>
             )}
           </View>
 
           <SectionLabel variant="secondary">Debug</SectionLabel>
           <View style={styles.consoleList}>
-            <Pressable style={styles.consoleRow} onPress={() => navigation.navigate("OnboardingPreview")}>
+            <Touchable
+              style={styles.consoleRow}
+              onPress={() => {
+                tapLight();
+                navigation.navigate("OnboardingPreview");
+              }}
+            >
               <Text style={styles.consoleText}>&gt; preview onboarding</Text>
-            </Pressable>
+            </Touchable>
             <View style={styles.rowDivider} />
-            <Pressable style={styles.consoleRow} onPress={() => navigation.navigate("WeatherPreview")}>
+            <Touchable
+              style={styles.consoleRow}
+              onPress={() => {
+                tapLight();
+                navigation.navigate("WeatherPreview");
+              }}
+            >
               <Text style={styles.consoleText}>&gt; preview weather &amp; time</Text>
-            </Pressable>
+            </Touchable>
             {Platform.OS === "android" && (
               <>
                 <View style={styles.rowDivider} />
-                <Pressable
+                <Touchable
                   style={styles.consoleRow}
                   onPress={async () => {
+                    tapLight();
                     const granted = await requestPermission();
                     if (!granted) {
                       Alert.alert("Permission needed", "Grant notification permission first.");
@@ -260,11 +295,12 @@ export default function SettingsScreen({ navigation }: Props) {
                   }}
                 >
                   <Text style={styles.consoleText}>&gt; test alarm in 90s</Text>
-                </Pressable>
+                </Touchable>
                 <View style={styles.rowDivider} />
-                <Pressable
+                <Touchable
                   style={styles.consoleRow}
                   onPress={() => {
+                    tapLight();
                     const next = !forcingLive;
                     setDebugForceLive(next ? true : null);
                     setForcingLive(next);
@@ -273,15 +309,16 @@ export default function SettingsScreen({ navigation }: Props) {
                   <Text style={[styles.consoleText, forcingLive && { color: colors.live }]}>
                     {forcingLive ? "> forcing live, tap to clear" : "> force live (debug)"}
                   </Text>
-                </Pressable>
+                </Touchable>
                 <View style={styles.rowDivider} />
-                <Pressable
+                <Touchable
                   style={styles.consoleRow}
                   onPress={async () => {
                     // Calls the exact function the periodic background task runs — a much more
                     // direct test than expo-background-task's own trigger-for-testing API, which
                     // silently no-ops whenever the app is in the foreground (i.e. always, when
                     // you're the one tapping this button).
+                    tapLight();
                     await refreshAlarmSound();
                     const path = await getCachedAlarmSoundPath();
                     const summary = await describeSavedRecording();
@@ -294,13 +331,16 @@ export default function SettingsScreen({ navigation }: Props) {
                   }}
                 >
                   <Text style={styles.consoleText}>&gt; run background sound refresh now</Text>
-                </Pressable>
-                <Pressable
+                </Touchable>
+                <Touchable
                   style={styles.consoleRow}
-                  onPress={async () => Alert.alert("Saved recording", await describeSavedRecording())}
+                  onPress={async () => {
+                    tapLight();
+                    Alert.alert("Saved recording", await describeSavedRecording());
+                  }}
                 >
                   <Text style={styles.consoleText}>&gt; saved recording status</Text>
-                </Pressable>
+                </Touchable>
               </>
             )}
           </View>

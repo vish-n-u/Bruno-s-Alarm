@@ -2,7 +2,9 @@ import { useState } from "react";
 import { ActivityIndicator, Modal, Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { Ionicons } from "@expo/vector-icons";
+import Touchable from "./Touchable";
 import { openAlarmPermissionSettings, openAppSettings, openFullScreenIntentSettings, requestPermission } from "../lib/notifications";
+import { tapLight } from "../lib/haptics";
 import { fonts, radius, spacing, useThemeColors, type ThemeColors } from "../lib/theme";
 
 // Shown before the Live alarm can be switched on. It's an honest opt-in: this feature is less
@@ -29,6 +31,9 @@ export default function LiveAlarmSetupSheet({ visible, onConfirm, onCancel }: Pr
 
   async function handleTurnOn() {
     if (busy) return;
+    // Fires immediately — requestPermission() below can pop a system dialog, and the tap
+    // should feel acknowledged before that even appears.
+    tapLight();
     setBusy(true);
     setDenied(false);
     try {
@@ -103,16 +108,22 @@ export default function LiveAlarmSetupSheet({ visible, onConfirm, onCancel }: Pr
             )}
           </ScrollView>
 
-          <Pressable style={[styles.primaryButton, busy && styles.buttonBusy]} onPress={handleTurnOn} disabled={busy}>
+          <Touchable style={[styles.primaryButton, busy && styles.buttonBusy]} onPress={handleTurnOn} disabled={busy}>
               {busy ? (
                 <ActivityIndicator color={colors.accentText} />
               ) : (
                 <Text style={styles.primaryButtonText}>Turn on live alarm</Text>
               )}
-          </Pressable>
-          <Pressable style={styles.cancelButton} onPress={onCancel}>
+          </Touchable>
+          <Touchable
+            style={styles.cancelButton}
+            onPress={() => {
+              tapLight();
+              onCancel();
+            }}
+          >
             <Text style={styles.cancelButtonText}>Not now</Text>
-          </Pressable>
+          </Touchable>
         </SafeAreaView>
       </View>
     </Modal>
@@ -135,14 +146,20 @@ function PermissionRow({
   styles: ReturnType<typeof createStyles>;
 }) {
   return (
-    <Pressable style={styles.permissionRow} onPress={onPress}>
+    <Touchable
+      style={styles.permissionRow}
+      onPress={() => {
+        tapLight();
+        onPress();
+      }}
+    >
       <Ionicons name={icon} size={20} color={colors.accent} />
       <View style={styles.permissionText}>
         <Text style={styles.permissionTitle}>{title}</Text>
         <Text style={styles.permissionHint}>{hint}</Text>
       </View>
       <Ionicons name="chevron-forward" size={16} color={colors.textSecondary} />
-    </Pressable>
+    </Touchable>
   );
 }
 

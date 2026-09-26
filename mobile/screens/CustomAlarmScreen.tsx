@@ -1,11 +1,12 @@
 import { useCallback, useEffect, useState } from "react";
-import { Pressable, ScrollView, StyleSheet, Switch, Text, View } from "react-native";
+import { ScrollView, StyleSheet, Switch, Text, View } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { Ionicons } from "@expo/vector-icons";
 import { useFocusEffect } from "@react-navigation/native";
 import type { NativeStackScreenProps } from "@react-navigation/native-stack";
 import type { HomeStackParamList } from "../App";
 import EditCustomAlarmModal from "../components/EditCustomAlarmModal";
+import Touchable from "../components/Touchable";
 import {
   getCustomAlarms,
   nextCustomAlarmOccurrence,
@@ -15,6 +16,7 @@ import {
 } from "../lib/customAlarm";
 import { ensureAlarmPermissions } from "../lib/alarmPermissions";
 import { tapLight } from "../lib/haptics";
+import { animateNextLayout } from "../lib/layoutAnim";
 import { fonts, radius, shadow, spacing, useThemeColors, type ThemeColors } from "../lib/theme";
 
 const REPEAT_LABEL: Record<RepeatMode, string> = {
@@ -67,7 +69,10 @@ export default function CustomAlarmScreen({}: Props) {
 
   const refresh = useCallback(() => {
     getCustomAlarms()
-      .then(setAlarms)
+      .then((fetched) => {
+        animateNextLayout();
+        setAlarms(fetched);
+      })
       .catch(() => setAlarms([]));
   }, []);
 
@@ -110,10 +115,13 @@ export default function CustomAlarmScreen({}: Props) {
         ) : (
           <View style={styles.list}>
             {alarms.map((alarm) => (
-              <Pressable
+              <Touchable
                 key={alarm.id}
                 style={[styles.card, !alarm.enabled && styles.cardDisabled]}
-                onPress={() => openEditAlarm(alarm.id)}
+                onPress={() => {
+                  tapLight();
+                  openEditAlarm(alarm.id);
+                }}
               >
                 <View style={styles.cardLeft}>
                   <Text style={[styles.cardTime, !alarm.enabled && styles.cardTextDisabled]}>
@@ -130,15 +138,22 @@ export default function CustomAlarmScreen({}: Props) {
                   trackColor={{ false: colors.surfaceAlt, true: colors.accent }}
                   thumbColor={colors.surface}
                 />
-              </Pressable>
+              </Touchable>
             ))}
           </View>
         )}
       </ScrollView>
 
-      <Pressable style={styles.fab} onPress={openNewAlarm} hitSlop={8}>
+      <Touchable
+        style={styles.fab}
+        onPress={() => {
+          tapLight();
+          openNewAlarm();
+        }}
+        hitSlop={8}
+      >
         <Ionicons name="add" size={28} color={colors.accentText} />
-      </Pressable>
+      </Touchable>
 
       <EditCustomAlarmModal
         visible={editModalVisible}

@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import {
   ActivityIndicator,
   Alert,
@@ -15,6 +15,7 @@ import {
   type NativeScrollEvent,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
+import Touchable from "./Touchable";
 import { ensureAlarmPermissions } from "../lib/alarmPermissions";
 import { success, tapLight, tick, warning } from "../lib/haptics";
 import { playDeleteSound } from "../lib/uiSound";
@@ -73,35 +74,67 @@ type Styles = ReturnType<typeof createStyles>;
 // properly generic component instead of fighting those typings at every call site.
 const AnimatedFlatList = Animated.FlatList as unknown as new <T>() => FlatList<T>;
 
-// How far (in rows) a row's depth falloff reaches — rows further than this from center are
-// fully faded/shrunk and don't need their own interpolation stops.
-const DEPTH_SPREAD = 2;
+// Rest-state vs. centered-state size for a row — matches the native picker's own hard two-tier
+// contrast (a big jump, not a gradual one) rather than the softer multi-step fade the previous
+// five-row design used. Expressed as a scale ratio, not a literal fontSize: fontSize edits text
+// layout, which only the JS thread can recompute — driving the wheel's whole scroll position off
+// a JS-thread value (rather than the native thread) reintroduced real lag, the exact "highlights
+// the previous one too" symptom this was meant to fix. `transform: scale` is paint-only, so it
+// stays on the native thread and tracks the actual scroll position every frame, no exceptions.
+const REST_FONT_SIZE = 19;
+const FOCUS_SCALE = 30 / REST_FONT_SIZE;
 
-/** Wraps a single row so it fades and shrinks the further it sits from the centered
- * (selected) row — the same cylindrical illusion a real mechanical wheel picker gives, instead
- * of a flat, uniform list where every row looks equally "in focus". Driven by the wheel's own
- * scrollY (native-driven, so this costs nothing on the JS thread while spinning). */
+// How far from a row's own center its highlight extends, as a fraction of ROW_HEIGHT. Using
+// the full row (a fraction of 1) meant two neighboring rows were each still half-blended
+// toward "focused" right at the midpoint between them — both visibly lit up at once while
+// scrolling past, reading as a glitch rather than a handoff. Keeping this under 0.5 guarantees
+// the two rows' highlight windows never overlap: there's a brief, deliberate gap right at the
+// midpoint where neither is highlighted, then the next row snaps on — a clean single "spotlight"
+// that only ever lights one row at a time, instead of a mushy cross-fade between two.
+const FOCUS_WINDOW = ROW_HEIGHT * 0.42;
+
+/** A single row's size and color track the wheel's scrollY continuously, so the "this is the
+ * one that's selected" look updates every frame in lockstep with the actual scroll position —
+ * never gated behind the settled `selectedIndex` state, which visibly lagged a beat behind
+ * during a fast spin. Only three rows are ever on screen at once (see VISIBLE_ROWS), so there's
+ * only ever one interpolation stop on each side to worry about. */
 function WheelRow({
   index,
   scrollY,
   rowStyle,
-  children,
+  textStyle,
+  label,
+  live,
+  colors,
 }: {
   index: number;
   scrollY: Animated.Value;
   rowStyle: object;
-  children: ReactNode;
+  textStyle: object;
+  label: string;
+  live: boolean;
+  colors: ThemeColors;
 }) {
-  const inputRange = [
-    (index - DEPTH_SPREAD) * ROW_HEIGHT,
-    (index - 1) * ROW_HEIGHT,
-    index * ROW_HEIGHT,
-    (index + 1) * ROW_HEIGHT,
-    (index + DEPTH_SPREAD) * ROW_HEIGHT,
-  ];
-  const opacity = scrollY.interpolate({ inputRange, outputRange: [0.22, 0.55, 1, 0.55, 0.22], extrapolate: "clamp" });
-  const scale = scrollY.interpolate({ inputRange, outputRange: [0.72, 0.88, 1, 0.88, 0.72], extrapolate: "clamp" });
-  return <Animated.View style={[rowStyle, { opacity, transform: [{ scale }] }]}>{children}</Animated.View>;
+  const focusRange = [index * ROW_HEIGHT - FOCUS_WINDOW, index * ROW_HEIGHT, index * ROW_HEIGHT + FOCUS_WINDOW];
+  const restColor = live ? colors.live : colors.textSecondary;
+  const color = scrollY.interpolate({
+    inputRange: focusRange,
+    outputRange: [restColor, colors.textPrimary, restColor],
+    extrapolate: "clamp",
+  });
+  const scale = scrollY.interpolate({
+    inputRange: focusRange,
+    outputRange: [1, FOCUS_SCALE, 1],
+    extrapolate: "clamp",
+  });
+
+  return (
+    <View style={rowStyle}>
+      <Animated.Text style={[textStyle, live && { fontFamily: fonts.monoBold }, { color, transform: [{ scale }] }]}>
+        {label}
+      </Animated.Text>
+    </View>
+  );
 }
 
 function Wheel<T extends string | number>({
@@ -111,6 +144,7 @@ function Wheel<T extends string | number>({
   onSettle,
   isLive,
   styles,
+  colors,
   /** Renders several back-to-back copies of `data` so scrolling past either end lands back on
    * the other side (23 → 0, 59 → 0) instead of stopping dead — a real clock wheel, not a
    * bounded list. */
@@ -122,6 +156,7 @@ function Wheel<T extends string | number>({
   onSettle: (index: number) => void;
   isLive: (value: T) => boolean;
   styles: Styles;
+  colors: ThemeColors;
   loop?: boolean;
 }) {
   const listRef = useRef<FlatList<T>>(null);
@@ -133,7 +168,6 @@ function Wheel<T extends string | number>({
     // eslint-disable-next-line react-hooks/exhaustive-deps
     [loop, data.length],
   );
-  const selectedValue = data[selectedIndex];
 
   // Drives both the per-row depth effect (native-driven, so it stays smooth regardless of what
   // the JS thread is doing) and, via the listener below, the row-crossing haptic tick.
@@ -156,33 +190,63 @@ function Wheel<T extends string | number>({
     }
   }
 
+  // Native-driven: color and transform (scale) are both native-driver-safe, so the whole
+  // per-row effect updates on the native thread, every frame, regardless of what the JS thread
+  // is doing — this is what keeps it feeling instant rather than a beat behind the finger.
   const onScroll = Animated.event([{ nativeEvent: { contentOffset: { y: scrollY } } }], {
     useNativeDriver: true,
     listener: handleScroll,
   });
 
-  // Scroll the wheel to the correct position whenever selectedIndex changes — covers the
-  // edit-existing-alarm case where state updates after mount, since initialScrollIndex only
-  // positions the FlatList at first render and doesn't react to later prop changes. For a
-  // looping wheel this also re-fires after every settle, recentering back onto the middle
-  // copy — imperceptible, since every copy shows the exact same values, so nothing visibly
-  // moves; it just quietly stops the wheel from ever drifting toward either physical end.
+  // Which virtual row the list is actually resting at, so the effect below can tell "did this
+  // selectedIndex change come from our own settle" apart from "did the parent just hand us a
+  // genuinely new value" (loading a saved alarm's time after the modal already mounted).
+  const lastVirtualRow = useRef<number | null>(null);
+  // Set right before calling onSettle, and consumed (cleared) the very next time the effect
+  // below runs — a same-tick way to pass "this update came from us" without needing state.
+  const settledInternally = useRef(false);
+
+  // Scroll the wheel to the correct position whenever selectedIndex changes for a real reason:
+  // the first render, or the edit-existing-alarm case where state updates after mount (covers
+  // initialScrollIndex only positioning things at first render, not reacting to later prop
+  // changes). For our own settle, only recenter back onto the middle copy once actually close to
+  // running out of room on one side — jumping on every single settle risked landing a frame out
+  // of sync with the native scroll position (this is what the intermittent flicker was: a jump
+  // that, most of the time, coincided cleanly with the native settle, but occasionally didn't).
   useEffect(() => {
-    listRef.current?.scrollToIndex({ index: middleOffset + selectedIndex, animated: false });
+    const target = middleOffset + selectedIndex;
+    const internal = settledInternally.current;
+    settledInternally.current = false;
+
+    if (!internal || lastVirtualRow.current === null) {
+      listRef.current?.scrollToIndex({ index: target, animated: false });
+      lastVirtualRow.current = target;
+      return;
+    }
+    if (!loop) return;
+
+    const margin = data.length * 2;
+    const current = lastVirtualRow.current;
+    const driftedNearEdge = current < margin || current > data.length * LOOP_COPIES - margin;
+    if (driftedNearEdge) {
+      listRef.current?.scrollToIndex({ index: target, animated: false });
+      lastVirtualRow.current = target;
+    }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [selectedIndex, loop]);
 
   function handleScrollEnd(e: NativeSyntheticEvent<NativeScrollEvent>) {
     const row = rowAt(e.nativeEvent.contentOffset.y);
+    lastVirtualRow.current = row;
     const real = loop
       ? ((row % data.length) + data.length) % data.length
       : Math.max(0, Math.min(data.length - 1, row));
+    settledInternally.current = true;
     onSettle(real);
   }
 
   return (
     <View style={styles.wheelWrap}>
-      <View pointerEvents="none" style={styles.wheelSelectionBand} />
       <AnimatedFlatList<T>
         ref={listRef}
         data={virtualData}
@@ -197,11 +261,15 @@ function Wheel<T extends string | number>({
         scrollEventThrottle={16}
         onMomentumScrollEnd={handleScrollEnd}
         renderItem={({ item, index }) => (
-          <WheelRow index={index} scrollY={scrollY} rowStyle={styles.wheelRow}>
-            <Text style={[styles.wheelText, isLive(item) && styles.wheelTextLive, item === selectedValue && styles.wheelTextSelected]}>
-              {format(item)}
-            </Text>
-          </WheelRow>
+          <WheelRow
+            index={index}
+            scrollY={scrollY}
+            rowStyle={styles.wheelRow}
+            textStyle={styles.wheelText}
+            label={format(item)}
+            live={isLive(item)}
+            colors={colors}
+          />
         )}
       />
     </View>
@@ -287,6 +355,10 @@ export default function EditCustomAlarmModal({ visible, alarmId, onClose, onSave
       return;
     }
 
+    // Fires immediately, before the slow part below — see the comment above about why a real
+    // tap can otherwise feel unresponsive for a moment; success() at the end still confirms
+    // the save actually completed.
+    tapLight();
     setSaving(true);
     try {
       // Asks for whatever is still missing (notifications, exact alarms, lock-screen display)
@@ -332,17 +404,24 @@ export default function EditCustomAlarmModal({ visible, alarmId, onClose, onSave
         <SafeAreaView style={styles.sheet} edges={["bottom"]}>
           <View style={styles.grabber} />
           <View style={styles.header}>
-            <Pressable onPress={onClose} disabled={saving} hitSlop={8}>
+            <Touchable
+              onPress={() => {
+                tapLight();
+                onClose();
+              }}
+              disabled={saving}
+              hitSlop={8}
+            >
               <Text style={[styles.headerAction, saving && styles.headerActionDisabled]}>Cancel</Text>
-            </Pressable>
+            </Touchable>
             <Text style={styles.headerTitle}>{isEditing ? "Edit alarm" : "New alarm"}</Text>
-            <Pressable onPress={handleDone} disabled={saving} hitSlop={8}>
+            <Touchable onPress={handleDone} disabled={saving} hitSlop={8}>
               {saving ? (
                 <ActivityIndicator size="small" color={colors.accent} />
               ) : (
                 <Text style={[styles.headerAction, styles.headerActionPrimary]}>Done</Text>
               )}
-            </Pressable>
+            </Touchable>
           </View>
 
           {loading ? (
@@ -353,26 +432,32 @@ export default function EditCustomAlarmModal({ visible, alarmId, onClose, onSave
             <View style={styles.content}>
               <Text style={styles.liveHint}>Bruno is live around {liveLabel} your time</Text>
 
-              <View style={styles.wheelsRow}>
-                <Wheel
-                  data={HOURS}
-                  format={(v) => String(v).padStart(2, "0")}
-                  selectedIndex={hourIndex}
-                  onSettle={setHourIndex}
-                  isLive={(v) => liveHourSet.has(v)}
-                  styles={styles}
-                  loop
-                />
-                <Text style={styles.colon}>:</Text>
-                <Wheel
-                  data={MINUTES}
-                  format={(v) => String(v).padStart(2, "0")}
-                  selectedIndex={minuteIndex}
-                  onSettle={setMinuteIndex}
-                  isLive={(v) => liveMinuteSet.has(v)}
-                  styles={styles}
-                  loop
-                />
+              <View style={styles.wheelCard}>
+                {/* One pair of hairlines spanning both columns — the native picker frames its
+                    selected row this way, rather than each wheel drawing its own boxed band. */}
+                <View pointerEvents="none" style={styles.wheelsDivider} />
+                <View style={styles.wheelsRow}>
+                  <Wheel
+                    data={HOURS}
+                    format={(v) => String(v).padStart(2, "0")}
+                    selectedIndex={hourIndex}
+                    onSettle={setHourIndex}
+                    isLive={(v) => liveHourSet.has(v)}
+                    styles={styles}
+                    colors={colors}
+                    loop
+                  />
+                  <Wheel
+                    data={MINUTES}
+                    format={(v) => String(v).padStart(2, "0")}
+                    selectedIndex={minuteIndex}
+                    onSettle={setMinuteIndex}
+                    isLive={(v) => liveMinuteSet.has(v)}
+                    styles={styles}
+                    colors={colors}
+                    loop
+                  />
+                </View>
               </View>
 
               <ScrollView
@@ -382,7 +467,7 @@ export default function EditCustomAlarmModal({ visible, alarmId, onClose, onSave
                 style={styles.repeatRowScroll}
               >
                 {REPEAT_MODES.map((mode) => (
-                  <Pressable
+                  <Touchable
                     key={mode}
                     style={[styles.repeatChip, repeatMode === mode && styles.repeatChipActive]}
                     onPress={() => {
@@ -393,14 +478,14 @@ export default function EditCustomAlarmModal({ visible, alarmId, onClose, onSave
                     <Text style={[styles.repeatChipText, repeatMode === mode && styles.repeatChipTextActive]}>
                       {REPEAT_LABEL[mode]}
                     </Text>
-                  </Pressable>
+                  </Touchable>
                 ))}
               </ScrollView>
 
               {repeatMode === "custom" && (
                 <View style={styles.daysRow}>
                   {DAY_LETTERS.map((letter, day) => (
-                    <Pressable
+                    <Touchable
                       key={day}
                       style={[styles.dayCircle, customDays.includes(day) && styles.dayCircleActive]}
                       onPress={() => toggleDay(day)}
@@ -408,7 +493,7 @@ export default function EditCustomAlarmModal({ visible, alarmId, onClose, onSave
                       <Text style={[styles.dayCircleText, customDays.includes(day) && styles.dayCircleTextActive]}>
                         {letter}
                       </Text>
-                    </Pressable>
+                    </Touchable>
                   ))}
                 </View>
               )}
@@ -423,9 +508,9 @@ export default function EditCustomAlarmModal({ visible, alarmId, onClose, onSave
               />
 
               {isEditing && (
-                <Pressable style={styles.deleteButton} onPress={handleDelete}>
+                <Touchable style={styles.deleteButton} onPress={handleDelete}>
                   <Text style={styles.deleteButtonText}>Delete alarm</Text>
-                </Pressable>
+                </Touchable>
               )}
             </View>
           )}
@@ -501,51 +586,51 @@ function createStyles(colors: ThemeColors) {
       textAlign: "center",
       marginTop: spacing.md,
     },
+    // The wheel gets its own card, separate from the rest of the sheet — matching the native
+    // picker presenting its wheel as a distinct white surface rather than floating on the
+    // sheet's plain background.
+    wheelCard: {
+      position: "relative",
+      marginTop: spacing.xxl,
+      width: "100%",
+      backgroundColor: colors.surface,
+      borderWidth: 1,
+      borderColor: colors.border,
+      borderRadius: radius.lg,
+      paddingVertical: spacing.sm,
+    },
+    // One pair of full-width hairlines framing the centered row — no fill, no rounded box —
+    // the native picker's only visual cue for "this is the selected row" besides size/color.
+    wheelsDivider: {
+      position: "absolute",
+      left: spacing.lg,
+      right: spacing.lg,
+      top: PADDING,
+      height: ROW_HEIGHT,
+      borderTopWidth: StyleSheet.hairlineWidth,
+      borderBottomWidth: StyleSheet.hairlineWidth,
+      borderColor: colors.border,
+    },
     wheelsRow: {
       flexDirection: "row",
       alignItems: "center",
       justifyContent: "center",
-      marginTop: spacing.xxl,
+      gap: spacing.xxl,
     },
     wheelWrap: {
       width: 90,
       height: WHEEL_HEIGHT,
-    },
-    wheelSelectionBand: {
-      position: "absolute",
-      top: PADDING,
-      left: 0,
-      right: 0,
-      height: ROW_HEIGHT,
-      borderTopWidth: 1,
-      borderBottomWidth: 1,
-      borderColor: colors.border,
-      backgroundColor: colors.surfaceAlt,
-      borderRadius: radius.sm,
     },
     wheelRow: {
       height: ROW_HEIGHT,
       alignItems: "center",
       justifyContent: "center",
     },
+    // Base size only — the focused row is scaled up on top of this (see WheelRow), never given
+    // a literal larger fontSize, which would need a JS-thread relayout every frame.
     wheelText: {
-      color: colors.textSecondary,
       fontFamily: fonts.mono,
-      fontSize: 19,
-    },
-    wheelTextLive: {
-      color: colors.live,
-      fontFamily: fonts.monoBold,
-    },
-    wheelTextSelected: {
-      color: colors.textPrimary,
-      fontFamily: fonts.monoBold,
-    },
-    colon: {
-      color: colors.textPrimary,
-      fontFamily: fonts.monoBold,
-      fontSize: 20,
-      marginHorizontal: spacing.xs,
+      fontSize: REST_FONT_SIZE,
     },
     repeatRowScroll: {
       width: "100%",

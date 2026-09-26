@@ -1,19 +1,21 @@
 import { useMemo, useRef, useState } from "react";
 import {
+  Animated,
   Image,
   NativeScrollEvent,
   NativeSyntheticEvent,
-  Pressable,
-  ScrollView,
   StyleSheet,
   Text,
   TextInput,
   View,
   useWindowDimensions,
+  type ScrollView,
 } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
+import Touchable from "./Touchable";
 import { ensureAlarmPermissions } from "../lib/alarmPermissions";
+import { tapLight } from "../lib/haptics";
 import { scheduleUpcomingSessions } from "../lib/notifications";
 import { generateGuestName, setDisplayName } from "../lib/profile";
 import { todaysSessions } from "../lib/schedule";
@@ -46,6 +48,10 @@ export default function Onboarding({ onDone }: { onDone: () => void }) {
   const scrollRef = useRef<ScrollView>(null);
   const [index, setIndex] = useState(0);
   const [nameInput, setNameInput] = useState("");
+  // Drives the page dots' width/opacity continuously as you swipe, instead of them snapping
+  // between two fixed states only once a page settles — the same "growing pill" feel iOS/
+  // Android's own page indicators have.
+  const scrollX = useRef(new Animated.Value(0)).current;
 
   // Bruno's real sessions are fixed to 6AM/6PM India time (see lib/schedule.ts) — converted
   // here to whatever the viewer's own device clock calls that same moment, so this doesn't
@@ -82,6 +88,7 @@ export default function Onboarding({ onDone }: { onDone: () => void }) {
   const isLast = index === slides.length - 1;
 
   function goTo(next: number) {
+    tapLight();
     scrollRef.current?.scrollTo({ x: next * width, animated: true });
     setIndex(next);
   }
@@ -98,11 +105,15 @@ export default function Onboarding({ onDone }: { onDone: () => void }) {
   }
 
   async function handleDone() {
+    tapLight();
     await persistDisplayName();
     onDone();
   }
 
   async function finishWithNotifications() {
+    // Fires immediately — ensureAlarmPermissions() below can pop a system permission dialog,
+    // which shouldn't be the first feedback the tap gets.
+    tapLight();
     await persistDisplayName();
     const granted = await ensureAlarmPermissions();
     if (granted) await scheduleUpcomingSessions();
@@ -111,15 +122,17 @@ export default function Onboarding({ onDone }: { onDone: () => void }) {
 
   return (
     <View style={styles.container}>
-      <Pressable style={[styles.skip, { top: insets.top + spacing.sm }]} onPress={handleDone} hitSlop={12}>
+      <Touchable style={[styles.skip, { top: insets.top + spacing.sm }]} onPress={handleDone} hitSlop={12}>
         <Text style={styles.skipText}>Skip</Text>
-      </Pressable>
+      </Touchable>
 
-      <ScrollView
+      <Animated.ScrollView
         ref={scrollRef}
         horizontal
         pagingEnabled
         showsHorizontalScrollIndicator={false}
+        onScroll={Animated.event([{ nativeEvent: { contentOffset: { x: scrollX } } }], { useNativeDriver: false })}
+        scrollEventThrottle={16}
         onMomentumScrollEnd={handleScrollEnd}
         style={styles.scroll}
       >
@@ -148,28 +161,33 @@ export default function Onboarding({ onDone }: { onDone: () => void }) {
             )}
           </View>
         ))}
-      </ScrollView>
+      </Animated.ScrollView>
 
       <View style={styles.dots}>
-        {slides.map((slide, i) => (
-          <View key={slide.title} style={[styles.dot, i === index && styles.dotActive]} />
-        ))}
+        {slides.map((slide, i) => {
+          const inputRange = [(i - 1) * width, i * width, (i + 1) * width];
+          const dotWidth = scrollX.interpolate({ inputRange, outputRange: [7, 20, 7], extrapolate: "clamp" });
+          const dotColor = scrollX.interpolate({ inputRange, outputRange: [colors.border, colors.accent, colors.border] });
+          return (
+            <Animated.View key={slide.title} style={[styles.dot, { width: dotWidth, backgroundColor: dotColor }]} />
+          );
+        })}
       </View>
 
       <View style={[styles.footer, { paddingBottom: insets.bottom + spacing.xl }]}>
         {isLast ? (
           <>
-            <Pressable style={styles.primaryButton} onPress={finishWithNotifications}>
+            <Touchable style={styles.primaryButton} onPress={finishWithNotifications}>
               <Text style={styles.primaryButtonText}>Okay, notify me</Text>
-            </Pressable>
-            <Pressable style={styles.secondaryButton} onPress={handleDone}>
+            </Touchable>
+            <Touchable style={styles.secondaryButton} onPress={handleDone}>
               <Text style={styles.secondaryButtonText}>No thanks</Text>
-            </Pressable>
+            </Touchable>
           </>
         ) : (
-          <Pressable style={styles.primaryButton} onPress={() => goTo(index + 1)}>
+          <Touchable style={styles.primaryButton} onPress={() => goTo(index + 1)}>
             <Text style={styles.primaryButtonText}>Next</Text>
-          </Pressable>
+          </Touchable>
         )}
       </View>
     </View>
@@ -248,15 +266,11 @@ function createStyles(colors: ThemeColors) {
       gap: spacing.sm,
       marginBottom: spacing.xl,
     },
+    // Width/color are driven per-frame by scrollX (see the animated dots above) — only the
+    // static shape lives here.
     dot: {
-      width: 7,
       height: 7,
       borderRadius: 4,
-      backgroundColor: colors.border,
-    },
-    dotActive: {
-      backgroundColor: colors.accent,
-      width: 20,
     },
     footer: {
       paddingHorizontal: spacing.xl,

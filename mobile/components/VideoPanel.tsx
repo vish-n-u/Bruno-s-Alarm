@@ -3,6 +3,7 @@ import { Animated, Pressable, StyleSheet, View } from "react-native";
 import { useVideoPlayer, VideoView, type VideoSource } from "expo-video";
 import { Ionicons } from "@expo/vector-icons";
 import { getCachedAlarmVideoUri, refreshAlarmSound } from "../lib/alarmSound";
+import { tapLight } from "../lib/haptics";
 import { getDebugForceLive, isLiveWindow, isNearLiveWindow } from "../lib/schedule";
 import { getCloudflareLiveManifestUrl, isCloudflareConfigured, isCloudflareStreamLive } from "../lib/liveStatus";
 
@@ -84,6 +85,7 @@ export default function VideoPanel({
   }, []);
 
   function handleTap() {
+    tapLight();
     setMuted((m) => !m);
     if (hideTimer.current) clearTimeout(hideTimer.current);
     iconOpacity.stopAnimation();

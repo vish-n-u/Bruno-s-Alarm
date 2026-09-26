@@ -1,7 +1,8 @@
 import { useState } from "react";
-import { ActivityIndicator, Pressable, StyleSheet, Text, View } from "react-native";
+import { ActivityIndicator, StyleSheet, Text, View } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { Ionicons } from "@expo/vector-icons";
+import Touchable from "./Touchable";
 import VideoPanel from "./VideoPanel";
 import { snoozeRingingAlarm, stopRingingAlarm } from "../lib/notifications";
 import { disableOnceAlarmIfFired } from "../lib/customAlarm";
@@ -68,16 +69,16 @@ export default function AlarmRingingScreen({ alarmId }: { alarmId: string }) {
         </View>
 
         <View style={styles.bottomScrim}>
-          <Pressable style={[styles.stopButton, busy && styles.buttonBusy]} onPress={handleStop} disabled={busy}>
+          <Touchable style={[styles.stopButton, busy && styles.buttonBusy]} onPress={handleStop} disabled={busy}>
             {busy
               ? <ActivityIndicator color={colors.accentText} />
               : <Text style={styles.stopButtonText}>Stop</Text>}
-          </Pressable>
+          </Touchable>
 
-          <Pressable style={[styles.snoozeButton, busy && styles.buttonBusy]} onPress={handleSnooze} disabled={busy}>
+          <Touchable style={[styles.snoozeButton, busy && styles.buttonBusy]} onPress={handleSnooze} disabled={busy}>
             <Ionicons name="moon-outline" size={16} color="#fff" />
             <Text style={styles.snoozeButtonText}>Snooze 10 min</Text>
-          </Pressable>
+          </Touchable>
         </View>
       </SafeAreaView>
     </View>

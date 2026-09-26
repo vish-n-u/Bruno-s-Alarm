@@ -1,5 +1,5 @@
 import { useCallback, useState } from "react";
-import { Pressable, ScrollView, StyleSheet, Switch, Text, View } from "react-native";
+import { ScrollView, StyleSheet, Switch, Text, View } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { Ionicons } from "@expo/vector-icons";
 import LottieView from "lottie-react-native";
@@ -7,10 +7,12 @@ import { useFocusEffect } from "@react-navigation/native";
 import type { NativeStackScreenProps } from "@react-navigation/native-stack";
 import EditCustomAlarmModal from "./EditCustomAlarmModal";
 import Sky from "./Sky";
+import Touchable from "./Touchable";
 import type { HomeStackParamList } from "../App";
 import { getCustomAlarms, setCustomAlarmEnabled, type CustomAlarm, type RepeatMode } from "../lib/customAlarm";
 import { ensureAlarmPermissions } from "../lib/alarmPermissions";
 import { tapLight } from "../lib/haptics";
+import { animateNextLayout } from "../lib/layoutAnim";
 import { isSubscribed } from "../lib/notifications";
 import { todaysSessions } from "../lib/schedule";
 import { fonts, radius, shadow, spacing, useNow, useThemeColors, type ThemeColors } from "../lib/theme";
@@ -63,7 +65,10 @@ export default function HomeScreen({ navigation }: Props) {
 
   const refreshCustomAlarms = useCallback(() => {
     getCustomAlarms()
-      .then(setCustomAlarms)
+      .then((alarms) => {
+        animateNextLayout();
+        setCustomAlarms(alarms);
+      })
       .catch(() => setCustomAlarms([]));
   }, []);
 
@@ -74,7 +79,10 @@ export default function HomeScreen({ navigation }: Props) {
     useCallback(() => {
       refreshCustomAlarms();
       isSubscribed()
-        .then(setBrunoSubscribed)
+        .then((subscribed) => {
+          animateNextLayout();
+          setBrunoSubscribed(subscribed);
+        })
         .catch(() => setBrunoSubscribed(false));
     }, [refreshCustomAlarms])
   );
@@ -119,17 +127,26 @@ export default function HomeScreen({ navigation }: Props) {
               <Text style={styles.title}>Bruno's Alarm</Text>
               <Text style={styles.subtitle}>A real dog. Two alarms a day. Never once late.</Text>
             </View>
-            <Pressable
+            <Touchable
               style={styles.settingsButton}
-              onPress={() => navigation.navigate("Settings")}
+              onPress={() => {
+                tapLight();
+                navigation.navigate("Settings");
+              }}
               hitSlop={12}
             >
               <Ionicons name="settings-outline" size={22} color={colors.textSecondary} />
-            </Pressable>
+            </Touchable>
           </View>
 
           {brunoSubscribed && (
-            <Pressable style={styles.brunoCard} onPress={() => navigation.navigate("Settings")}>
+            <Touchable
+              style={styles.brunoCard}
+              onPress={() => {
+                tapLight();
+                navigation.navigate("Settings");
+              }}
+            >
               <View style={styles.alarmCardLeft}>
                 <Text style={styles.brunoCardTime}>{brunoTimeLabel}</Text>
                 <Text style={styles.brunoCardLabel}>Bruno's real howl · Every day</Text>
@@ -137,7 +154,7 @@ export default function HomeScreen({ navigation }: Props) {
               <View style={styles.brunoTag}>
                 <Text style={styles.brunoTagText}>BRUNO</Text>
               </View>
-            </Pressable>
+            </Touchable>
           )}
 
           {!brunoSubscribed && customAlarms.length === 0 && (
@@ -156,10 +173,13 @@ export default function HomeScreen({ navigation }: Props) {
             <View style={styles.yourAlarmsSection}>
               <Text style={styles.yourAlarmsLabel}>Your alarms</Text>
               {customAlarms.map((alarm) => (
-                <Pressable
+                <Touchable
                   key={alarm.id}
                   style={[styles.alarmCard, !alarm.enabled && styles.alarmCardDisabled]}
-                  onPress={() => openEditAlarm(alarm.id)}
+                  onPress={() => {
+                    tapLight();
+                    openEditAlarm(alarm.id);
+                  }}
                 >
                   <View style={styles.alarmCardLeft}>
                     <Text style={[styles.alarmTime, !alarm.enabled && styles.alarmTextDisabled]}>
@@ -176,12 +196,18 @@ export default function HomeScreen({ navigation }: Props) {
                     trackColor={{ false: colors.surfaceAlt, true: colors.accent }}
                     thumbColor={colors.surface}
                   />
-                </Pressable>
+                </Touchable>
               ))}
-              <Pressable style={styles.manageAlarmsRow} onPress={() => navigation.navigate("CustomAlarm")}>
+              <Touchable
+                style={styles.manageAlarmsRow}
+                onPress={() => {
+                  tapLight();
+                  navigation.navigate("CustomAlarm");
+                }}
+              >
                 <Text style={styles.manageAlarmsText}>Manage alarms</Text>
                 <Ionicons name="chevron-forward" size={16} color={colors.textSecondary} />
-              </Pressable>
+              </Touchable>
             </View>
           )}
         </View>
@@ -194,9 +220,16 @@ export default function HomeScreen({ navigation }: Props) {
         </View>
       </ScrollView>
 
-      <Pressable style={styles.fab} onPress={openNewAlarm} hitSlop={8}>
+      <Touchable
+        style={styles.fab}
+        onPress={() => {
+          tapLight();
+          openNewAlarm();
+        }}
+        hitSlop={8}
+      >
         <Ionicons name="add" size={28} color={colors.accentText} />
-      </Pressable>
+      </Touchable>
 
       <EditCustomAlarmModal
         visible={editModalVisible}
@@ -217,7 +250,10 @@ function createStyles(colors: ThemeColors) {
     content: {
       flexGrow: 1,
       justifyContent: "space-between",
-      padding: spacing.xl,
+      // More breathing room than the standard spacing.xl inset — the bold uppercase title
+      // especially read as hugging the screen edge at the tighter margin.
+      paddingHorizontal: spacing.xxl,
+      paddingTop: spacing.xxl,
       paddingBottom: spacing.xxl,
     },
     header: {

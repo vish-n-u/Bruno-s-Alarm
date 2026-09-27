@@ -20,6 +20,7 @@ import { ensureAlarmPermissions } from "../lib/alarmPermissions";
 import { success, tapLight, tick, warning } from "../lib/haptics";
 import { playDeleteSound } from "../lib/uiSound";
 import {
+  deleteCustomAlarm,
   getCustomAlarm,
   saveCustomAlarm,
   type CustomAlarm,
@@ -280,20 +281,15 @@ type Props = {
   /** Omit to create a new alarm; pass an existing id to edit it. */
   alarmId?: string;
   onClose: () => void;
-  /** Called after a successful save, so the caller can refresh its own list. */
+  /** Called after a successful save or delete, so the caller can refresh its own list. */
   onSaved: () => void;
-  /** Called when Delete is tapped, instead of this modal deleting the alarm itself — the
-   * caller owns the actual delete-with-an-undo-window (see Home/CustomAlarmScreen), so the
-   * alarm can vanish from the list immediately while still being reversible for a few
-   * seconds. */
-  onDeleteRequested: (alarmId: string) => void;
 };
 
 // A true in-place popup (RN's own Modal, sliding up over a dimmed backdrop) rather than a
 // pushed navigation route — even a "modal presentation" stack screen still reads as
 // "went to a new page." This is opened directly from HomeScreen/CustomAlarmScreen via local
 // state, not navigation.
-export default function EditCustomAlarmModal({ visible, alarmId, onClose, onSaved, onDeleteRequested }: Props) {
+export default function EditCustomAlarmModal({ visible, alarmId, onClose, onSaved }: Props) {
   const colors = useThemeColors();
   const styles = createStyles(colors);
   const isEditing = Boolean(alarmId);
@@ -392,11 +388,12 @@ export default function EditCustomAlarmModal({ visible, alarmId, onClose, onSave
     }
   }
 
-  function handleDelete() {
+  async function handleDelete() {
     if (!alarmId) return;
     warning();
     playDeleteSound();
-    onDeleteRequested(alarmId);
+    await deleteCustomAlarm(alarmId);
+    onSaved();
     onClose();
   }
 

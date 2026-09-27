@@ -1,5 +1,5 @@
 BRUNO'S ALARM — PRIVACY POLICY
-Effective September 21, 2026
+Effective September 27, 2026
 Package: com.brunosalarm.app
 
 Bruno's Alarm wakes you up with a real dog's twice-daily howl, and lets you chat with
@@ -23,9 +23,11 @@ deliver the video. No ads, nothing sold to third parties.
   Authentication, with no name/email/phone attached), the text of any message you
   send, a display name, and a timestamp. The display name is either the nickname
   you typed during onboarding or, if you skipped that, an auto-generated one like
-  "Viewer 4821" — either way it's never linked to your real name. These are stored
-  in a shared database (Cloud Firestore) and are visible to everyone viewing that
-  session's chat, since that's the point of a public chat.
+  "Viewer 4821" — either way it's never linked to your real name. A typed nickname
+  is automatically checked and replaced with a generated one if it's inappropriate
+  or impersonates staff. These are stored in a shared database (Cloud Firestore) and
+  are visible to everyone viewing that session's chat, since that's the point of a
+  public chat.
 - If you report a chat message: the message you reported, your reason, and your
   anonymous device ID, so we can review it.
 - If you turn on the optional "Ring when Bruno goes live" alarm: Firebase Cloud

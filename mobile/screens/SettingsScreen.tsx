@@ -23,8 +23,9 @@ import { animateNextLayout } from "../lib/layoutAnim";
 import { setDebugForceLive } from "../lib/schedule";
 import { fonts, radius, shadow, spacing, useThemeColors, type ThemeColors } from "../lib/theme";
 
-const PRIVACY_POLICY_URL =
-  "https://plant-garnet-37d.notion.site/BRUNO-S-ALARM-3d327ffbfc9180a3b404f1de22bf62b8";
+// Served by the Next.js site at the repo root (app/privacy, app/terms).
+const PRIVACY_POLICY_URL = "https://bruno-s-alarm.vercel.app/privacy";
+const TERMS_URL = "https://bruno-s-alarm.vercel.app/terms";
 
 const KIND_LABEL: Record<ScheduledAlarmKind, string> = {
   session: "Bruno's real sessions",
@@ -206,6 +207,17 @@ export default function SettingsScreen({ navigation }: Props) {
           onPress={() => {
             tapLight();
             Linking.openURL(PRIVACY_POLICY_URL);
+          }}
+          colors={colors}
+          styles={styles}
+        />
+        <View style={styles.rowDivider} />
+        <SettingsRow
+          icon="document-text-outline"
+          title="Terms of Service"
+          onPress={() => {
+            tapLight();
+            Linking.openURL(TERMS_URL);
           }}
           colors={colors}
           styles={styles}

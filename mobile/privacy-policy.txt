@@ -16,9 +16,10 @@ deliver the video. No ads, nothing sold to third parties.
 
 1. INFORMATION WE COLLECT
 - Automatically, via Firebase Analytics and Crashlytics: basic app-usage events
-  (like which screens you open), device/OS info, and crash or error reports. This
-  is standard, aggregate diagnostic data — it isn't tied to your name or contact
-  info.
+  (like which screens you open), device/OS info, and crash or error reports.
+  Analytics also works out an approximate location (country or region) from a
+  masked IP address. This is standard, aggregate diagnostic data — it isn't tied to
+  your name or contact info.
 - If you use live chat: an anonymous device ID (created by Firebase Anonymous
   Authentication, with no name/email/phone attached), the text of any message you
   send, a display name, and a timestamp. The display name is either the nickname
@@ -105,18 +106,33 @@ ad network of its own.
 The app does not request access to your microphone, contacts, photos, files, or
 location.
 
-6. CHILDREN'S PRIVACY
+6. DELETING YOUR DATA
+There's no account, so most of this you can do yourself, straight away:
+- Everything on your phone: uninstall the app. Alarms, your nickname, blocks, and
+  the cached recording are all removed.
+- Live alerts: turn off "Ring when Bruno goes live" in Settings. Your device is
+  unsubscribed from the alert topic.
+- Chat messages: these delete themselves a couple of hours after each session ends.
+To have something removed sooner, such as a message you sent or a report you filed,
+email vishnuna26@gmail.com with the subject "Delete my data". Because there's no
+account to look up, include the display name you used and roughly when you chatted.
+We'll delete it and reply within 30 days. Usage and crash data from Firebase
+Analytics and Crashlytics isn't linked to anything that identifies you, so it can't
+be matched to a request; it's deleted automatically under Firebase's retention
+periods (crash reports after 90 days).
+
+7. CHILDREN'S PRIVACY
 Bruno's Alarm isn't directed at children. Live chat's public, moderated nature
 means it isn't intended for use by children either. We don't knowingly collect
 information from children — if you believe a child has used chat inappropriately
 or shared personal information, contact us using the email below and we'll remove
 it.
 
-7. CHANGES TO THIS POLICY
+8. CHANGES TO THIS POLICY
 If this policy changes, the date at the top of this page will change with it.
 Continuing to use the app after an update means you accept the revised policy.
 
-8. CONTACT
+9. CONTACT
 Questions about this policy, the app, or a chat report: vishnuna26@gmail.com
 
 Bruno's Alarm is an independent app, not affiliated with or endorsed by Google,

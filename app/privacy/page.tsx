@@ -29,7 +29,7 @@ export default function PrivacyPage() {
       other={{ href: "/terms", label: "Terms of Service" }}
       summary={
         <p>
-          There&rsquo;s no sign-up and we never learn your name, email, or phone number. Your
+          There&rsquo;s no sign-up and we never learn your real name, email, or phone number. Your
           alarms are stored only on your phone. When you use live chat, the app creates an
           anonymous device ID so messages can be moderated and rate-limited, and anything you
           send in chat is public to everyone watching that session. We use Firebase Analytics
@@ -49,8 +49,9 @@ export default function PrivacyPage() {
         <li>
           <strong>Automatically, via Firebase Analytics and Crashlytics:</strong> basic
           app-usage events (like which screens you open), device and OS info, and crash or error
-          reports. This is standard diagnostic data and isn&rsquo;t tied to your name or contact
-          info.
+          reports. Analytics also works out an approximate location (country or region) from a
+          masked IP address. This is standard diagnostic data and isn&rsquo;t tied to your name or
+          contact info.
         </li>
         <li>
           <strong>If you use live chat:</strong> an anonymous device ID (created by Firebase
@@ -153,7 +154,28 @@ export default function PrivacyPage() {
         your device.
       </p>
 
-      <h2><span className="num">7</span>Children</h2>
+      <h2 id="delete-your-data"><span className="num">7</span>Deleting your data</h2>
+      <p>There&rsquo;s no account, so most of this you can do yourself, straight away:</p>
+      <ul>
+        <li><strong>Everything on your phone:</strong> uninstall the app. Alarms, your nickname, blocks, and the cached recording are all removed.</li>
+        <li><strong>Live alerts:</strong> turn off &ldquo;Ring when Bruno goes live&rdquo; in Settings. Your device is unsubscribed from the alert topic.</li>
+        <li><strong>Chat messages:</strong> these delete themselves a couple of hours after each session ends. You don&rsquo;t need to ask.</li>
+      </ul>
+      <p>
+        To have something removed sooner, such as a message you sent or a report you filed,
+        email <a href={`mailto:${CONTACT_EMAIL}?subject=Delete%20my%20data`}>{CONTACT_EMAIL}</a>{" "}
+        with the subject &ldquo;Delete my data&rdquo;. Because there&rsquo;s no account to look
+        up, include the display name you used and roughly when you chatted, so we can find it.
+        We&rsquo;ll delete it and reply within 30 days.
+      </p>
+      <p>
+        Usage and crash data from Firebase Analytics and Crashlytics isn&rsquo;t linked to your
+        name or anything that identifies you, so we can&rsquo;t match it to a request. It&rsquo;s
+        deleted automatically under Firebase&rsquo;s retention periods (crash reports after 90
+        days).
+      </p>
+
+      <h2><span className="num">8</span>Children</h2>
       <p>
         Bruno&rsquo;s Alarm isn&rsquo;t directed at children, and live chat&rsquo;s public nature
         means it isn&rsquo;t meant for them either. We don&rsquo;t knowingly collect information
@@ -161,13 +183,13 @@ export default function PrivacyPage() {
         information, email us and we&rsquo;ll remove it.
       </p>
 
-      <h2><span className="num">8</span>Changes to this policy</h2>
+      <h2><span className="num">9</span>Changes to this policy</h2>
       <p>
         If this policy changes, the date at the top changes with it. Continuing to use the app
         after an update means you accept the revised policy.
       </p>
 
-      <h2><span className="num">9</span>Contact</h2>
+      <h2><span className="num">10</span>Contact</h2>
       <p>
         Questions about this policy, the app, or a chat report:{" "}
         <a href={`mailto:${CONTACT_EMAIL}`}>{CONTACT_EMAIL}</a>

@@ -247,7 +247,9 @@
     <li>
       If you use live chat: an anonymous device ID (created by Firebase Anonymous
       Authentication, with no name/email/phone attached), the text of any message you send,
-      an auto-generated display name like <code>Viewer 4821</code>, and a timestamp. These
+      a display name, and a timestamp. The display name is either the nickname you typed
+      during onboarding or, if you skipped that, an auto-generated one like
+      <code>Viewer 4821</code> — either way it's never linked to your real name. These
       are stored in a shared database (Cloud Firestore) and are visible to everyone viewing
       that session's chat, since that's the point of a public chat.
     </li>
@@ -256,10 +258,6 @@
         gives your device a push identifier, and the app subscribes it to a "live" topic so it can be told when
         Bruno starts streaming. No name, email, or phone number is attached, and turning the option off
         unsubscribes it.
-      </li>
-      <li>
-        On Android, Firebase Analytics may read your device's advertising ID (where your device provides one)
-        to measure usage. We do not use it to show ads.
       </li>
       <li>
       If you report a chat message: the message you reported, your reason, and your
@@ -277,9 +275,8 @@
     <li>Your scheduled alarm times, held by Android's own <code>AlarmManager</code>.</li>
     <li>Whether you've completed the app's one-time onboarding screen, and whether you turned on the optional live alarm.</li>
     <li>
-      A nickname you can optionally type during onboarding — currently unused by any feature
-      (live chat generates its own display name instead), kept only in case a future feature
-      uses it.
+      A nickname you can optionally type during onboarding, used as your display name in live
+      chat. Skip it and the app uses a random guest name instead.
     </li>
     <li>
       Whether you've accepted live chat's conduct rules, and a list of any chat participants
@@ -297,8 +294,10 @@
     posted: it checks length, filters certain language, and enforces a rate limit and a
     per-session cap so chat can't be flooded. Messages that get posted are public — anyone
     viewing that session can read them, and they're stored as part of that session's chat
-    history for moderation and app functionality. We don't sell or share chat content with
-    third parties, and it's never linked to your name, email, or any account.
+    history for moderation and app functionality. A session's messages are automatically
+    deleted a couple of hours after that session goes quiet — we don't keep a running chat
+    history. We don't sell or share chat content with third parties, and it's never linked
+    to your name, email, or any account.
   </p>
   <p>Two tools if something in chat bothers you:</p>
   <ul class="tool-list">
@@ -370,10 +369,6 @@
     <li>
       <span class="perm-name">com.google.android.c2dm.permission.RECEIVE</span>
       <span class="perm-why">Lets the optional live alerts reach your phone (Firebase Cloud Messaging).</span>
-    </li>
-    <li>
-      <span class="perm-name">AD_ID</span>
-      <span class="perm-why">Declared by Firebase Analytics; not used to show ads.</span>
     </li>
   </ul>
   <p>The app does not request access to your microphone, contacts, photos, files, or location.</p>

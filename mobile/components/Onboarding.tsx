@@ -34,9 +34,9 @@ type Slide = ImageSlide | IconSlide | NameInputSlide;
 // first thing a new user sees, and a real dog beats a stock paw glyph for making the point
 // that this app is about one specific, real animal. Slides 2, 4 stay icon-led since they're
 // about concepts (schedule, notifications), not "this is a real dog." Slide 3 collects an
-// optional display name for the chat (hidden for now, see docs/hidden-features.md) — stored
-// locally now so there's nothing left to retrofit once it ships. Copy is deliberately short
-// and a little self-deprecating; keep it that way when editing.
+// optional display name, shown next to the person's messages in the live chat (see
+// lib/chat.ts). Skipping it saves a "GuestNNNN" instead. Copy is deliberately short and a
+// little self-deprecating; keep it that way when editing.
 export default function Onboarding({ onDone }: { onDone: () => void }) {
   const colors = useThemeColors();
   const styles = createStyles(colors);
@@ -74,7 +74,7 @@ export default function Onboarding({ onDone }: { onDone: () => void }) {
       {
         kind: "name-input",
         title: "Got a name?",
-        body: "It's for the chat, whenever that exists. Skip if you like.",
+        body: "It shows next to your messages in the live chat. Skip and we'll invent one.",
       },
       {
         kind: "icon",

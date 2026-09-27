@@ -5,6 +5,7 @@ import { getMessaging } from "firebase-admin/messaging";
 import * as logger from "firebase-functions/logger";
 import { setGlobalOptions } from "firebase-functions/v2";
 import { HttpsError, onCall, onRequest } from "firebase-functions/v2/https";
+import { onSchedule } from "firebase-functions/v2/scheduler";
 import { Filter } from "bad-words";
 
 // Bruno's Alarm live chat — this is the ONLY write path for chat messages. The mobile app
@@ -43,9 +44,9 @@ function codePointLength(text: string): number {
   return [...text].length;
 }
 
-// Deterministic, so the same anonymous uid always reads as the same "Viewer NNNN" within and
-// across sessions — no separate profile document/read needed, and nothing the client
-// supplies or can spoof (unlike a client-chosen display name would be).
+// The fallback name: deterministic, so the same anonymous uid always reads as the same
+// "Viewer NNNN" — used whenever the app doesn't send a name (older app versions, someone who
+// skipped the name step on an older build) or sends one that fails the checks below.
 function displayNameForUid(uid: string): string {
   let hash = 0;
   for (let i = 0; i < uid.length; i++) {
@@ -54,9 +55,31 @@ function displayNameForUid(uid: string): string {
   return `Viewer ${1000 + (hash % 9000)}`;
 }
 
+const MAX_NAME_LENGTH = 24; // matches the onboarding name field's own maxLength
+// Names that would read as the dog or the app's own staff. Not a full impersonation defence —
+// just stops the obvious ones. Anything that matches quietly falls back to "Viewer NNNN".
+const RESERVED_NAME = /\b(bruno|admin|administrator|moderator|mod|staff|official|support)\b/i;
+
+/** The name shown next to a message. The app sends the name typed during onboarding, but a
+ * client-supplied value is untrusted — a modified app could send anything — so it's cleaned and
+ * checked here, and any failure just uses the anonymous "Viewer NNNN" instead of rejecting the
+ * message. */
+function chatNameFor(uid: string, raw: unknown): string {
+  const fallback = displayNameForUid(uid);
+  if (typeof raw !== "string") return fallback;
+  const cleaned = [...raw.replace(/[\u0000-\u001f\u007f]/g, "").replace(/\s+/g, " ").trim()]
+    .slice(0, MAX_NAME_LENGTH)
+    .join("")
+    .trim();
+  if (cleaned.length === 0) return fallback;
+  if (profanityFilter.isProfane(cleaned) || RESERVED_NAME.test(cleaned)) return fallback;
+  return cleaned;
+}
+
 type SendChatMessageRequest = {
   sessionId?: unknown;
   text?: unknown;
+  displayName?: unknown;
 };
 
 export const sendChatMessage = onCall<SendChatMessageRequest>(async (request) => {
@@ -65,7 +88,7 @@ export const sendChatMessage = onCall<SendChatMessageRequest>(async (request) =>
     throw new HttpsError("unauthenticated", "Sign-in required.");
   }
 
-  const { sessionId, text: rawText } = request.data ?? {};
+  const { sessionId, text: rawText, displayName: rawName } = request.data ?? {};
   if (typeof sessionId !== "string" || sessionId.length === 0) {
     throw new HttpsError("invalid-argument", "Missing sessionId.");
   }
@@ -103,11 +126,16 @@ export const sendChatMessage = onCall<SendChatMessageRequest>(async (request) =>
       throw new HttpsError("failed-precondition", "Chat is full for this session.");
     }
 
-    tx.set(sessionRef, { messageCount: FieldValue.increment(1) }, { merge: true });
+    // lastMessageAt is what cleanupOldChat (below) uses to tell an active chat from a finished one.
+    tx.set(
+      sessionRef,
+      { messageCount: FieldValue.increment(1), lastMessageAt: FieldValue.serverTimestamp() },
+      { merge: true },
+    );
     tx.set(rateLimitRef, { lastMessageAt: FieldValue.serverTimestamp() });
     tx.create(messageRef, {
       text,
-      displayName: displayNameForUid(uid),
+      displayName: chatNameFor(uid, rawName),
       deviceId: uid,
       timestamp: FieldValue.serverTimestamp(),
       flagged: false,
@@ -115,6 +143,72 @@ export const sendChatMessage = onCall<SendChatMessageRequest>(async (request) =>
   });
 
   return { ok: true };
+});
+
+// --- Deleting finished chats ------------------------------------------------------------
+// Chat is per live session and only ever shown while that session is live, so nothing needs to
+// keep a session's messages once it's over. This runs hourly and removes every session that's
+// been quiet for CHAT_RETENTION_MS (a buffer past the last message so a stream that's still going
+// isn't cut off mid-chat). The persistent "Bruno's Pack" room is never touched.
+const CHAT_RETENTION_MS = 2 * 60 * 60 * 1000;
+
+/** "2026-09-18-AM" / "-PM" -> that session's start (00:30 / 12:30 UTC), or null if the id isn't
+ * one of the app's own session ids. */
+function sessionStartFromId(id: string): number | null {
+  const m = /^(\d{4}-\d{2}-\d{2})-(AM|PM)$/.exec(id);
+  if (!m) return null;
+  const t = Date.parse(`${m[1]}T${m[2] === "AM" ? "00:30" : "12:30"}:00Z`);
+  return Number.isFinite(t) ? t : null;
+}
+
+async function lastActivityMs(sessionRef: FirebaseFirestore.DocumentReference): Promise<number> {
+  const snap = await sessionRef.get();
+  const last = snap.data()?.lastMessageAt as Timestamp | undefined;
+  if (last) return last.toMillis();
+  // Sessions written before lastMessageAt existed: fall back to the newest message, then to the
+  // session's own start time. Anything with neither is empty or a stray test doc — treat as old.
+  const newest = await sessionRef.collection("messages").orderBy("timestamp", "desc").limit(1).get();
+  const ts = newest.docs[0]?.data()?.timestamp as Timestamp | undefined;
+  if (ts) return ts.toMillis();
+  return sessionStartFromId(sessionRef.id) ?? 0;
+}
+
+/** A report only stores the message's id, so once the message is gone the report would be
+ * unreadable. Copy the reported text (read here on the server, so it can't be faked by whoever
+ * filed the report) onto each report before its session is deleted. */
+async function archiveReportedMessages(sessionRef: FirebaseFirestore.DocumentReference): Promise<number> {
+  const reports = await db.collection("reports").where("sessionId", "==", sessionRef.id).get();
+  let archived = 0;
+  for (const report of reports.docs) {
+    if (report.data().messageText !== undefined) continue;
+    const messageId = report.data().messageId;
+    if (typeof messageId !== "string") continue;
+    const message = await sessionRef.collection("messages").doc(messageId).get();
+    const data = message.data();
+    await report.ref.update({
+      messageText: data?.text ?? null,
+      reportedDisplayName: data?.displayName ?? null,
+      reportedUid: data?.deviceId ?? null,
+      archivedAt: FieldValue.serverTimestamp(),
+    });
+    archived++;
+  }
+  return archived;
+}
+
+export const cleanupOldChat = onSchedule("every 60 minutes", async () => {
+  const cutoff = Date.now() - CHAT_RETENTION_MS;
+  const sessionRefs = await db.collection("sessions").listDocuments();
+  let deleted = 0;
+  let archivedReports = 0;
+  for (const ref of sessionRefs) {
+    if (UNCAPPED_SESSION_IDS.has(ref.id)) continue;
+    if ((await lastActivityMs(ref)) > cutoff) continue;
+    archivedReports += await archiveReportedMessages(ref);
+    await db.recursiveDelete(ref);
+    deleted++;
+  }
+  logger.info("Chat cleanup", { checked: sessionRefs.length, deleted, archivedReports });
 });
 
 // --- "Bruno just went live" push ---------------------------------------------------------
@@ -132,6 +226,9 @@ function secretsMatch(provided: string | undefined, expected: string): boolean {
   if (!provided) return false;
   const a = Buffer.from(provided);
   const b = Buffer.from(expected);
+  // Length check runs first (and short-circuits) specifically so a wrong-length header never
+  // reaches timingSafeEqual, which throws on mismatched buffer lengths rather than returning
+  // false — that would otherwise turn a bad request into a 500 instead of a clean 401.
   return a.length === b.length && timingSafeEqual(a, b);
 }
 
@@ -156,6 +253,11 @@ export const cloudflareLiveWebhook = onRequest(async (req, res) => {
     return;
   }
 
+  // Read-then-write inside a transaction, not a plain read-then-write — Cloudflare (or any
+  // webhook sender) can deliver the same event more than once, and two near-simultaneous
+  // deliveries reading the same stale "not throttled yet" value before either writes would
+  // otherwise both pass the check and double-ring everyone. Firestore transactions serialize
+  // conflicting reads/writes (retrying one of them), so only one delivery ever wins the claim.
   const alertRef = db.doc("system/liveAlert");
   const claimed = await db.runTransaction(async (tx) => {
     const snap = await tx.get(alertRef);

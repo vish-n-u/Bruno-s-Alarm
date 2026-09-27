@@ -13,6 +13,7 @@ import {
 import { getFunctions, httpsCallable } from "@react-native-firebase/functions";
 import { Filter } from "bad-words";
 import { ensureAnonymousAuth } from "./firebase";
+import { getDisplayName } from "./profile";
 
 // Live chat, scoped to one real Bruno session at a time (see lib/schedule.ts's
 // currentSessionId()) rather than one continuous room. All writes go through a single
@@ -122,12 +123,17 @@ export async function sendChatMessage(sessionId: string, rawText: string): Promi
     return { ok: false, reason: "not-signed-in" };
   }
 
-  const send = httpsCallable<{ sessionId: string; text: string }, { ok: true }>(
+  // The name from onboarding (or the guest name made when it was skipped). Sent with every
+  // message, but the server is what actually decides whether to use it — it cleans it and falls
+  // back to an anonymous "Viewer NNNN" if it doesn't pass — so nothing here is trusted.
+  const displayName = (await getDisplayName())?.trim() || undefined;
+
+  const send = httpsCallable<{ sessionId: string; text: string; displayName?: string }, { ok: true }>(
     getFunctions(),
     "sendChatMessage"
   );
   try {
-    await send({ sessionId, text });
+    await send({ sessionId, text, displayName });
     return { ok: true };
   } catch (error) {
     const code = (error as { code?: string } | undefined)?.code;

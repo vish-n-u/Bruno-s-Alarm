@@ -23,7 +23,7 @@ export default async function StatusPage({
 
   if (!secret || key !== secret) {
     return (
-      <main>
+      <main className="status-page">
         <div className="card">Not authorized. Pass <code>?key=STATUS_SECRET</code>.</div>
       </main>
     );
@@ -33,7 +33,7 @@ export default async function StatusPage({
   const subs = getAllSubscriptions();
 
   return (
-    <main>
+    <main className="status-page">
       <header>
         <h1>Bruno's Alarm — status</h1>
       </header>

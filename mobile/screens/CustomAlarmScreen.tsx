@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { ScrollView, StyleSheet, Switch, Text, View } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { Ionicons } from "@expo/vector-icons";
@@ -7,7 +7,9 @@ import type { NativeStackScreenProps } from "@react-navigation/native-stack";
 import type { HomeStackParamList } from "../App";
 import EditCustomAlarmModal from "../components/EditCustomAlarmModal";
 import Touchable from "../components/Touchable";
+import UndoSnackbar from "../components/UndoSnackbar";
 import {
+  deleteCustomAlarm,
   getCustomAlarms,
   nextCustomAlarmOccurrence,
   setCustomAlarmEnabled,
@@ -60,6 +62,16 @@ export default function CustomAlarmScreen({}: Props) {
   const [alarms, setAlarms] = useState<CustomAlarm[]>([]);
   const [editModalAlarmId, setEditModalAlarmId] = useState<string | undefined>(undefined);
   const [editModalVisible, setEditModalVisible] = useState(false);
+  // Same delete-with-undo pattern as HomeScreen — see its own comments for why the timer
+  // isn't cancelled on unmount (navigating away shouldn't cancel a delete nobody undid).
+  const [pendingDeleteId, setPendingDeleteId] = useState<string | null>(null);
+  const deleteTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const isMountedRef = useRef(true);
+  useEffect(() => {
+    return () => {
+      isMountedRef.current = false;
+    };
+  }, []);
   // Tick every minute so the "Next alarm in X" countdown stays current while the screen is open.
   const [, forceUpdate] = useState(0);
   useEffect(() => {
@@ -97,6 +109,29 @@ export default function CustomAlarmScreen({}: Props) {
   function openEditAlarm(alarmId: string) {
     setEditModalAlarmId(alarmId);
     setEditModalVisible(true);
+  }
+
+  const UNDO_WINDOW_MS = 4000;
+
+  function requestDelete(alarmId: string) {
+    if (deleteTimerRef.current) clearTimeout(deleteTimerRef.current);
+    animateNextLayout();
+    setAlarms((prev) => prev.filter((a) => a.id !== alarmId));
+    setPendingDeleteId(alarmId);
+    deleteTimerRef.current = setTimeout(async () => {
+      deleteTimerRef.current = null;
+      await deleteCustomAlarm(alarmId);
+      if (isMountedRef.current) setPendingDeleteId(null);
+    }, UNDO_WINDOW_MS);
+  }
+
+  function undoDelete() {
+    if (deleteTimerRef.current) {
+      clearTimeout(deleteTimerRef.current);
+      deleteTimerRef.current = null;
+    }
+    setPendingDeleteId(null);
+    refresh();
   }
 
   return (
@@ -160,7 +195,9 @@ export default function CustomAlarmScreen({}: Props) {
         alarmId={editModalAlarmId}
         onClose={() => setEditModalVisible(false)}
         onSaved={refresh}
+        onDeleteRequested={requestDelete}
       />
+      <UndoSnackbar visible={pendingDeleteId !== null} message="Alarm deleted" onUndo={undoDelete} />
     </SafeAreaView>
   );
 }

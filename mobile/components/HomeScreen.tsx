@@ -1,4 +1,4 @@
-import { useCallback, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { ScrollView, StyleSheet, Switch, Text, View } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { Ionicons } from "@expo/vector-icons";
@@ -8,8 +8,15 @@ import type { NativeStackScreenProps } from "@react-navigation/native-stack";
 import EditCustomAlarmModal from "./EditCustomAlarmModal";
 import Sky from "./Sky";
 import Touchable from "./Touchable";
+import UndoSnackbar from "./UndoSnackbar";
 import type { HomeStackParamList } from "../App";
-import { getCustomAlarms, setCustomAlarmEnabled, type CustomAlarm, type RepeatMode } from "../lib/customAlarm";
+import {
+  deleteCustomAlarm,
+  getCustomAlarms,
+  setCustomAlarmEnabled,
+  type CustomAlarm,
+  type RepeatMode,
+} from "../lib/customAlarm";
 import { ensureAlarmPermissions } from "../lib/alarmPermissions";
 import { tapLight } from "../lib/haptics";
 import { animateNextLayout } from "../lib/layoutAnim";
@@ -62,6 +69,10 @@ export default function HomeScreen({ navigation }: Props) {
   const [brunoSubscribed, setBrunoSubscribed] = useState(false);
   const [editModalAlarmId, setEditModalAlarmId] = useState<string | undefined>(undefined);
   const [editModalVisible, setEditModalVisible] = useState(false);
+  // The alarm hides from the list the instant delete is tapped, but isn't actually deleted
+  // from storage until this window elapses — Undo just cancels the pending timer.
+  const [pendingDeleteId, setPendingDeleteId] = useState<string | null>(null);
+  const deleteTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const refreshCustomAlarms = useCallback(() => {
     getCustomAlarms()
@@ -107,6 +118,44 @@ export default function HomeScreen({ navigation }: Props) {
   function openEditAlarm(alarmId: string) {
     setEditModalAlarmId(alarmId);
     setEditModalVisible(true);
+  }
+
+  // Navigating away during the undo window shouldn't cancel the delete — the alarm should
+  // still go away exactly as if the screen had stayed open, since nobody tapped Undo. This
+  // only stops the pending timer's callback from calling setState after the screen is gone.
+  const isMountedRef = useRef(true);
+  useEffect(() => {
+    return () => {
+      isMountedRef.current = false;
+    };
+  }, []);
+
+  const UNDO_WINDOW_MS = 4000;
+
+  // Hides the alarm right away (so delete still feels instant) without actually removing it
+  // from storage yet — the real deleteCustomAlarm() call is deferred until the undo window
+  // passes, so "Undo" just has to cancel a timer, not reconstruct anything.
+  function requestDelete(alarmId: string) {
+    if (deleteTimerRef.current) clearTimeout(deleteTimerRef.current);
+    animateNextLayout();
+    setCustomAlarms((prev) => prev.filter((a) => a.id !== alarmId));
+    setPendingDeleteId(alarmId);
+    deleteTimerRef.current = setTimeout(async () => {
+      deleteTimerRef.current = null;
+      await deleteCustomAlarm(alarmId);
+      if (isMountedRef.current) setPendingDeleteId(null);
+    }, UNDO_WINDOW_MS);
+  }
+
+  function undoDelete() {
+    if (deleteTimerRef.current) {
+      clearTimeout(deleteTimerRef.current);
+      deleteTimerRef.current = null;
+    }
+    setPendingDeleteId(null);
+    // The alarm was never actually deleted from storage yet — refreshing just brings it back
+    // into view, in its original spot, instead of guessing where to reinsert it.
+    refreshCustomAlarms();
   }
 
   return (
@@ -236,7 +285,9 @@ export default function HomeScreen({ navigation }: Props) {
         alarmId={editModalAlarmId}
         onClose={() => setEditModalVisible(false)}
         onSaved={refreshCustomAlarms}
+        onDeleteRequested={requestDelete}
       />
+      <UndoSnackbar visible={pendingDeleteId !== null} message="Alarm deleted" onUndo={undoDelete} />
     </SafeAreaView>
   );
 }

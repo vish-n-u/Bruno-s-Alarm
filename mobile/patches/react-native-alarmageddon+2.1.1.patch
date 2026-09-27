@@ -92,7 +92,7 @@ index 84502ce..88e3df8 100644
          prefs.edit().putString(id, obj.toString()).apply()
      }
 diff --git a/node_modules/react-native-alarmageddon/android/src/main/java/com/rnalarmmodule/AlarmReceiver.kt b/node_modules/react-native-alarmageddon/android/src/main/java/com/rnalarmmodule/AlarmReceiver.kt
-index 8eb109e..b14b88c 100644
+index 8eb109e..fc856ef 100644
 --- a/node_modules/react-native-alarmageddon/android/src/main/java/com/rnalarmmodule/AlarmReceiver.kt
 +++ b/node_modules/react-native-alarmageddon/android/src/main/java/com/rnalarmmodule/AlarmReceiver.kt
 @@ -6,11 +6,17 @@ import android.app.*
@@ -157,7 +157,7 @@ index 8eb109e..b14b88c 100644
          showNotificationWithActions(context, id, title, body, snoozeEnabled, snoozeInterval)
      }
  
-@@ -97,13 +116,16 @@ class AlarmReceiver : BroadcastReceiver() {
+@@ -97,36 +116,99 @@ class AlarmReceiver : BroadcastReceiver() {
              audioManager = context.getSystemService(Context.AUDIO_SERVICE) as AudioManager
          }
          audioManager?.let { am ->
@@ -175,11 +175,38 @@ index 8eb109e..b14b88c 100644
  
              val attributes = AudioAttributes.Builder()
                  .setUsage(AudioAttributes.USAGE_ALARM)
-@@ -126,7 +148,57 @@ class AlarmReceiver : BroadcastReceiver() {
-         }
-     }
+                 .setContentType(AudioAttributes.CONTENT_TYPE_SONIFICATION)
+                 .build()
  
--    private fun playAlarm(context: Context, id: String) {
++            // Logged, not acted on: an alarm should keep blaring through a focus loss (another
++            // app briefly grabbing audio, a system sound, etc.) rather than duck or pause — this
++            // is purely so a mystery silent-alarm report has something to check afterward.
++            val focusChangeListener = AudioManager.OnAudioFocusChangeListener { change ->
++                Log.d(TAG, "Audio focus changed: $change (alarm continues regardless)")
++            }
++
+             val focusRequest = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+                 AudioFocusRequest.Builder(AudioManager.AUDIOFOCUS_GAIN_TRANSIENT)
+                     .setAudioAttributes(attributes)
+-                    .setOnAudioFocusChangeListener {}
++                    .setOnAudioFocusChangeListener(focusChangeListener)
+                     .build()
+             } else null
+ 
+             @Suppress("DEPRECATION")
+-            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
++            val focusResult = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+                 am.requestAudioFocus(focusRequest!!)
+             } else {
+-                am.requestAudioFocus(null, AudioManager.STREAM_ALARM, AudioManager.AUDIOFOCUS_GAIN_TRANSIENT)
++                am.requestAudioFocus(focusChangeListener, AudioManager.STREAM_ALARM, AudioManager.AUDIOFOCUS_GAIN_TRANSIENT)
++            }
++            // Not fatal either way (playback doesn't depend on holding focus), but a FAILED
++            // result here would be a real, previously-invisible clue for a silent-alarm report.
++            Log.d(TAG, "Audio focus request result: $focusResult")
++        }
++    }
++
 +    private fun startVolumeGuard(context: Context, am: AudioManager, maxVolume: Int) {
 +        if (volumeReceiver != null) return
 +        val appContext = context.applicationContext
@@ -212,8 +239,8 @@ index 8eb109e..b14b88c 100644
 +        val observer = object : ContentObserver(Handler(Looper.getMainLooper())) {
 +            override fun onChange(selfChange: Boolean) {
 +                restore()
-+            }
-+        }
+             }
+         }
 +        appContext.contentResolver.registerContentObserver(Settings.System.CONTENT_URI, true, observer)
 +        volumeObserver = observer
 +        volumeGuardContext = appContext
@@ -228,22 +255,35 @@ index 8eb109e..b14b88c 100644
 +        volumeReceiver = null
 +        volumeObserver = null
 +        volumeGuardContext = null
-+    }
-+
+     }
+ 
+-    private fun playAlarm(context: Context, id: String) {
 +    private fun playAlarm(context: Context, id: String, soundPath: String? = null) {
          player?.let {
              try {
                  if (it.isPlaying) it.stop()
-@@ -136,7 +208,7 @@ class AlarmReceiver : BroadcastReceiver() {
+@@ -136,7 +218,19 @@ class AlarmReceiver : BroadcastReceiver() {
          }
  
          player = MediaPlayer().apply {
 -            try {
++            // Neither listener existed before — a decoder error or the OS reclaiming the player
++            // mid-ring would previously go completely silent with zero trace. `isLooping = true`
++            // means onCompletion should never fire on its own; if it ever does, that's direct
++            // evidence the alarm stopped itself rather than being stopped by a user action.
++            setOnErrorListener { _, what, extra ->
++                Log.e(TAG, "MediaPlayer error for alarm id=$id: what=$what extra=$extra")
++                true // mark handled so the framework doesn't also silently invoke onCompletion
++            }
++            setOnCompletionListener {
++                Log.w(TAG, "MediaPlayer onCompletion fired for alarm id=$id despite isLooping=true")
++            }
++
 +            fun setDefaultSource() {
                  // Try to use custom alarm sound from host app's res/raw folder
                  val resId = context.resources.getIdentifier(RAW_RES, "raw", context.packageName)
                  if (resId != 0) {
-@@ -150,22 +222,63 @@ class AlarmReceiver : BroadcastReceiver() {
+@@ -150,22 +244,63 @@ class AlarmReceiver : BroadcastReceiver() {
                          ?: android.media.RingtoneManager.getDefaultUri(android.media.RingtoneManager.TYPE_NOTIFICATION)
                      setDataSource(context, alarmUri)
                  }
@@ -322,7 +362,7 @@ index 8eb109e..b14b88c 100644
              }
          }
  
-@@ -265,6 +378,7 @@ class AlarmReceiver : BroadcastReceiver() {
+@@ -265,6 +400,7 @@ class AlarmReceiver : BroadcastReceiver() {
  
      private fun stopAlarm(context: Context, id: String?) {
          Log.d(TAG, "Stopping alarm id=$id")
@@ -330,7 +370,7 @@ index 8eb109e..b14b88c 100644
          
          player?.apply {
              try {
-@@ -310,11 +424,13 @@ class AlarmReceiver : BroadcastReceiver() {
+@@ -310,11 +446,13 @@ class AlarmReceiver : BroadcastReceiver() {
          val title = originalIntent.getStringExtra("title") ?: "Alarm"
          val body = originalIntent.getStringExtra("body") ?: ""
          val minutes = originalIntent.getIntExtra("snoozeMinutes", SNOOZE_MINUTES)

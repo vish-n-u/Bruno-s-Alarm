@@ -7,6 +7,7 @@ import { setGlobalOptions } from "firebase-functions/v2";
 import { HttpsError, onCall, onRequest } from "firebase-functions/v2/https";
 import { onSchedule } from "firebase-functions/v2/scheduler";
 import { Filter } from "bad-words";
+import { chatNameFor } from "./chatName";
 
 // Bruno's Alarm live chat — this is the ONLY write path for chat messages. The mobile app
 // never writes to Firestore's sessions/{id}/messages directly (see firestore.rules, which
@@ -44,37 +45,8 @@ function codePointLength(text: string): number {
   return [...text].length;
 }
 
-// The fallback name: deterministic, so the same anonymous uid always reads as the same
-// "Viewer NNNN" — used whenever the app doesn't send a name (older app versions, someone who
-// skipped the name step on an older build) or sends one that fails the checks below.
-function displayNameForUid(uid: string): string {
-  let hash = 0;
-  for (let i = 0; i < uid.length; i++) {
-    hash = (Math.imul(hash, 31) + uid.charCodeAt(i)) >>> 0;
-  }
-  return `Viewer ${1000 + (hash % 9000)}`;
-}
-
-const MAX_NAME_LENGTH = 24; // matches the onboarding name field's own maxLength
-// Names that would read as the dog or the app's own staff. Not a full impersonation defence —
-// just stops the obvious ones. Anything that matches quietly falls back to "Viewer NNNN".
-const RESERVED_NAME = /\b(bruno|admin|administrator|moderator|mod|staff|official|support)\b/i;
-
-/** The name shown next to a message. The app sends the name typed during onboarding, but a
- * client-supplied value is untrusted — a modified app could send anything — so it's cleaned and
- * checked here, and any failure just uses the anonymous "Viewer NNNN" instead of rejecting the
- * message. */
-function chatNameFor(uid: string, raw: unknown): string {
-  const fallback = displayNameForUid(uid);
-  if (typeof raw !== "string") return fallback;
-  const cleaned = [...raw.replace(/[\u0000-\u001f\u007f]/g, "").replace(/\s+/g, " ").trim()]
-    .slice(0, MAX_NAME_LENGTH)
-    .join("")
-    .trim();
-  if (cleaned.length === 0) return fallback;
-  if (profanityFilter.isProfane(cleaned) || RESERVED_NAME.test(cleaned)) return fallback;
-  return cleaned;
-}
+// chatNameFor/displayNameForUid live in ./chatName.ts (no Firebase imports, so it can be unit
+// tested — see chatName.test.ts — without also booting Admin SDK credentials).
 
 type SendChatMessageRequest = {
   sessionId?: unknown;
@@ -219,8 +191,15 @@ export const cleanupOldChat = onSchedule("every 60 minutes", async () => {
 // anywhere. Unlike the scheduled 6AM/6PM alarms, this follows the real stream, so it also
 // covers Bruno going live early or late.
 const LIVE_ALERT_TOPIC = "live";
-// A dropped-and-reconnected stream fires "connected" again; one push per go-live is enough.
-const LIVE_ALERT_MIN_GAP_MS = 30 * 60 * 1000;
+// A dropped-and-reconnected stream fires "connected" again — tracked as one continuous session
+// (started on "connected", ended on "disconnected") rather than a flat time window, so a
+// reconnect a few minutes after a real go-live doesn't get treated as a brand new one, but a
+// genuinely new go-live 35 minutes after a brief earlier test isn't wrongly swallowed either
+// (the flat 30-minute version couldn't tell those two cases apart).
+// Self-healing safety net: if "disconnected" is ever missed (a dropped webhook, Cloudflare
+// hiccup), a session older than this is treated as over anyway, so a later real go-live is
+// never permanently blocked by a stale "still active" record.
+const LIVE_SESSION_MAX_AGE_MS = 3 * 60 * 60 * 1000;
 
 function secretsMatch(provided: string | undefined, expected: string): boolean {
   if (!provided) return false;
@@ -247,28 +226,46 @@ export const cloudflareLiveWebhook = onRequest(async (req, res) => {
   // else (including the test ping when a webhook is first created) is acknowledged and ignored.
   const data = req.body?.data;
   const expectedInput = process.env.CF_LIVE_INPUT_UID;
-  if (data?.event_type !== "live_input.connected" || (expectedInput && data?.input_id !== expectedInput)) {
-    logger.info("Live webhook ignored", { eventType: data?.event_type, inputId: data?.input_id });
+  const eventType = data?.event_type;
+  const inputMatches = !expectedInput || data?.input_id === expectedInput;
+  const isConnect = eventType === "live_input.connected";
+  const isDisconnect = eventType === "live_input.disconnected";
+  if (!inputMatches || (!isConnect && !isDisconnect)) {
+    logger.info("Live webhook ignored", { eventType, inputId: data?.input_id });
     res.status(200).send("ignored");
+    return;
+  }
+
+  const sessionRef = db.doc("system/liveSession");
+
+  if (isDisconnect) {
+    // Ends the session immediately, rather than waiting for LIVE_SESSION_MAX_AGE_MS to elapse —
+    // a genuinely new go-live right after this one shouldn't have to wait out that whole window
+    // to be treated as fresh.
+    await sessionRef.delete().catch(() => {});
+    logger.info("Live session ended");
+    res.status(200).send("session ended");
     return;
   }
 
   // Read-then-write inside a transaction, not a plain read-then-write — Cloudflare (or any
   // webhook sender) can deliver the same event more than once, and two near-simultaneous
-  // deliveries reading the same stale "not throttled yet" value before either writes would
-  // otherwise both pass the check and double-ring everyone. Firestore transactions serialize
-  // conflicting reads/writes (retrying one of them), so only one delivery ever wins the claim.
-  const alertRef = db.doc("system/liveAlert");
+  // deliveries reading the same stale "not already in a session" value before either writes
+  // would otherwise both pass the check and double-ring everyone. Firestore transactions
+  // serialize conflicting reads/writes (retrying one of them), so only one delivery ever wins.
   const claimed = await db.runTransaction(async (tx) => {
-    const snap = await tx.get(alertRef);
-    const lastSent = (snap.data()?.lastSentAt as Timestamp | undefined)?.toMillis() ?? 0;
-    if (Date.now() - lastSent < LIVE_ALERT_MIN_GAP_MS) return false;
-    tx.set(alertRef, { lastSentAt: FieldValue.serverTimestamp() });
+    const snap = await tx.get(sessionRef);
+    const startedAt = (snap.data()?.startedAt as Timestamp | undefined)?.toMillis();
+    // Already in an active, non-stale session — this "connected" is a reconnect blip on the
+    // same broadcast, not a new go-live. A stale session (older than the max age) means the
+    // matching "disconnected" was likely missed, so treat it as if that session had ended.
+    if (startedAt && Date.now() - startedAt < LIVE_SESSION_MAX_AGE_MS) return false;
+    tx.set(sessionRef, { startedAt: FieldValue.serverTimestamp() });
     return true;
   });
   if (!claimed) {
-    logger.info("Live webhook throttled");
-    res.status(200).send("throttled");
+    logger.info("Live webhook: already in an active session, skipping push");
+    res.status(200).send("already active");
     return;
   }
 
@@ -298,8 +295,8 @@ export const cloudflareLiveWebhook = onRequest(async (req, res) => {
 
   if (visible.status === "rejected" && alarm.status === "rejected") {
     // Nothing went out — release the claim so Cloudflare's retry (or the next connect) isn't
-    // wrongly throttled.
-    await alertRef.delete().catch(() => {});
+    // wrongly treated as "already in this session".
+    await sessionRef.delete().catch(() => {});
     res.status(500).send("push failed");
     return;
   }

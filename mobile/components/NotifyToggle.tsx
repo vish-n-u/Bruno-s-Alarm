@@ -4,6 +4,7 @@ import { Ionicons } from "@expo/vector-icons";
 import { ensureAlarmPermissions } from "../lib/alarmPermissions";
 import { tapLight } from "../lib/haptics";
 import { isSubscribed, scheduleUpcomingSessions, unsubscribe } from "../lib/notifications";
+import { sessionTimesLabel } from "../lib/schedule";
 import { fonts, radius, spacing, useThemeColors, type ThemeColors } from "../lib/theme";
 
 type Status = "checking" | "idle" | "subscribed" | "denied" | "unsupported";
@@ -56,16 +57,16 @@ export default function NotifyToggle() {
         : status === "denied"
           ? "Blocked, enable in device settings"
           : status === "subscribed"
-            ? "On for Bruno's 6AM & 6PM sessions"
-            : "Get woken up for Bruno's real sessions";
+            ? `On. Rings around ${sessionTimesLabel()} every day`
+            : `Rings when Bruno howls, around ${sessionTimesLabel()}`;
 
   return (
     <View style={styles.row}>
       <View style={styles.iconChip}>
-        <Ionicons name="notifications" size={18} color={colors.accent} />
+        <Ionicons name="alarm" size={18} color={colors.accent} />
       </View>
       <View style={styles.textWrap}>
-        <Text style={styles.title}>Wake me up with Bruno</Text>
+        <Text style={styles.title}>Bruno's daily alarm</Text>
         <Text style={[styles.subtitle, status === "denied" && { color: colors.danger }]}>{subtitle}</Text>
       </View>
       {status === "checking" || busy ? (

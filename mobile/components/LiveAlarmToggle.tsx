@@ -6,7 +6,7 @@ import { tapLight } from "../lib/haptics";
 import { disableLiveAlarm, enableLiveAlarm, isLiveAlarmEnabled } from "../lib/liveAlerts";
 import { fonts, radius, spacing, useThemeColors, type ThemeColors } from "../lib/theme";
 
-// Separate from NotifyToggle ("Wake me up with Bruno" = the reliable scheduled alarms). Turning
+// Separate from NotifyToggle ("Bruno's daily alarm" = the reliable scheduled alarms). Turning
 // this ON never happens directly — it opens the setup sheet, which states the drawbacks and asks
 // for the permissions first. Turning it OFF is immediate.
 export default function LiveAlarmToggle() {
@@ -45,7 +45,9 @@ export default function LiveAlarmToggle() {
         <View style={styles.textWrap}>
           <Text style={styles.title}>Ring when Bruno goes live</Text>
           <Text style={styles.subtitle}>
-            {enabled ? "On. Rings whenever he goes live, best effort" : "Extra, best effort. Read the notes first"}
+            {enabled
+              ? "On. Rings whenever he goes live, even off schedule"
+              : "Rings whenever he goes live, even off schedule. Less reliable"}
           </Text>
         </View>
         <Switch

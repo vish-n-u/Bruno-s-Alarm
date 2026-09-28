@@ -44,6 +44,17 @@ export function todaysSessions(now: Date = new Date()): number[] {
   return SESSION_HOURS_UTC.map((minutesUtc) => todayMidnight + minutesUtc * 60000);
 }
 
+/** Bruno's two daily times in this device's own clock, earliest first — e.g. "7:30 AM and
+ * 7:30 PM" for someone two hours behind India. Use this in copy instead of a literal
+ * "6AM & 6PM", which only reads correctly in India. */
+export function sessionTimesLabel(now: Date = new Date()): string {
+  const minutesOfDay = (t: number) => new Date(t).getHours() * 60 + new Date(t).getMinutes();
+  return todaysSessions(now)
+    .sort((a, b) => minutesOfDay(a) - minutesOfDay(b))
+    .map((t) => new Date(t).toLocaleString(undefined, { hour: "numeric", minute: "2-digit" }))
+    .join(" and ");
+}
+
 /** Returns the timestamp (ms) of the most recent 6AM/6PM IST session at-or-before `now`. */
 export function lastSessionAt(now: Date = new Date()): number {
   const todayMidnight = utcMidnight(now);

@@ -130,7 +130,7 @@ export default function HomeScreen({ navigation }: Props) {
           <View style={styles.header}>
             <View style={styles.headerTitleWrap}>
               <Text style={styles.title}>Bruno's Alarm</Text>
-              <Text style={styles.subtitle}>A real dog. Two alarms a day. Never once late.</Text>
+              <Text style={styles.subtitle}>A real dog. Two alarms a day.</Text>
             </View>
             <Touchable
               style={styles.settingsButton}
@@ -154,7 +154,7 @@ export default function HomeScreen({ navigation }: Props) {
             >
               <View style={styles.alarmCardLeft}>
                 <Text style={styles.brunoCardTime}>{brunoTimeLabel}</Text>
-                <Text style={styles.brunoCardLabel}>Bruno's real howl · Every day</Text>
+                <Text style={styles.brunoCardLabel}>Bruno's daily alarm · Every day</Text>
               </View>
               <View style={styles.brunoTag}>
                 <Text style={styles.brunoTagText}>BRUNO</Text>
@@ -170,7 +170,7 @@ export default function HomeScreen({ navigation }: Props) {
                 loop
                 style={styles.emptyLottie}
               />
-              <Text style={styles.emptyText}>Nothing scheduled. Tap + and he'll do his best.</Text>
+              <Text style={styles.emptyText}>Nothing scheduled yet. Tap + to set an alarm.</Text>
             </View>
           )}
 

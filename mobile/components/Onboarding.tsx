@@ -14,29 +14,21 @@ import {
 import { Ionicons } from "@expo/vector-icons";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import Touchable from "./Touchable";
-import { ensureAlarmPermissions } from "../lib/alarmPermissions";
 import { tapLight } from "../lib/haptics";
-import { scheduleUpcomingSessions } from "../lib/notifications";
 import { generateGuestName, setDisplayName } from "../lib/profile";
-import { todaysSessions } from "../lib/schedule";
+import { sessionTimesLabel } from "../lib/schedule";
 import { fonts, radius, spacing, useThemeColors, type ThemeColors } from "../lib/theme";
 
-function formatLocalTime(timestamp: number): string {
-  return new Date(timestamp).toLocaleString(undefined, { hour: "numeric", minute: "2-digit" });
-}
-
-type ImageSlide = { kind: "image"; image: number; title: string; body: string };
-type IconSlide = { kind: "icon"; icon: keyof typeof Ionicons.glyphMap; title: string; body: string };
-type NameInputSlide = { kind: "name-input"; title: string; body: string };
+type ImageSlide = { kind: "image"; image: number; title: string; body?: string };
+type IconSlide = { kind: "icon"; icon: keyof typeof Ionicons.glyphMap; title: string; body?: string };
+type NameInputSlide = { kind: "name-input"; title: string; body?: string };
 type Slide = ImageSlide | IconSlide | NameInputSlide;
 
-// Slide 1 uses the real studio photo of Bruno instead of a generic icon — it's the very
-// first thing a new user sees, and a real dog beats a stock paw glyph for making the point
-// that this app is about one specific, real animal. Slides 2, 4 stay icon-led since they're
-// about concepts (schedule, notifications), not "this is a real dog." Slide 3 collects an
-// optional display name, shown next to the person's messages in the live chat (see
-// lib/chat.ts). Skipping it saves a "GuestNNNN" instead. Copy is deliberately short and a
-// little self-deprecating; keep it that way when editing.
+// Three facts, each with one short line of personality, and nothing else: he's live twice a
+// day, you can pick your own alarm time (it plays his latest howl), and there's a live chat.
+// Jokes are about Bruno, never about whether the alarm works. The chat slide doubles as the
+// optional display-name input (see lib/chat.ts) — skipping it saves a "GuestNNNN" instead.
+// Keep it this short; permissions are asked for later, when someone actually sets an alarm.
 export default function Onboarding({ onDone }: { onDone: () => void }) {
   const colors = useThemeColors();
   const styles = createStyles(colors);
@@ -53,37 +45,30 @@ export default function Onboarding({ onDone }: { onDone: () => void }) {
   // Android's own page indicators have.
   const scrollX = useRef(new Animated.Value(0)).current;
 
-  // Bruno's real sessions are fixed to 6AM/6PM India time (see lib/schedule.ts) — converted
-  // here to whatever the viewer's own device clock calls that same moment, so this doesn't
-  // literally claim "6AM" for someone who isn't in India.
-  const slides = useMemo<Slide[]>(() => {
-    const [first, second] = todaysSessions();
-    return [
+  // Bruno's sessions are fixed to 6AM/6PM India time — sessionTimesLabel() converts them to the
+  // viewer's own clock, so this never claims "6AM" for someone who isn't in India.
+  const slides = useMemo<Slide[]>(
+    () => [
       {
         kind: "image",
-        image: require("../assets/icon.png"),
-        title: "It's an alarm. Sort of.",
-        body: "A dog howls at a church bell twice a day. This wakes you up with it. It's a beta, so sorry in advance.",
+        image: require("../assets/bruno-photo.jpg"),
+        title: "Bruno howls live, twice a day.",
+        body: `Around ${sessionTimesLabel()}, when the church bell rings. He takes it very seriously.`,
       },
       {
         kind: "icon",
-        icon: "time-outline",
-        title: `Around ${formatLocalTime(first)} and ${formatLocalTime(second)}.`,
-        body: "He isn't punctual, sorry. You can set your own alarm time from Home instead.",
+        icon: "alarm-outline",
+        title: "Or pick your own time.",
+        body: "Your alarm plays his latest howl. Same enthusiasm, your schedule.",
       },
       {
         kind: "name-input",
-        title: "Got a name?",
-        body: "It shows next to your messages in the live chat. Skip and we'll invent one.",
+        title: "Chat while he's live.",
+        body: "Say hi to everyone else a dog just woke up.",
       },
-      {
-        kind: "icon",
-        icon: "notifications-outline",
-        title: "Want a heads up?",
-        body: "We'll notify you when he starts. Probably.",
-      },
-    ];
-  }, []);
+    ],
+    []
+  );
 
   const isLast = index === slides.length - 1;
 
@@ -110,16 +95,6 @@ export default function Onboarding({ onDone }: { onDone: () => void }) {
     onDone();
   }
 
-  async function finishWithNotifications() {
-    // Fires immediately — ensureAlarmPermissions() below can pop a system permission dialog,
-    // which shouldn't be the first feedback the tap gets.
-    tapLight();
-    await persistDisplayName();
-    const granted = await ensureAlarmPermissions();
-    if (granted) await scheduleUpcomingSessions();
-    onDone();
-  }
-
   return (
     <View style={styles.container}>
       <Touchable style={[styles.skip, { top: insets.top + spacing.sm }]} onPress={handleDone} hitSlop={12}>
@@ -143,15 +118,15 @@ export default function Onboarding({ onDone }: { onDone: () => void }) {
             ) : slide.kind === "icon" ? (
               <Ionicons name={slide.icon} size={56} color={colors.accent} style={styles.icon} />
             ) : (
-              <Ionicons name="person-circle-outline" size={56} color={colors.accent} style={styles.icon} />
+              <Ionicons name="chatbubbles-outline" size={56} color={colors.accent} style={styles.icon} />
             )}
             <Text style={styles.title}>{slide.title}</Text>
-            <Text style={styles.body}>{slide.body}</Text>
+            {slide.body && <Text style={styles.body}>{slide.body}</Text>}
             {slide.kind === "name-input" && (
               <TextInput
                 value={nameInput}
                 onChangeText={setNameInput}
-                placeholder="e.g. Jamie"
+                placeholder="Your name in chat (optional)"
                 placeholderTextColor={colors.textSecondary}
                 style={styles.nameInput}
                 maxLength={24}
@@ -167,7 +142,13 @@ export default function Onboarding({ onDone }: { onDone: () => void }) {
         {slides.map((slide, i) => {
           const inputRange = [(i - 1) * width, i * width, (i + 1) * width];
           const dotWidth = scrollX.interpolate({ inputRange, outputRange: [7, 20, 7], extrapolate: "clamp" });
-          const dotColor = scrollX.interpolate({ inputRange, outputRange: [colors.border, colors.accent, colors.border] });
+          // Clamped like dotWidth above — unclamped, a dot two or more pages away extrapolated
+          // its color past the palette entirely (the stray bright-blue dots).
+          const dotColor = scrollX.interpolate({
+            inputRange,
+            outputRange: [colors.border, colors.accent, colors.border],
+            extrapolate: "clamp",
+          });
           return (
             <Animated.View key={slide.title} style={[styles.dot, { width: dotWidth, backgroundColor: dotColor }]} />
           );
@@ -176,14 +157,9 @@ export default function Onboarding({ onDone }: { onDone: () => void }) {
 
       <View style={[styles.footer, { paddingBottom: insets.bottom + spacing.xl }]}>
         {isLast ? (
-          <>
-            <Touchable style={styles.primaryButton} onPress={finishWithNotifications}>
-              <Text style={styles.primaryButtonText}>Okay, notify me</Text>
-            </Touchable>
-            <Touchable style={styles.secondaryButton} onPress={handleDone}>
-              <Text style={styles.secondaryButtonText}>No thanks</Text>
-            </Touchable>
-          </>
+          <Touchable style={styles.primaryButton} onPress={handleDone}>
+            <Text style={styles.primaryButtonText}>Get started</Text>
+          </Touchable>
         ) : (
           <Touchable style={styles.primaryButton} onPress={() => goTo(index + 1)}>
             <Text style={styles.primaryButtonText}>Next</Text>
@@ -289,15 +265,6 @@ function createStyles(colors: ThemeColors) {
       color: colors.accentText,
       fontFamily: fonts.bodyBold,
       fontSize: 15,
-    },
-    secondaryButton: {
-      paddingVertical: spacing.sm + 2,
-      alignItems: "center",
-    },
-    secondaryButtonText: {
-      color: colors.textSecondary,
-      fontFamily: fonts.body,
-      fontSize: 14,
     },
   });
 }

@@ -64,8 +64,12 @@ async function clearScheduled(): Promise<void> {
   await armIOSBackgroundAlarms("session", []);
 }
 
-const SESSION_TITLE = "🐕 Bruno is howling!";
-const SESSION_BODY = "The session just went live. Open the app to watch.";
+// Scheduled session alarms fire on the clock, not when the camera actually goes live (he's
+// sometimes late), so they must not claim he's live. Only ringForLiveStart below — triggered by
+// the camera itself — gets to say that.
+const SESSION_TITLE = "🐕 It's Bruno time";
+const SESSION_BODY = "His session is starting. Open the app to watch him live.";
+const LIVE_TITLE = "🐕 Bruno is live!";
 
 /** Schedules the next batch of session notifications, replacing any previously scheduled. */
 export async function scheduleUpcomingSessions(): Promise<void> {
@@ -178,7 +182,7 @@ export async function ringForLiveStart(): Promise<void> {
   await RNAlarmModule.scheduleAlarm({
     id: `${LIVE_PREFIX}${at}`,
     datetimeISO: toAlarmDatetime(at),
-    title: SESSION_TITLE,
+    title: LIVE_TITLE,
     body: "He just went live. Open the app to watch.",
     snoozeEnabled: true,
     snoozeInterval: SNOOZE_MINUTES,

@@ -3,7 +3,7 @@ import { getMessaging, subscribeToTopic, unsubscribeFromTopic } from "@react-nat
 import { Platform } from "react-native";
 
 // The optional "Live alarm": a real alarm that rings the moment Bruno actually goes live. It is
-// deliberately its own opt-in, separate from "Wake me up with Bruno" (the scheduled 6AM/6PM
+// deliberately its own opt-in, separate from "Bruno's daily alarm" (the scheduled 6AM/6PM
 // alarms, which the phone itself holds and are the reliable path). The backend
 // (functions/src/index.ts's cloudflareLiveWebhook) pushes to this FCM topic when Cloudflare
 // reports the stream connected; joining the topic is all a device does, so no push tokens are

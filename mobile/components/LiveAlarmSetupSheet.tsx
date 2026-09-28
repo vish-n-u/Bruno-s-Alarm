@@ -14,7 +14,7 @@ const DRAWBACKS = [
   "It can ring at any hour. Whenever Bruno goes live, including an early, late or test stream.",
   "It's not guaranteed. It won't ring if the app was force-stopped, or swiped away from recent apps on many phones, or the phone's battery saver blocks it.",
   "Keep the app in your recent apps and allow it to run in the background (steps below).",
-  "The 6AM & 6PM alarm is separate and is the reliable one. This is an extra.",
+  "Bruno's daily alarm is separate and is the reliable one. This is an extra.",
 ];
 
 type Props = {

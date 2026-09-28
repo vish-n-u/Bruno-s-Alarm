@@ -14,10 +14,12 @@ export default function AlarmRingingScreen({ alarmId }: { alarmId: string }) {
   const styles = createStyles(colors);
   const [busy, setBusy] = useState(false);
 
-  // bruno-session- alarms are a real, live howl; bruno-custom- alarms are a user-chosen
-  // wake time that likely doesn't line up with an actual live session — say so honestly
-  // rather than implying Bruno is howling right this second.
-  const isRealSession = alarmId.startsWith("bruno-session-") || alarmId.startsWith("bruno-live-");
+  // Only bruno-live- alarms are triggered by the camera actually going live, so only they say
+  // he's live. bruno-session- alarms fire on the clock at his usual time (he's sometimes late),
+  // and bruno-custom- alarms are a time the user picked — neither claims a live howl.
+  const isLive = alarmId.startsWith("bruno-live-");
+  const isRealSession = isLive || alarmId.startsWith("bruno-session-");
+  const title = isLive ? "Bruno is live!" : isRealSession ? "It's Bruno time" : "Your Bruno alarm";
   // Android alarm ids end in the scheduled timestamp (bruno-session-<ms> / bruno-custom-
   // <ms>) — pull it out to show the exact scheduled time in the same mono "departure
   // board" language used on Home, rather than just a generic title.
@@ -63,7 +65,7 @@ export default function AlarmRingingScreen({ alarmId }: { alarmId: string }) {
         <View style={styles.topScrim}>
           <View style={styles.titleRow}>
             <Ionicons name={isRealSession ? "paw" : "alarm"} size={22} color="#fff" />
-            <Text style={styles.title}>{isRealSession ? "Bruno is howling!" : "Your Bruno alarm"}</Text>
+            <Text style={styles.title}>{title}</Text>
           </View>
           {timeLabel && <Text style={styles.timeLabel}>{timeLabel}</Text>}
         </View>

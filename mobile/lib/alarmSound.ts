@@ -85,6 +85,18 @@ const RETRY_DELAYS_MS = [60_000, 120_000, 300_000];
 // buys nothing, since a new recording appears at most a couple of times a day.
 const FOREGROUND_MIN_GAP_MS = 5 * 60 * 1000;
 
+// The saved recording always lives at the same path (scheduled alarms point at it), so a new
+// download swaps the file's contents underneath anything showing it. Screens playing it
+// (VideoPanel) subscribe here and reload instead of freezing on the replaced file.
+const recordingChangedListeners = new Set<() => void>();
+
+export function onAlarmRecordingChanged(listener: () => void): () => void {
+  recordingChangedListeners.add(listener);
+  return () => {
+    recordingChangedListeners.delete(listener);
+  };
+}
+
 let inFlight: Promise<boolean> | null = null;
 let retryTimer: ReturnType<typeof setTimeout> | null = null;
 let lastAttemptAt = 0;
@@ -133,6 +145,13 @@ async function attemptRefresh(): Promise<boolean> {
       const record: CacheRecord = { path: FINAL_PATH, recordedAt: latest.recordedAt, size };
       await AsyncStorage.setItem(CACHE_KEY, JSON.stringify(record));
       await recordOutcome("downloaded");
+      recordingChangedListeners.forEach((listener) => {
+        try {
+          listener();
+        } catch {
+          // A broken listener must not undo a successful download.
+        }
+      });
       return false;
     } catch {
       // Network failure, storage full, etc. — leave whatever was cached before untouched.

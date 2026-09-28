@@ -16,16 +16,27 @@ export function getCloudflareLiveManifestUrl(): string | null {
   return `https://customer-${CUSTOMER_CODE}.cloudflarestream.com/${LIVE_INPUT_UID}/manifest/video.m3u8`;
 }
 
-export async function isCloudflareStreamLive(): Promise<boolean> {
-  if (!isCloudflareConfigured()) return false;
+export type LiveStatus = {
+  live: boolean;
+  /** Cloudflare's ID for the recording of the broadcast that's live right now — a new one for
+   * every broadcast, identical on every phone. Used as the live chat room, so each stream gets
+   * its own chat instead of sharing one with every other stream that half-day. Null when off. */
+  streamId: string | null;
+};
+
+const OFFLINE: LiveStatus = { live: false, streamId: null };
+
+export async function getCloudflareLiveStatus(): Promise<LiveStatus> {
+  if (!isCloudflareConfigured()) return OFFLINE;
   try {
     const res = await fetch(
       `https://customer-${CUSTOMER_CODE}.cloudflarestream.com/${LIVE_INPUT_UID}/lifecycle`
     );
-    if (!res.ok) return false;
+    if (!res.ok) return OFFLINE;
     const data = await res.json();
-    return data?.live === true;
+    if (data?.live !== true) return OFFLINE;
+    return { live: true, streamId: typeof data.videoUID === "string" ? data.videoUID : null };
   } catch {
-    return false;
+    return OFFLINE;
   }
 }

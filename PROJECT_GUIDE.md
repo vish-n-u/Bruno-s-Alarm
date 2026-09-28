@@ -155,10 +155,17 @@ Contact email used in the app, site and policies: `vishnuna26@gmail.com`.
   `…cloudflarestream.com/<liveInputUID>/lifecycle` endpoint every **15 s**
   (`lib/liveStatus.ts`). The Live tab polls all day (catches off-schedule streams); the ringing
   screen only asks near session times.
+- It watches the live video's playback position once a second:
+  - when Cloudflare says the broadcast stopped, it keeps playing until the viewer's remaining
+    footage runs out (video still for 3 s, or 30 s max), then reports "not live";
+  - while still live, a video that hasn't moved for 15 s is reloaded (max 3 times in a row).
+- Leaving the app pauses the video; coming back to a live stream reloads it at the live moment.
 - If the live player errors, it falls back to the recording.
-- `screens/LiveScreen.tsx`: live → video + LIVE badge + chat. After a stream ends it plays the
-  saved recording for a **5-minute grace period** (no label), then shows the "NO SIGNAL" card
-  with the next session time. (Proposed: remove the grace replay — §10.)
+- When a new recording downloads, the player reloads it (`onAlarmRecordingChanged` in
+  `lib/alarmSound.ts`) — the file path never changes because scheduled alarms point at it.
+- `screens/LiveScreen.tsx`: live → video + LIVE badge + chat; not live → the "NO SIGNAL" card
+  with the next session time. There is **no replay** after a stream (removed 28 Sep — it could
+  only show an older or test clip).
 
 ### 4.4 "Ring when Bruno goes live" (optional, Android)
 
@@ -181,8 +188,11 @@ Contact email used in the app, site and policies: `vishnuna26@gmail.com`.
   3 s per device**, **500 messages per session**.
 - One-time rules gate before first send (`components/ChatTermsGate.tsx`); report a message
   (`components/ReportMessageModal.tsx` → `reports` collection) and block a viewer (local only).
-- Chat room ID comes from the **clock** (`currentSessionId()` in `lib/schedule.ts`:
-  `YYYY-MM-DD-AM|PM` of the last scheduled session). ⚠ Known problem — see §10.
+- Chat room ID = `stream-<videoUID>`, where `videoUID` is Cloudflare's ID for the current
+  broadcast (returned by the `lifecycle` check, same on every phone), so each stream gets its
+  own room. Falls back to the clock-based `currentSessionId()` (`YYYY-MM-DD-AM|PM`) only when
+  there's no ID (debug force-live). App versions before 15 still use the clock-based room.
+  If the camera drops and Cloudflare starts a new recording, the chat starts a new room.
 - Messages are deleted by `cleanupOldChat` ~2 hours after a room goes quiet.
 - **Bruno's Pack** — a persistent always-open chat tab — is fully built but **hidden**
   (`CHAT_ENABLED = false` in `mobile/App.tsx`). Decision already made: when it's switched on,
@@ -253,7 +263,9 @@ Contact email used in the app, site and policies: `vishnuna26@gmail.com`.
   3. Mirrors that MP4 into R2 once as `alarm-recordings/<videoUID>.mp4` (unique name per
      recording — a fixed name like `latest.mp4` got stuck in Cloudflare's cache and served old
      bytes), keeps the newest 3, and returns `{ url, recordedAt }`.
-  4. Returns `202 { error: "not_ready" }` while Cloudflare is still making the MP4.
+  4. Returns `202 { error: "not_ready" }` while Cloudflare is still making the MP4. If
+     Cloudflare's MP4 generation **failed** (status `error`, which otherwise stays forever), it
+     deletes and re-requests it automatically (`requestDownload()`).
   Mirroring exists to avoid Stream's per-minute delivery fees when many phones download.
 
 ---
@@ -302,7 +314,7 @@ cd mobile/android && ./gradlew bundleRelease
 
 Releasing a new Play build:
 1. Bump **`versionCode` in BOTH `mobile/app.json` and `mobile/android/app/build.gradle`**
-   (the android folder isn't regenerated automatically). Current: **14**. Play rejects a
+   (the android folder isn't regenerated automatically). Current: **15**. Play rejects a
    versionCode it has already seen.
 2. Build the AAB, upload in Play Console. Commit the version bump.
 3. Store assets: `mobile/assets/play-store-icon.png` (512×512) and
@@ -354,16 +366,17 @@ logs, Diagnostics, Device IDs; nothing shared; encrypted in transit; deletion vi
 2. **Larix free-tier watermark.** Recordings show a full-screen "TEST STREAM – Powered by
    Larix Broadcaster" overlay, visible in the live feed and baked into recordings. Needs a Larix
    subscription (or another encoder). Owner action, not code.
-3. **Chat room tied to the clock, not the stream.** Every stream in the same AM/PM half-day
-   shares one room, so a new stream shows the previous stream's chat. **Proposed fix:** the
-   webhook creates a chat-room ID on connect (reused if the camera reconnects within ~5 min);
-   the app reads it from Firestore instead of `currentSessionId()`; the function rejects
-   messages to any other room.
-4. **Live tab after a stream ends.** The 5-minute unlabeled replay shows whatever the phone
-   last downloaded (often an older clip) and confused testing. **Proposed:** go straight to
-   NO SIGNAL (or add a "REPLAY" label). Also: treat a live stream that stops making progress for
-   ~15 s as ended (today only a player *error* triggers the fallback). Also save each new
-   recording under its own filename instead of deleting the file that may be playing.
+3. ~~Chat room tied to the clock~~ — **FIXED 28 Sep (app v15)**: one room per Cloudflare
+   broadcast (§4.5). Considered alternative, not built: the live webhook writes a room ID to
+   Firestore and the app listens to it (instant start/end detection instead of 15 s polling,
+   room kept across short camera drops).
+4. ~~Live tab after a stream ends~~ — **FIXED 28 Sep (app v15)**: the stream plays to the end,
+   frozen streams reload, the app resyncs after returning from the background, no replay, and
+   the player reloads when a new recording downloads (§4.3). Needs an on-device test with a
+   real stream stop.
+   Still open: what alarms should play when the server has no valid recording (the phone keeps
+   whatever it last saved), and whether to show a labelled "last session" replay between
+   sessions once the real recording is ready.
 5. **Bruno's Pack 200-message cap** — decided, not built (§4.5).
 6. **Discoverability of Bruno's daily alarm.** Onboarding no longer offers it, so new users only
    find it in Settings. Offered: a one-tap "Turn on Bruno's daily alarm" card on Home.

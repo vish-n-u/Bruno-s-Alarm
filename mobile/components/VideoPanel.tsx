@@ -1,11 +1,11 @@
-import { useEffect, useRef, useState } from "react";
-import { Animated, Pressable, StyleSheet, View } from "react-native";
+import { useEffect, useMemo, useRef, useState } from "react";
+import { Animated, AppState, Pressable, StyleSheet, View } from "react-native";
 import { useVideoPlayer, VideoView, type VideoSource } from "expo-video";
 import { Ionicons } from "@expo/vector-icons";
-import { getCachedAlarmVideoUri, refreshAlarmSound } from "../lib/alarmSound";
+import { getCachedAlarmVideoUri, onAlarmRecordingChanged, refreshAlarmSound } from "../lib/alarmSound";
 import { tapLight } from "../lib/haptics";
 import { getDebugForceLive, isLiveWindow, isNearLiveWindow } from "../lib/schedule";
-import { getCloudflareLiveManifestUrl, isCloudflareConfigured, isCloudflareStreamLive } from "../lib/liveStatus";
+import { getCloudflareLiveManifestUrl, getCloudflareLiveStatus, isCloudflareConfigured } from "../lib/liveStatus";
 
 // Real footage of Bruno howling, bundled locally so it always plays with zero
 // network/hosting dependency until Cloudflare Stream/R2 are configured. See
@@ -32,11 +32,23 @@ const FALLBACK_VOD_SOURCE: VideoSource = process.env.EXPO_PUBLIC_VOD_VIDEO_URL |
 const LIVE_ALARM_GRACE_MS = 90_000;
 const LIVE_ALARM_RETRY_MS = 3_000;
 
-// Only rendered on the alarm-ringing screen now (Home doesn't show video at all). Starts
-// muted (autoplay shouldn't blast sound the moment the alarm fires) — allowUnmute={false}
-// there because the actual alarm sound comes from the native alarm itself (see
-// plugins/withAlarmSound.js), which loops continuously via react-native-alarmageddon's own
-// MediaPlayer until Stop/Snooze — unmuting the video too would just overlap/echo against it.
+const POLL_MS = 15_000;
+// Viewers are several seconds behind the camera, so when Cloudflare reports the broadcast has
+// stopped there's still footage left to watch. Keep playing it, and only switch away once the
+// video actually stops moving (it ran out) — or after DRAIN_MAX_MS, so it can never hang.
+const DRAIN_STALL_MS = 3_000;
+const DRAIN_MAX_MS = 30_000;
+// While Cloudflare still says live, a video that hasn't moved for this long is stuck rather than
+// just buffering on a slow connection — reload the stream, a few times at most.
+const FROZEN_MS = 15_000;
+const MAX_FROZEN_RELOADS = 3;
+const PROGRESS_CHECK_MS = 1_000;
+
+// Shown on the alarm-ringing screen and the Live tab. Starts muted (autoplay shouldn't blast
+// sound the moment the alarm fires) — allowUnmute={false} on the ringing screen because the
+// actual alarm sound comes from the native alarm itself (see plugins/withAlarmSound.js), which
+// loops via react-native-alarmageddon's own MediaPlayer until Stop/Snooze — unmuting the video
+// too would just overlap/echo against it.
 export default function VideoPanel({
   allowUnmute = true,
   paused = false,
@@ -52,26 +64,41 @@ export default function VideoPanel({
    * playing/unmuted video would otherwise keep making sound in the background. */
   paused?: boolean;
   /** Reports this panel's own live/not-live determination (the real Cloudflare-confirmed one,
-   * not just the clock window) — lets a parent screen react to the same signal instead of
-   * running its own separate, potentially inconsistent check. */
-  onLiveChange?: (live: boolean) => void;
+   * not just the clock window) plus Cloudflare's ID for the current broadcast — lets a parent
+   * screen react to the same signal instead of running its own, possibly inconsistent, check. */
+  onLiveChange?: (live: boolean, streamId: string | null) => void;
 }) {
   const [live, setLive] = useState(isLiveWindow());
+  const [streamId, setStreamId] = useState<string | null>(null);
+  const liveRef = useRef(live);
+  liveRef.current = live;
+  const pausedRef = useRef(paused);
+  pausedRef.current = paused;
 
   useEffect(() => {
-    onLiveChange?.(live);
+    onLiveChange?.(live, live ? streamId : null);
     // Only the parent's latest callback identity should matter, not re-fire this on every
-    // parent re-render — it should fire when `live` itself actually changes.
+    // parent re-render — it should fire when the live state itself actually changes.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [live]);
+  }, [live, streamId]);
   const [muted, setMuted] = useState(true);
-  // Bruno's actual latest recording, if one's ever been downloaded — takes priority over the
-  // fixed placeholder clip so the VOD fallback shows the real thing, not one static video
-  // forever.
-  const [cachedVideoUri, setCachedVideoUri] = useState<string | undefined>(undefined);
+
+  // Bruno's latest saved recording, if one's ever been downloaded — takes priority over the
+  // fixed placeholder clip. `version` changes whenever a new recording replaces the file: the
+  // path stays the same (scheduled alarms point at it), so without it the player would keep
+  // showing a file that was deleted and swapped underneath it and freeze.
+  const [recording, setRecording] = useState<{ uri: string; version: number } | null>(null);
+  function applyRecording(uri: string | undefined, replaced: boolean) {
+    if (!uri) return;
+    setRecording((prev) =>
+      prev && prev.uri === uri && !replaced ? prev : { uri, version: (prev?.version ?? 0) + 1 }
+    );
+  }
 
   // Computed once at mount: only a go-live alarm gets a grace window at all.
   const graceDeadline = useRef(alwaysCheckLive ? Date.now() + LIVE_ALARM_GRACE_MS : 0);
+  // Set when Cloudflare says the broadcast stopped but the viewer still has footage to watch.
+  const drainStartedAt = useRef<number | null>(null);
 
   // Reels-style tap-to-mute: tapping anywhere on the video toggles mute and briefly flashes a
   // centered speaker icon that fades back out, instead of a small always-on corner button.
@@ -96,27 +123,29 @@ export default function VideoPanel({
   }
 
   // Re-checks (and actively tries to refresh) the cached recording every time we're about to
-  // show the VOD fallback rather than only once on mount — e.g. right as a live session ends,
-  // the recording that just happened may not have been cached yet; refreshAlarmSound() is
-  // safe to call opportunistically (no-ops if there's nothing newer, per its own doc) so this
-  // gives the fallback its best shot at actually being the latest one, not a stale/previous
-  // recording or the bundled placeholder.
+  // show the VOD fallback rather than only once on mount — refreshAlarmSound() is safe to call
+  // opportunistically (no-ops if there's nothing newer), so the fallback has its best shot at
+  // being the latest one, not a stale/previous recording or the bundled placeholder.
   useEffect(() => {
     if (live) return;
     let cancelled = false;
     getCachedAlarmVideoUri().then((uri) => {
-      if (!cancelled) setCachedVideoUri(uri);
+      if (!cancelled) applyRecording(uri, false);
     });
-    refreshAlarmSound()
-      .then(() => getCachedAlarmVideoUri())
-      .then((uri) => {
-        if (!cancelled && uri) setCachedVideoUri(uri);
-      })
-      .catch(() => {});
+    refreshAlarmSound().catch(() => {});
     return () => {
       cancelled = true;
     };
   }, [live]);
+
+  // A newly downloaded recording has replaced the saved file — reload it.
+  useEffect(
+    () =>
+      onAlarmRecordingChanged(() => {
+        getCachedAlarmVideoUri().then((uri) => applyRecording(uri, true));
+      }),
+    []
+  );
 
   useEffect(() => {
     let cancelled = false;
@@ -129,14 +158,14 @@ export default function VideoPanel({
         // forces the state rather than merely widening the window in which we're willing to
         // ask (which would still report "not live" for a genuinely offline camera).
         if (!cancelled) setLive(forced);
-        timer = setTimeout(check, 15000);
+        timer = setTimeout(check, POLL_MS);
         return;
       }
       if (!isCloudflareConfigured()) {
         // Not wired up yet — fall back to trusting the clock window alone, same as
         // before this existed, so local testing/the debug toggle still work.
         if (!cancelled) setLive(isLiveWindow());
-        timer = setTimeout(check, 15000);
+        timer = setTimeout(check, POLL_MS);
         return;
       }
       const inGrace = Date.now() < graceDeadline.current;
@@ -147,17 +176,27 @@ export default function VideoPanel({
       // go-live alarm's grace window (above) is still open.
       if (!alwaysCheckLive && !inGrace && !isNearLiveWindow()) {
         if (!cancelled) setLive(false);
-        timer = setTimeout(check, 15000);
+        timer = setTimeout(check, POLL_MS);
         return;
       }
-      const actuallyLive = await isCloudflareStreamLive();
+      const status = await getCloudflareLiveStatus();
       if (cancelled) return;
-      setLive(actuallyLive);
+      if (status.live) {
+        drainStartedAt.current = null;
+        setStreamId(status.streamId);
+        setLive(true);
+      } else if (liveRef.current) {
+        // The broadcast just stopped — let the viewer finish the footage they're still behind
+        // on; the progress watcher below switches away once it actually runs out.
+        if (drainStartedAt.current === null) drainStartedAt.current = Date.now();
+      } else {
+        setLive(false);
+      }
       // Retry quickly while a go-live alarm's grace window is still open — even a "yes" here
       // can still fail to actually play for a couple more seconds while HLS segments
       // populate (see the playback-error handling below, which will bounce back to VOD and
       // rely on this fast retry to recover) — then settle into the normal, cheaper cadence.
-      timer = setTimeout(check, inGrace ? LIVE_ALARM_RETRY_MS : 15000);
+      timer = setTimeout(check, inGrace ? LIVE_ALARM_RETRY_MS : POLL_MS);
     };
 
     check();
@@ -167,12 +206,15 @@ export default function VideoPanel({
     };
   }, []);
 
-  const vodSource: VideoSource = cachedVideoUri || FALLBACK_VOD_SOURCE;
+  const vodSource: VideoSource = useMemo(
+    () => (recording ? { uri: recording.uri } : FALLBACK_VOD_SOURCE),
+    [recording]
+  );
   const source = live ? LIVE_SOURCE : vodSource;
 
   // The first load is handled entirely by useVideoPlayer's own source argument — play()
   // right in its setup callback. This ref exists only to detect a *later* change (live/VOD
-  // toggling), so we don't call replace() redundantly on mount and race the initial load.
+  // toggling, or a new recording), so we don't call replace() redundantly on mount.
   const loadedSource = useRef(source);
 
   const player = useVideoPlayer(source, (p) => {
@@ -187,7 +229,7 @@ export default function VideoPanel({
       player.replace(source);
       player.loop = true;
       player.muted = muted;
-      player.play();
+      if (!pausedRef.current) player.play();
     }
   }, [source, player, muted]);
 
@@ -206,6 +248,61 @@ export default function VideoPanel({
     }
   }, [paused, player]);
 
+  // Leaving the app (home button, another app) pauses the video. Coming back to a live stream
+  // reloads it at the live moment — resuming the old position left it stuck until the user
+  // switched tabs.
+  useEffect(() => {
+    const subscription = AppState.addEventListener("change", (state) => {
+      if (state === "background") {
+        player.pause();
+      } else if (state === "active" && !pausedRef.current) {
+        if (liveRef.current) player.replace(LIVE_SOURCE);
+        player.play();
+      }
+    });
+    return () => subscription.remove();
+  }, [player]);
+
+  // Watches whether the live video is actually moving (its playback position advancing), once a
+  // second. Two jobs: after the broadcast stops, switch away as soon as the remaining footage has
+  // played out; and while it's still live, reload a stream that has been frozen for a while.
+  useEffect(() => {
+    if (!live) return;
+    let lastTime = player.currentTime;
+    let lastMovedAt = Date.now();
+    let frozenReloads = 0;
+    const id = setInterval(() => {
+      const now = Date.now();
+      if (player.currentTime !== lastTime) {
+        lastTime = player.currentTime;
+        lastMovedAt = now;
+        frozenReloads = 0;
+      }
+      // Paused or in the background, it isn't supposed to move — don't count that as stuck.
+      if (pausedRef.current || AppState.currentState !== "active") {
+        lastMovedAt = now;
+      }
+      const stillFor = now - lastMovedAt;
+
+      const drainStart = drainStartedAt.current;
+      if (drainStart !== null) {
+        if (stillFor >= DRAIN_STALL_MS || now - drainStart >= DRAIN_MAX_MS) {
+          drainStartedAt.current = null;
+          setLive(false);
+        }
+        return;
+      }
+
+      if (stillFor >= FROZEN_MS && frozenReloads < MAX_FROZEN_RELOADS) {
+        frozenReloads += 1;
+        lastMovedAt = now;
+        player.replace(LIVE_SOURCE);
+        player.play();
+      }
+    }, PROGRESS_CHECK_MS);
+    return () => clearInterval(id);
+  }, [live, player]);
+
   // Covers the gap Cloudflare's own live-status check can't see: it confirms a camera is
   // connected, but not that *this* playback of the HLS stream actually succeeds (a dropped
   // segment, a local network hiccup, a CDN edge that hasn't caught up yet). If the player
@@ -219,6 +316,7 @@ export default function VideoPanel({
       // genuinely doesn't exist) shouldn't silently undo it.
       if (status === "error" && live && getDebugForceLive() === null) {
         console.warn("Live stream failed to play — falling back to the recorded replay.", error);
+        drainStartedAt.current = null;
         setLive(false);
       }
     });
@@ -246,8 +344,8 @@ export default function VideoPanel({
 }
 
 const styles = StyleSheet.create({
-  // Fills whatever full-screen container it's placed in (only ever the alarm-ringing
-  // screen now) — no card frame/rounded corners, this is the entire screen's background.
+  // Fills whatever full-screen container it's placed in (the alarm-ringing screen or the Live
+  // tab) — no card frame/rounded corners, this is the entire screen's background.
   frame: {
     position: "absolute",
     top: 0,

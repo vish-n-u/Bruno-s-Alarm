@@ -12,11 +12,6 @@ function formatTime(timestamp: number): string {
   return new Date(timestamp).toLocaleString(undefined, { hour: "numeric", minute: "2-digit" });
 }
 
-// Once the live session actually ends, keep showing the (now-VOD) player for a few more
-// minutes instead of cutting straight to "no signal" — someone opening the tab right as it
-// wraps up still gets to see it, rather than an abrupt dead end.
-const POST_LIVE_GRACE_MS = 5 * 60 * 1000;
-
 // Classic broadcast test-card color bars (SMPTE order) — a static, zero-cost detail that
 // makes the "no signal" screen read as an actual dead broadcast rather than a generic empty
 // state.
@@ -82,22 +77,23 @@ export default function LiveScreen() {
   // the background after leaving the Live tab.
   const isFocused = useIsFocused();
   const [live, setLive] = useState(false);
+  const [streamId, setStreamId] = useState<string | null>(null);
   const [nextTime, setNextTime] = useState(() => formatTime(nextSessionAt()));
-  // 0 means "never seen live this session" — Date.now() is always far past that, so the
-  // grace period is naturally already expired until the first real live sighting.
-  const lastLiveAtRef = useRef(0);
-  // Only exists to force a re-render as the grace period ticks past — `live`/`lastLiveAtRef`
-  // alone wouldn't trigger one on their own since nothing else changes during that window.
-  const [, forceTick] = useState(0);
 
-  function handleLiveChange(isLive: boolean) {
-    if (isLive) lastLiveAtRef.current = Date.now();
+  function handleLiveChange(isLive: boolean, id: string | null) {
     setLive(isLive);
+    setStreamId(id);
   }
 
-  const withinGrace = !live && Date.now() - lastLiveAtRef.current <= POST_LIVE_GRACE_MS;
-  const showNoSignal = !live && !withinGrace;
-  const playing = isFocused && (live || withinGrace);
+  // No replay once a stream ends — the only thing this screen could replay is whatever the
+  // phone last downloaded (often an older or test clip), which read as a frozen, wrong picture.
+  // VideoPanel already lets the viewer finish the live footage before reporting "not live".
+  const showNoSignal = !live;
+  const playing = isFocused && live;
+  // One chat room per broadcast (Cloudflare's ID for it), so a new stream never shows the
+  // previous stream's messages. Falls back to the clock-based room only if the ID is missing
+  // (debug "force live", or Cloudflare not configured).
+  const chatRoom = streamId ? `stream-${streamId}` : currentSessionId();
 
   // The next-live time only needs to be right, not live-ticking — recomputed once a minute
   // is plenty, and avoids a full per-second re-render just for this screen.
@@ -106,17 +102,9 @@ export default function LiveScreen() {
     return () => clearInterval(id);
   }, []);
 
-  // Re-checks the grace period every 10s so it actually expires into "no signal" on its own,
-  // rather than only re-evaluating whenever `live` itself happens to change.
-  useEffect(() => {
-    if (!withinGrace) return;
-    const id = setInterval(() => forceTick((n) => n + 1), 10000);
-    return () => clearInterval(id);
-  }, [withinGrace]);
-
   return (
     <View style={styles.root}>
-      {/* VideoPanel stays mounted (paused unless live or in the post-live grace period) so
+      {/* VideoPanel stays mounted (paused unless live) so
           its own Cloudflare poll keeps running underneath — the moment it reports live, the
           no-signal screen disappears and real video is already loaded and ready, not started
           fresh from a cold mount. */}
@@ -125,11 +113,9 @@ export default function LiveScreen() {
           shortcut assumes — an ad-hoc/off-schedule stream needs to be detected here too. */}
       <VideoPanel allowUnmute={true} paused={!playing} onLiveChange={handleLiveChange} alwaysCheckLive={true} />
       {showNoSignal && <NoSignalScreen nextTime={nextTime} />}
-      {/* Chat is scoped to the actual live session, not the post-live grace period's replay —
-          the grace window is a viewing courtesy, not a real live moment to chat about. Skipped
-          entirely once NoSignal is showing, so its own "not live" placeholder doesn't double
-          up against NoSignal's already-clear messaging. */}
-      {!showNoSignal && <LiveChat sessionId={currentSessionId()} live={live} />}
+      {/* Chat only exists while live — skipped entirely once NoSignal is showing, so its own
+          "not live" placeholder doesn't double up against NoSignal's already-clear messaging. */}
+      {live && <LiveChat sessionId={chatRoom} live={live} />}
       {live && (
         <SafeAreaView style={styles.overlay} edges={["top"]} pointerEvents="none">
           <View style={styles.liveBadge}>

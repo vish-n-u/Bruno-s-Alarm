@@ -86,6 +86,23 @@ function isSessionRecording(v: CloudflareVideoSummary): boolean {
   return overlapsSession(start, start + v.duration * 1000, SESSION_LEAD_MINUTES, SESSION_LAG_MINUTES);
 }
 
+type DownloadInfo = { status?: string; url?: string };
+
+/** Asks Stream for the recording's downloadable MP4 (idempotent: returns the current status, or
+ * starts generating it). If a previous generation FAILED, Stream keeps reporting "error" forever
+ * and the recording could never reach phones — so a failed one is deleted and requested again,
+ * which this call then reports as in progress. */
+async function requestDownload(uid: string): Promise<DownloadInfo | null> {
+  const first = await cloudflareFetch(`/stream/${uid}/downloads`, { method: "POST" });
+  if (!first.ok) return null;
+  const download: DownloadInfo | undefined = first.body?.result?.default;
+  if (download?.status !== "error") return download ?? null;
+
+  await cloudflareFetch(`/stream/${uid}/downloads`, { method: "DELETE" });
+  const retry = await cloudflareFetch(`/stream/${uid}/downloads`, { method: "POST" });
+  return retry.ok ? (retry.body?.result?.default ?? null) : null;
+}
+
 /** Deletes all but the newest few recordings (and the old fixed-name "latest.mp4" from before
  * each recording got its own name). Best-effort — a failure here never affects the response. */
 async function pruneOldRecordings(client: S3Client): Promise<void> {
@@ -123,9 +140,7 @@ async function getOrMirrorToR2(latest: CloudflareVideoSummary): Promise<string |
   // Same idempotent Stream call as the non-R2 path — the difference is this server fetches
   // the bytes itself (one delivery charge, not per-device) instead of handing the Stream URL
   // straight to the mobile app.
-  const downloadsRes = await cloudflareFetch(`/stream/${latest.uid}/downloads`, { method: "POST" });
-  if (!downloadsRes.ok) return null;
-  const download = downloadsRes.body?.result?.default;
+  const download = await requestDownload(latest.uid);
   if (download?.status !== "ready" || typeof download?.url !== "string") return null;
 
   const fileRes = await fetch(download.url);
@@ -203,13 +218,12 @@ export async function GET() {
     // before R2 mirroring existed. Idempotent: if a downloadable MP4 already exists for this
     // video, Cloudflare returns its current status instead of regenerating; if none exists
     // yet, this starts creating one (which a later call will find ready).
-    const downloadsRes = await cloudflareFetch(`/stream/${latest.uid}/downloads`, { method: "POST" });
-    if (!downloadsRes.ok) {
+    const download = await requestDownload(latest.uid);
+    if (!download) {
       return NextResponse.json({ error: "cloudflare_error" }, { status: 502 });
     }
 
-    const download = downloadsRes.body?.result?.default;
-    if (download?.status === "ready" && typeof download?.url === "string") {
+    if (download.status === "ready" && typeof download.url === "string") {
       return NextResponse.json({ url: download.url, recordedAt: latest.created });
     }
 

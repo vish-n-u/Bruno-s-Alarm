@@ -6,6 +6,7 @@ import {
   PutObjectCommand,
   S3Client,
 } from "@aws-sdk/client-s3";
+import { overlapsSession } from "@/lib/schedule";
 
 const { CLOUDFLARE_API_TOKEN, CLOUDFLARE_ACCOUNT_ID, CLOUDFLARE_LIVE_INPUT_UID } = process.env;
 const { R2_ACCOUNT_ID, R2_ACCESS_KEY_ID, R2_SECRET_ACCESS_KEY, R2_BUCKET_NAME, R2_PUBLIC_URL } = process.env;
@@ -59,7 +60,31 @@ async function cloudflareFetch(path: string, init?: RequestInit) {
   return { ok: res.ok, body: await res.json().catch(() => null) };
 }
 
-type CloudflareVideoSummary = { uid: string; created: string };
+type CloudflareVideoSummary = {
+  uid: string;
+  created: string;
+  duration?: number;
+  status?: { state?: string };
+};
+
+// Every stream on the Live Input is recorded — including test streams and broken recordings —
+// and whatever this route returns becomes the alarm sound and ringing-screen video on every
+// phone. So "latest" means the latest recording of a REAL session: fully processed, long
+// enough to contain a howl, and overlapping a scheduled 06:00/18:00 IST session. Before this,
+// a failed recording started just after the 18:00 session blocked it for hours ("not ready"),
+// and a later test stream became everyone's alarm.
+const MIN_DURATION_SECONDS = 30;
+// He isn't punctual: accept a stream that starts up to 10 min early or is still going 30 min late.
+const SESSION_LEAD_MINUTES = 10;
+const SESSION_LAG_MINUTES = 30;
+
+function isSessionRecording(v: CloudflareVideoSummary): boolean {
+  if (v.status?.state !== "ready") return false;
+  if (typeof v.duration !== "number" || v.duration < MIN_DURATION_SECONDS) return false;
+  const start = Date.parse(v.created);
+  if (!Number.isFinite(start)) return false;
+  return overlapsSession(start, start + v.duration * 1000, SESSION_LEAD_MINUTES, SESSION_LAG_MINUTES);
+}
 
 /** Deletes all but the newest few recordings (and the old fixed-name "latest.mp4" from before
  * each recording got its own name). Best-effort — a failure here never affects the response. */
@@ -158,7 +183,8 @@ export async function GET() {
       return NextResponse.json({ error: "cloudflare_error" }, { status: 502 });
     }
 
-    const videos: CloudflareVideoSummary[] = videosRes.body?.result ?? [];
+    const allVideos: CloudflareVideoSummary[] = videosRes.body?.result ?? [];
+    const videos = allVideos.filter(isSessionRecording);
     if (videos.length === 0) {
       return NextResponse.json({ error: "no_recordings" }, { status: 404 });
     }

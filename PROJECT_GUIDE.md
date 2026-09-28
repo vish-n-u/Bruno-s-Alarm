@@ -146,7 +146,7 @@ Contact email used in the app, site and policies: `vishnuna26@gmail.com`.
   task every ~15 min (`lib/backgroundRefresh.ts`), and the ringing/Live screens. "Not ready"
   answers are retried after ~1, 3 and 8 minutes. A download is only saved after it completes
   and its size matches.
-- ⚠ Known problem: the backend picks the newest recording *of any kind* — see §10.
+- The backend only hands out recordings of real sessions (§6), so test streams don't reach alarms.
 
 ### 4.3 Live video and the Live tab
 
@@ -246,7 +246,10 @@ Contact email used in the app, site and policies: `vishnuna26@gmail.com`.
   When the Play listing is public, set `PLAY_STORE_LIVE = true` in `app/site.ts`.
 - **`GET /api/latest-recording`** (public, no auth):
   1. Lists the Live Input's recordings from the Cloudflare Stream API (token stays server-side).
-  2. Picks the **newest by creation time** (⚠ §10).
+  2. Picks the newest recording **of a real session**: `status.state === "ready"`, at least
+     30 s long, and overlapping a scheduled 06:00/18:00 IST session (from 10 min before to
+     30 min after). Test streams, broken recordings and off-schedule streams are ignored, so
+     they never become anyone's alarm. The rule lives in `overlapsSession()` in `lib/schedule.ts`.
   3. Mirrors that MP4 into R2 once as `alarm-recordings/<videoUID>.mp4` (unique name per
      recording — a fixed name like `latest.mp4` got stuck in Cloudflare's cache and served old
      bytes), keeps the newest 3, and returns `{ url, recordedAt }`.
@@ -343,13 +346,11 @@ logs, Diagnostics, Device IDs; nothing shared; encrypted in transit; deletion vi
 
 ## 10. Open issues and decided-but-not-built work (priority order)
 
-1. **Recording selection is wrong — HIGH.** `/api/latest-recording` takes the newest
-   recording of any kind, so **test streams and broken recordings become everyone's alarm
-   sound/video**. On 28 Sep: the real 18:00 recording (106 s) never reached phones because a
-   broken recording (state `error`) started 3 min later and made the endpoint answer
-   "not ready" for hours; then a 22:23 test stream became "latest".
-   **Agreed fix (server-only):** pick the newest recording that is `state=ready`, longer than
-   ~30 s, and started within ~30 min of 06:00 or 18:00 IST.
+1. ~~Recording selection~~ — **FIXED 28 Sep.** `/api/latest-recording` used to take the
+   newest recording of any kind, so test streams and broken recordings became everyone's alarm
+   (the real 18:00 recording on 28 Sep was blocked by a broken one, then replaced by a 22:23
+   test stream). It now only serves real-session recordings (§6). Tip: if you test-stream near
+   06:00/18:00 IST for more than 30 s, that test *will* count as a session.
 2. **Larix free-tier watermark.** Recordings show a full-screen "TEST STREAM – Powered by
    Larix Broadcaster" overlay, visible in the live feed and baked into recordings. Needs a Larix
    subscription (or another encoder). Owner action, not code.

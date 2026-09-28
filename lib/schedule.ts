@@ -22,6 +22,21 @@ export function nextSessionAt(now: Date = new Date()): number {
   return Math.min(...future);
 }
 
+/** Whether a stretch of time [startMs, endMs] overlaps one of Bruno's scheduled sessions,
+ *  from `leadMinutes` before a session to `lagMinutes` after it. Used to tell a real session's
+ *  recording apart from a test stream at some other time of day. Checks the neighbouring days
+ *  too, so a recording that crosses UTC midnight is still matched. */
+export function overlapsSession(startMs: number, endMs: number, leadMinutes: number, lagMinutes: number): boolean {
+  const dayStart = utcMidnight(new Date(startMs));
+  for (const dayOffset of [-1, 0, 1]) {
+    for (const minutesUtc of SESSION_HOURS_UTC) {
+      const session = dayStart + dayOffset * 86400000 + minutesUtc * 60000;
+      if (endMs >= session - leadMinutes * 60000 && startMs <= session + lagMinutes * 60000) return true;
+    }
+  }
+  return false;
+}
+
 /** Which of the two daily sessions a session timestamp (from nextSessionAt/lastSessionAt)
  *  belongs to, based on which SESSION_HOURS_UTC slot it falls in. */
 export function sessionKindAt(sessionTimestamp: number): "morning" | "evening" {

@@ -35,7 +35,7 @@ const FEATURES = [
   },
   {
     title: "Live when he's live",
-    body: "At session time you get the camera. Any other time it plays his latest recording, so there's always a howl in it. Flip one switch and it'll ring you the moment he goes live, even off schedule.",
+    body: "At session time the Live tab shows the camera. If your alarm rings while he's off, it plays his latest recording, so there's always a howl in it. Flip one switch and it'll ring you the moment he goes live, even off schedule.",
   },
   {
     title: "Your own times too",
@@ -91,7 +91,7 @@ export default function Home() {
                 <br />
                 a day.
               </h1>
-              <p className="hand hero-hand">Never once late. Mostly.</p>
+              <p className="hand hero-hand">The alarm&rsquo;s always on time. He mostly is.</p>
               <p className="lede">
                 Twice a day a church bell rings near Bruno&rsquo;s home, and he howls at it, every
                 time. Bruno&rsquo;s Alarm points a camera at him and turns that howl into your

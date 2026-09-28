@@ -16,6 +16,13 @@ export function getCloudflareLiveManifestUrl(): string | null {
   return `https://customer-${CUSTOMER_CODE}.cloudflarestream.com/${LIVE_INPUT_UID}/manifest/video.m3u8`;
 }
 
+/** HLS address of one broadcast's recording (its `videoUID`) — used to replay the stream that
+ * just ended on the Live tab. Recordings on this account are public (no signed URLs). */
+export function getCloudflareRecordingManifestUrl(videoUID: string): string | null {
+  if (!CUSTOMER_CODE) return null;
+  return `https://customer-${CUSTOMER_CODE}.cloudflarestream.com/${videoUID}/manifest/video.m3u8`;
+}
+
 export type LiveStatus = {
   live: boolean;
   /** Cloudflare's ID for the recording of the broadcast that's live right now — a new one for

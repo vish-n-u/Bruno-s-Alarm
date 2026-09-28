@@ -1,5 +1,6 @@
-import { useCallback, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { ScrollView, StyleSheet, Switch, Text, View } from "react-native";
+import AsyncStorage from "@react-native-async-storage/async-storage";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { Ionicons } from "@expo/vector-icons";
 import LottieView from "lottie-react-native";
@@ -18,8 +19,8 @@ import {
 import { ensureAlarmPermissions } from "../lib/alarmPermissions";
 import { tapLight } from "../lib/haptics";
 import { animateNextLayout } from "../lib/layoutAnim";
-import { isSubscribed } from "../lib/notifications";
-import { todaysSessions } from "../lib/schedule";
+import { isSubscribed, scheduleUpcomingSessions } from "../lib/notifications";
+import { sessionTimesLabel, todaysSessions } from "../lib/schedule";
 import { fonts, radius, shadow, spacing, useNow, useThemeColors, type ThemeColors } from "../lib/theme";
 import { useWeatherCondition } from "../lib/weather";
 
@@ -46,6 +47,10 @@ function formatAlarmTime(hour: number, minute: number): string {
   return d.toLocaleString(undefined, { hour: "numeric", minute: "2-digit" });
 }
 
+// Onboarding no longer offers Bruno's daily alarm, so Home does — once, until turned on or
+// dismissed. Settings keeps the toggle either way.
+const DAILY_ALARM_CARD_DISMISSED_KEY = "bruno-daily-alarm-card-dismissed";
+
 function formatLocalTime(timestamp: number): string {
   return new Date(timestamp).toLocaleString(undefined, { hour: "numeric", minute: "2-digit" });
 }
@@ -67,6 +72,37 @@ export default function HomeScreen({ navigation }: Props) {
   const [brunoSubscribed, setBrunoSubscribed] = useState(false);
   const [editModalAlarmId, setEditModalAlarmId] = useState<string | undefined>(undefined);
   const [editModalVisible, setEditModalVisible] = useState(false);
+  // Starts true so the card doesn't flash in for a moment before the saved choice loads.
+  const [dailyCardDismissed, setDailyCardDismissed] = useState(true);
+  const [turningOnDaily, setTurningOnDaily] = useState(false);
+
+  useEffect(() => {
+    AsyncStorage.getItem(DAILY_ALARM_CARD_DISMISSED_KEY)
+      .then((value) => setDailyCardDismissed(value === "1"))
+      .catch(() => setDailyCardDismissed(false));
+  }, []);
+
+  async function turnOnDailyAlarm() {
+    if (turningOnDaily) return;
+    tapLight();
+    setTurningOnDaily(true);
+    try {
+      // Asks for whatever is still missing and explains it; false means it already said why.
+      if (!(await ensureAlarmPermissions())) return;
+      await scheduleUpcomingSessions();
+      animateNextLayout();
+      setBrunoSubscribed(true);
+    } finally {
+      setTurningOnDaily(false);
+    }
+  }
+
+  function dismissDailyCard() {
+    tapLight();
+    animateNextLayout();
+    setDailyCardDismissed(true);
+    AsyncStorage.setItem(DAILY_ALARM_CARD_DISMISSED_KEY, "1").catch(() => {});
+  }
 
   const refreshCustomAlarms = useCallback(() => {
     getCustomAlarms()
@@ -160,6 +196,21 @@ export default function HomeScreen({ navigation }: Props) {
                 <Text style={styles.brunoTagText}>BRUNO</Text>
               </View>
             </Touchable>
+          )}
+
+          {!brunoSubscribed && !dailyCardDismissed && (
+            <View style={styles.dailyCard}>
+              <Text style={styles.dailyCardTitle}>Bruno's daily alarm</Text>
+              <Text style={styles.dailyCardBody}>Rings when he howls, around {sessionTimesLabel()}.</Text>
+              <View style={styles.dailyCardActions}>
+                <Touchable style={styles.dailyCardButton} onPress={turnOnDailyAlarm} disabled={turningOnDaily}>
+                  <Text style={styles.dailyCardButtonText}>{turningOnDaily ? "Turning on…" : "Turn on"}</Text>
+                </Touchable>
+                <Touchable onPress={dismissDailyCard} hitSlop={8} disabled={turningOnDaily}>
+                  <Text style={styles.dailyCardDismiss}>Not now</Text>
+                </Touchable>
+              </View>
+            </View>
           )}
 
           {!brunoSubscribed && customAlarms.length === 0 && (
@@ -329,6 +380,52 @@ function createStyles(colors: ThemeColors) {
       fontFamily: fonts.bodyBold,
       fontSize: 11,
       letterSpacing: 0.5,
+    },
+    // Same card shape as brunoCard (it's what that card becomes once turned on), with a dashed
+    // edge so it reads as an offer rather than something already set.
+    dailyCard: {
+      backgroundColor: colors.surface,
+      borderWidth: 1,
+      borderStyle: "dashed",
+      borderColor: colors.border,
+      borderRadius: radius.lg,
+      padding: spacing.lg,
+      marginBottom: spacing.lg,
+      gap: spacing.xs,
+    },
+    dailyCardTitle: {
+      color: colors.textPrimary,
+      fontFamily: fonts.bodyBold,
+      fontSize: 16,
+    },
+    dailyCardBody: {
+      color: colors.textSecondary,
+      fontFamily: fonts.body,
+      fontSize: 13,
+    },
+    dailyCardActions: {
+      flexDirection: "row",
+      alignItems: "center",
+      gap: spacing.lg,
+      marginTop: spacing.sm,
+    },
+    dailyCardButton: {
+      paddingVertical: spacing.sm,
+      paddingHorizontal: spacing.lg,
+      borderRadius: radius.md,
+      borderWidth: 1,
+      borderColor: colors.accentBorder,
+      backgroundColor: colors.accent,
+    },
+    dailyCardButtonText: {
+      color: colors.accentText,
+      fontFamily: fonts.bodyBold,
+      fontSize: 14,
+    },
+    dailyCardDismiss: {
+      color: colors.textSecondary,
+      fontFamily: fonts.bodyMedium,
+      fontSize: 14,
     },
     emptyState: {
       alignItems: "center",

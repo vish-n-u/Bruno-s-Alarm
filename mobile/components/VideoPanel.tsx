@@ -54,7 +54,14 @@ export default function VideoPanel({
   paused = false,
   onLiveChange,
   alwaysCheckLive = false,
+  replayUrl = null,
+  onReplayError,
 }: {
+  /** While not live, play this instead of the saved recording — the Live tab passes the
+   * recording of the stream that just ended, for its short replay window. */
+  replayUrl?: string | null;
+  /** The replay couldn't be played (e.g. Cloudflare hasn't made it available yet). */
+  onReplayError?: () => void;
   allowUnmute?: boolean;
   /** Skips the "only ask Cloudflare near a scheduled 6AM/6PM session" shortcut and always
    * asks — for a go-live alarm, which by definition can happen at any time of day. */
@@ -210,7 +217,8 @@ export default function VideoPanel({
     () => (recording ? { uri: recording.uri } : FALLBACK_VOD_SOURCE),
     [recording]
   );
-  const source = live ? LIVE_SOURCE : vodSource;
+  const replaySource: VideoSource | null = useMemo(() => (replayUrl ? { uri: replayUrl } : null), [replayUrl]);
+  const source = live ? LIVE_SOURCE : replaySource ?? vodSource;
 
   // The first load is handled entirely by useVideoPlayer's own source argument — play()
   // right in its setup callback. This ref exists only to detect a *later* change (live/VOD
@@ -318,10 +326,14 @@ export default function VideoPanel({
         console.warn("Live stream failed to play — falling back to the recorded replay.", error);
         drainStartedAt.current = null;
         setLive(false);
+      } else if (status === "error" && !live && replayUrl) {
+        console.warn("Replay of the last stream failed to play.", error);
+        onReplayError?.();
       }
     });
     return () => subscription.remove();
-  }, [player, live]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [player, live, replayUrl]);
 
   return (
     <View style={styles.frame}>

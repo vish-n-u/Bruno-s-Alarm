@@ -5,12 +5,16 @@ import { useIsFocused } from "@react-navigation/native";
 import { Ionicons } from "@expo/vector-icons";
 import LiveChat from "../components/LiveChat";
 import VideoPanel from "../components/VideoPanel";
+import { getCloudflareRecordingManifestUrl } from "../lib/liveStatus";
 import { currentSessionId, nextSessionAt } from "../lib/schedule";
 import { fonts, radius, spacing, useThemeColors } from "../lib/theme";
 
 function formatTime(timestamp: number): string {
   return new Date(timestamp).toLocaleString(undefined, { hour: "numeric", minute: "2-digit" });
 }
+
+// How long the stream that just ended stays watchable (as a labelled replay) before NO SIGNAL.
+const REPLAY_MS = 5 * 60 * 1000;
 
 // Classic broadcast test-card color bars (SMPTE order) — a static, zero-cost detail that
 // makes the "no signal" screen read as an actual dead broadcast rather than a generic empty
@@ -79,17 +83,35 @@ export default function LiveScreen() {
   const [live, setLive] = useState(false);
   const [streamId, setStreamId] = useState<string | null>(null);
   const [nextTime, setNextTime] = useState(() => formatTime(nextSessionAt()));
+  // The stream that just ended, replayed for a few minutes from its own Cloudflare recording —
+  // never the phone's saved clip, which is often an older or test recording.
+  const [replay, setReplay] = useState<{ url: string; until: number } | null>(null);
+  const lastStreamIdRef = useRef<string | null>(null);
 
   function handleLiveChange(isLive: boolean, id: string | null) {
+    if (isLive) {
+      if (id) lastStreamIdRef.current = id;
+      setReplay(null);
+    } else if (lastStreamIdRef.current) {
+      const url = getCloudflareRecordingManifestUrl(lastStreamIdRef.current);
+      lastStreamIdRef.current = null;
+      if (url) setReplay({ url, until: Date.now() + REPLAY_MS });
+    }
     setLive(isLive);
     setStreamId(id);
   }
 
-  // No replay once a stream ends — the only thing this screen could replay is whatever the
-  // phone last downloaded (often an older or test clip), which read as a frozen, wrong picture.
-  // VideoPanel already lets the viewer finish the live footage before reporting "not live".
-  const showNoSignal = !live;
-  const playing = isFocused && live;
+  useEffect(() => {
+    if (!replay) return;
+    const id = setTimeout(() => setReplay(null), Math.max(0, replay.until - Date.now()));
+    return () => clearTimeout(id);
+  }, [replay]);
+
+  // VideoPanel already lets the viewer finish the live footage before reporting "not live";
+  // then the replay (if there is one) runs, then NO SIGNAL.
+  const replaying = !live && replay !== null;
+  const showNoSignal = !live && !replaying;
+  const playing = isFocused && (live || replaying);
   // One chat room per broadcast (Cloudflare's ID for it), so a new stream never shows the
   // previous stream's messages. Falls back to the clock-based room only if the ID is missing
   // (debug "force live", or Cloudflare not configured).
@@ -111,16 +133,23 @@ export default function LiveScreen() {
       {/* alwaysCheckLive: this tab's whole point is showing Bruno live, so it can't be limited
           to only checking Cloudflare near the two fixed 6AM/6PM windows the way the default
           shortcut assumes — an ad-hoc/off-schedule stream needs to be detected here too. */}
-      <VideoPanel allowUnmute={true} paused={!playing} onLiveChange={handleLiveChange} alwaysCheckLive={true} />
+      <VideoPanel
+        allowUnmute={true}
+        paused={!playing}
+        onLiveChange={handleLiveChange}
+        alwaysCheckLive={true}
+        replayUrl={replaying ? replay.url : null}
+        onReplayError={() => setReplay(null)}
+      />
       {showNoSignal && <NoSignalScreen nextTime={nextTime} />}
-      {/* Chat only exists while live — skipped entirely once NoSignal is showing, so its own
-          "not live" placeholder doesn't double up against NoSignal's already-clear messaging. */}
+      {/* Chat only exists while live — closed during the replay, and skipped entirely once
+          NoSignal is showing, so its own "not live" placeholder doesn't double up against it. */}
       {live && <LiveChat sessionId={chatRoom} live={live} />}
-      {live && (
+      {(live || replaying) && (
         <SafeAreaView style={styles.overlay} edges={["top"]} pointerEvents="none">
           <View style={styles.liveBadge}>
-            <View style={[styles.liveDot, { backgroundColor: colors.live }]} />
-            <Text style={styles.liveBadgeText}>LIVE</Text>
+            <View style={[styles.liveDot, { backgroundColor: live ? colors.live : "#9a9a9a" }]} />
+            <Text style={styles.liveBadgeText}>{live ? "LIVE" : "REPLAY"}</Text>
           </View>
         </SafeAreaView>
       )}

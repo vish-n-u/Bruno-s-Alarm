@@ -22,8 +22,9 @@ The product has three parts:
 Video runs on **Cloudflare Stream** (live) and **Cloudflare R2** (saved recordings).
 
 What a user sees in the app:
-- **Home tab** — their alarms, a card for "Bruno's daily alarm" if it's on, a `+` button to add
-  their own alarm, a gear to Settings. Animated sky that follows the real time of day.
+- **Home tab** — their alarms, a card for "Bruno's daily alarm" (while it's off: a one-tap
+  "Turn on" offer with "Not now", which hides it for good; once on: the alarm's times), a `+`
+  button to add their own alarm, a gear to Settings. Animated sky that follows the real time of day.
 - **Live tab** — the live camera when Bruno is on, a "NO SIGNAL" test card when he isn't, and a
   live chat overlay during a stream.
 - **Onboarding** (first launch) — three short slides: he's live twice a day; or pick your own
@@ -163,9 +164,12 @@ Contact email used in the app, site and policies: `vishnuna26@gmail.com`.
 - If the live player errors, it falls back to the recording.
 - When a new recording downloads, the player reloads it (`onAlarmRecordingChanged` in
   `lib/alarmSound.ts`) — the file path never changes because scheduled alarms point at it.
-- `screens/LiveScreen.tsx`: live → video + LIVE badge + chat; not live → the "NO SIGNAL" card
-  with the next session time. There is **no replay** after a stream (removed 28 Sep — it could
-  only show an older or test clip).
+- `screens/LiveScreen.tsx`: live → video + LIVE badge + chat. When a stream ends, it replays
+  **that stream's own recording** (Cloudflare HLS by its `videoUID`,
+  `getCloudflareRecordingManifestUrl()`) for **5 minutes** with a grey REPLAY badge and chat
+  closed, then shows the "NO SIGNAL" card with the next session time. If the replay can't play
+  (Cloudflare not ready yet), it goes straight to NO SIGNAL. It never replays the phone's saved
+  clip (that was the old behaviour and showed old/test clips).
 
 ### 4.4 "Ring when Bruno goes live" (optional, Android)
 
@@ -374,12 +378,18 @@ logs, Diagnostics, Device IDs; nothing shared; encrypted in transit; deletion vi
    frozen streams reload, the app resyncs after returning from the background, no replay, and
    the player reloads when a new recording downloads (§4.3). Needs an on-device test with a
    real stream stop.
-   Still open: what alarms should play when the server has no valid recording (the phone keeps
-   whatever it last saved), and whether to show a labelled "last session" replay between
-   sessions once the real recording is ready.
+   A 5-minute replay of the stream that just ended was added back the right way (its own
+   recording, labelled REPLAY). Needs a real test: how soon Cloudflare makes it playable.
+   **To discuss (owner parked it):** the alarm's sound and ringing-screen video should come from
+   the same clip and stay in sync. Today the sound is the saved recording (native player) while
+   the video can be the live stream or a different clip; and a saved test clip (older phones)
+   is still used. Proposal on the table: ringing video = exactly the clip the sound plays (saved
+   real-session recording → built-in clip, which is the same 26 s clip as the built-in howl),
+   ignore saved clips that aren't from a real session, start the video where the sound is
+   (~1 s sync), and a "Bruno's live — watch" button when an alarm rings during a live stream.
 5. **Bruno's Pack 200-message cap** — decided, not built (§4.5).
-6. **Discoverability of Bruno's daily alarm.** Onboarding no longer offers it, so new users only
-   find it in Settings. Offered: a one-tap "Turn on Bruno's daily alarm" card on Home.
+6. ~~Discoverability of Bruno's daily alarm~~ — **FIXED 28 Sep (app v15)**: a dismissible
+   "Turn on" card on Home (`components/HomeScreen.tsx`).
 7. **Unexplained "alarm stopped after ~22 s" report** — investigation deferred by the owner;
    native logging was added so the next occurrence can be diagnosed from logcat.
 8. Deferred by the owner: volume lock as a user setting; iOS release; cleaning up the legacy

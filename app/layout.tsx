@@ -23,7 +23,7 @@ export const metadata: Metadata = {
     "A real dog howls at a church bell at 6AM and 6PM IST. This Android app wakes you up with it — live when he's on, recorded when he isn't.",
   openGraph: {
     title: "Bruno's Alarm",
-    description: "A real dog. Two alarms a day. Wake up to Bruno's howl, live.",
+    description: "A real dog, live twice a day. Wake up to Bruno's howl.",
     images: [{ url: "/bruno.jpg", width: 800, height: 800, alt: "Bruno mid-howl" }],
     type: "website",
   },

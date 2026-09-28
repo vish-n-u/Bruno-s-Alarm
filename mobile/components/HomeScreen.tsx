@@ -166,7 +166,7 @@ export default function HomeScreen({ navigation }: Props) {
           <View style={styles.header}>
             <View style={styles.headerTitleWrap}>
               <Text style={styles.title}>Bruno's Alarm</Text>
-              <Text style={styles.subtitle}>A real dog. Two alarms a day.</Text>
+              <Text style={styles.subtitle}>A real dog. Live twice a day.</Text>
             </View>
             <Touchable
               style={styles.settingsButton}

@@ -408,5 +408,8 @@ logs, Diagnostics, Device IDs; nothing shared; encrypted in transit; deletion vi
 - Copy in the app is short and plain; humour is about Bruno, never about whether the alarm
   works. Use one name per feature ("Bruno's daily alarm", "Ring when Bruno goes live") and
   local times, never a bare "6AM & 6PM".
+- Tagline everywhere (app Home, website hero, Play feature graphic): **"A real dog. Live twice
+  a day."** Don't use "Two alarms a day" — it reads as if the app only sets two alarms, when
+  people can set as many of their own as they like.
 - Commit with clear messages once work is confirmed; the owner often asks to build an AAB or
   install on the USB-connected phone after changes.

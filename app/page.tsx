@@ -87,7 +87,7 @@ export default function Home() {
               <h1 className="display">
                 A real dog.
                 <br />
-                Two alarms
+                Live twice
                 <br />
                 a day.
               </h1>

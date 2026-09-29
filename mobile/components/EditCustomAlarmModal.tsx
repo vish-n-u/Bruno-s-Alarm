@@ -32,6 +32,8 @@ const ROW_HEIGHT = 44;
 const VISIBLE_ROWS = 5;
 const WHEEL_HEIGHT = ROW_HEIGHT * VISIBLE_ROWS;
 const PADDING = ROW_HEIGHT * Math.floor(VISIBLE_ROWS / 2);
+// The wheel card's own top/bottom padding — the centre-row lines have to account for it.
+const WHEEL_CARD_PADDING = 8;
 
 const HOURS = Array.from({ length: 24 }, (_, i) => i); // 0..23
 const MINUTES = Array.from({ length: 60 }, (_, i) => i); // 0..59
@@ -572,15 +574,17 @@ function createStyles(colors: ThemeColors) {
       borderWidth: 1,
       borderColor: colors.border,
       borderRadius: radius.lg,
-      paddingVertical: spacing.sm,
+      paddingVertical: WHEEL_CARD_PADDING,
     },
     // One pair of full-width hairlines framing the centered row — no fill, no rounded box —
     // the native picker's only visual cue for "this is the selected row" besides size/color.
+    // Absolute positioning is measured from the card's outer edge, ignoring its padding, so the
+    // padding is added back — without it the lines sat that much above the centred row.
     wheelsDivider: {
       position: "absolute",
       left: spacing.lg,
       right: spacing.lg,
-      top: PADDING,
+      top: WHEEL_CARD_PADDING + PADDING,
       height: ROW_HEIGHT,
       borderTopWidth: StyleSheet.hairlineWidth,
       borderBottomWidth: StyleSheet.hairlineWidth,
@@ -606,6 +610,10 @@ function createStyles(colors: ThemeColors) {
     wheelText: {
       fontFamily: fonts.mono,
       fontSize: REST_FONT_SIZE,
+      // Android pads text above and below for accents by default, which pushes the digits off
+      // the row's centre — drop it so each number sits exactly in the middle of its row.
+      includeFontPadding: false,
+      textAlignVertical: "center",
     },
     repeatRowScroll: {
       width: "100%",

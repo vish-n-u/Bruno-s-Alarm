@@ -379,6 +379,13 @@ logs, Diagnostics, Device IDs; nothing shared; encrypted in transit; deletion vi
   `node --test lib/`.
 - **Animated + native driver:** animating `fontSize` forces the JS thread and caused lag and
   flicker in the time-picker wheel. Use `transform: scale` and `color` (native-driver safe).
+- **Don't use `snapToInterval` for long lists on Android.** React Native converts it to whole
+  pixels by dropping the decimal, so on phones with a non-round density (e.g. Samsung A35 at
+  2.8125) the 44-unit rows (123.75 px) snapped every 123 px and the looping time wheel drifted
+  until it stopped between two numbers. The wheel uses `snapToOffsets` (one stop per row, each
+  within a pixel) instead.
+- The time picker is a plain clock on purpose — no Bruno times highlighted or hinted (owner
+  found it pushy, 29 Sep).
 - **`adb` on Git Bash:** use `//sdcard/...` (double slash) to avoid path mangling. For precise
   taps, dump the UI (`adb shell uiautomator dump //sdcard/ui.xml`, `adb pull`) and read element
   bounds instead of estimating from screenshots. The test phone is 1080×2373.

@@ -26,7 +26,6 @@ import {
   type CustomAlarm,
   type RepeatMode,
 } from "../lib/customAlarm";
-import { todaysSessions } from "../lib/schedule";
 import { fonts, radius, spacing, useThemeColors, type ThemeColors } from "../lib/theme";
 
 const ROW_HEIGHT = 44;
@@ -57,15 +56,6 @@ const REPEAT_LABEL: Record<RepeatMode, string> = {
   custom: "Custom",
 };
 const DAY_LETTERS = ["S", "M", "T", "W", "T", "F", "S"]; // index = Date.getDay(), 0=Sun
-
-// Bruno's two real sessions today, converted to this device's local wall-clock time —
-// Date getters already reflect local timezone, so no Intl/toLocaleString parsing needed.
-function liveMoments() {
-  return todaysSessions().map((ts) => {
-    const d = new Date(ts);
-    return { hour: d.getHours(), minute: d.getMinutes() };
-  });
-}
 
 type Styles = ReturnType<typeof createStyles>;
 
@@ -104,7 +94,6 @@ function WheelRow({
   rowStyle,
   textStyle,
   label,
-  live,
   colors,
 }: {
   index: number;
@@ -112,14 +101,12 @@ function WheelRow({
   rowStyle: object;
   textStyle: object;
   label: string;
-  live: boolean;
   colors: ThemeColors;
 }) {
   const focusRange = [index * ROW_HEIGHT - FOCUS_WINDOW, index * ROW_HEIGHT, index * ROW_HEIGHT + FOCUS_WINDOW];
-  const restColor = live ? colors.live : colors.textSecondary;
   const color = scrollY.interpolate({
     inputRange: focusRange,
-    outputRange: [restColor, colors.textPrimary, restColor],
+    outputRange: [colors.textSecondary, colors.textPrimary, colors.textSecondary],
     extrapolate: "clamp",
   });
   const scale = scrollY.interpolate({
@@ -130,7 +117,7 @@ function WheelRow({
 
   return (
     <View style={rowStyle}>
-      <Animated.Text style={[textStyle, live && { fontFamily: fonts.monoBold }, { color, transform: [{ scale }] }]}>
+      <Animated.Text style={[textStyle, { color, transform: [{ scale }] }]}>
         {label}
       </Animated.Text>
     </View>
@@ -142,7 +129,6 @@ function Wheel<T extends string | number>({
   format,
   selectedIndex,
   onSettle,
-  isLive,
   styles,
   colors,
   /** Renders several back-to-back copies of `data` so scrolling past either end lands back on
@@ -154,7 +140,6 @@ function Wheel<T extends string | number>({
   format: (value: T) => string;
   selectedIndex: number;
   onSettle: (index: number) => void;
-  isLive: (value: T) => boolean;
   styles: Styles;
   colors: ThemeColors;
   loop?: boolean;
@@ -167,6 +152,16 @@ function Wheel<T extends string | number>({
     () => (loop ? Array.from({ length: data.length * LOOP_COPIES }, (_, i) => data[i % data.length]) : data),
     // eslint-disable-next-line react-hooks/exhaustive-deps
     [loop, data.length],
+  );
+
+  // Where each row comes to rest. A single snapToInterval is converted to whole pixels on Android
+  // by dropping the decimal (ReactScrollViewManager: `(snapToInterval * density).toInt()`), so on a
+  // phone whose scaling isn't a round number (e.g. a Samsung at 2.8125 px per unit: rows 123.75 px
+  // apart, snap step 123 px) the error added up over the hundreds of looped rows and the wheel
+  // stopped between two numbers. Listing every row's own stop keeps each within a pixel.
+  const snapOffsets = useMemo(
+    () => Array.from({ length: virtualData.length }, (_, i) => i * ROW_HEIGHT),
+    [virtualData.length],
   );
 
   // Drives both the per-row depth effect (native-driven, so it stays smooth regardless of what
@@ -252,7 +247,7 @@ function Wheel<T extends string | number>({
         data={virtualData}
         keyExtractor={(_, index) => String(index)}
         showsVerticalScrollIndicator={false}
-        snapToInterval={ROW_HEIGHT}
+        snapToOffsets={snapOffsets}
         decelerationRate={WHEEL_DECELERATION}
         contentContainerStyle={{ paddingVertical: PADDING }}
         getItemLayout={(_, index) => ({ length: ROW_HEIGHT, offset: ROW_HEIGHT * index, index })}
@@ -267,7 +262,6 @@ function Wheel<T extends string | number>({
             rowStyle={styles.wheelRow}
             textStyle={styles.wheelText}
             label={format(item)}
-            live={isLive(item)}
             colors={colors}
           />
         )}
@@ -335,14 +329,6 @@ export default function EditCustomAlarmModal({ visible, alarmId, onClose, onSave
     tapLight();
     setCustomDays((prev) => (prev.includes(day) ? prev.filter((d) => d !== day) : [...prev, day].sort()));
   }
-
-  const moments = useMemo(() => liveMoments(), []);
-  const liveHourSet = useMemo(() => new Set(moments.map((m) => m.hour)), [moments]);
-  const liveMinuteSet = useMemo(() => new Set(moments.map((m) => m.minute)), [moments]);
-
-  const liveLabel = moments
-    .map((m) => `${String(m.hour).padStart(2, "0")}:${String(m.minute).padStart(2, "0")}`)
-    .join(" and ");
 
   async function handleDone() {
     // saveCustomAlarm() below does a network call plus up to 14 native scheduleAlarm()
@@ -430,8 +416,6 @@ export default function EditCustomAlarmModal({ visible, alarmId, onClose, onSave
             </View>
           ) : (
             <View style={styles.content}>
-              <Text style={styles.liveHint}>Bruno is live around {liveLabel} your time</Text>
-
               <View style={styles.wheelCard}>
                 {/* One pair of hairlines spanning both columns — the native picker frames its
                     selected row this way, rather than each wheel drawing its own boxed band. */}
@@ -442,7 +426,6 @@ export default function EditCustomAlarmModal({ visible, alarmId, onClose, onSave
                     format={(v) => String(v).padStart(2, "0")}
                     selectedIndex={hourIndex}
                     onSettle={setHourIndex}
-                    isLive={(v) => liveHourSet.has(v)}
                     styles={styles}
                     colors={colors}
                     loop
@@ -452,7 +435,6 @@ export default function EditCustomAlarmModal({ visible, alarmId, onClose, onSave
                     format={(v) => String(v).padStart(2, "0")}
                     selectedIndex={minuteIndex}
                     onSettle={setMinuteIndex}
-                    isLive={(v) => liveMinuteSet.has(v)}
                     styles={styles}
                     colors={colors}
                     loop
@@ -579,19 +561,12 @@ function createStyles(colors: ThemeColors) {
       paddingBottom: spacing.xxl,
       alignItems: "center",
     },
-    liveHint: {
-      color: colors.live,
-      fontFamily: fonts.bodyBold,
-      fontSize: 13,
-      textAlign: "center",
-      marginTop: spacing.md,
-    },
     // The wheel gets its own card, separate from the rest of the sheet — matching the native
     // picker presenting its wheel as a distinct white surface rather than floating on the
     // sheet's plain background.
     wheelCard: {
       position: "relative",
-      marginTop: spacing.xxl,
+      marginTop: spacing.md,
       width: "100%",
       backgroundColor: colors.surface,
       borderWidth: 1,

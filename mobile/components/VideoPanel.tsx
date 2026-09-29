@@ -44,11 +44,10 @@ const FROZEN_MS = 15_000;
 const MAX_FROZEN_RELOADS = 3;
 const PROGRESS_CHECK_MS = 1_000;
 
-// Shown on the alarm-ringing screen and the Live tab. Starts muted (autoplay shouldn't blast
-// sound the moment the alarm fires) — allowUnmute={false} on the ringing screen because the
-// actual alarm sound comes from the native alarm itself (see plugins/withAlarmSound.js), which
-// loops via react-native-alarmageddon's own MediaPlayer until Stop/Snooze — unmuting the video
-// too would just overlap/echo against it.
+// The Live tab's player: live stream, the replay of a stream that just ended, or (unused there,
+// hidden behind NO SIGNAL) the saved recording. Starts muted; tap to unmute. The alarm-ringing
+// screen does NOT use this — it has AlarmClipVideo, which only ever plays the clip the alarm
+// sound is playing, so picture and sound can't come from different clips.
 export default function VideoPanel({
   allowUnmute = true,
   paused = false,

@@ -55,6 +55,21 @@ export function sessionTimesLabel(now: Date = new Date()): string {
     .join(" and ");
 }
 
+/** Whether a recording that started at `startMs` belongs to one of Bruno's sessions — from an
+ * hour before a session to 30 min after it. Deliberately looser than the server's own rule
+ * (app/api/latest-recording): the server already only hands out real sessions; this is just to
+ * throw out clips a phone saved before that rule existed, like old test streams. */
+export function startsNearSession(startMs: number): boolean {
+  const dayStart = utcMidnight(new Date(startMs));
+  for (const dayOffset of [-1, 0, 1]) {
+    for (const minutesUtc of SESSION_HOURS_UTC) {
+      const session = dayStart + dayOffset * 86400000 + minutesUtc * 60000;
+      if (startMs >= session - 60 * 60000 && startMs <= session + 30 * 60000) return true;
+    }
+  }
+  return false;
+}
+
 /** Returns the timestamp (ms) of the most recent 6AM/6PM IST session at-or-before `now`. */
 export function lastSessionAt(now: Date = new Date()): number {
   const todayMidnight = utcMidnight(now);

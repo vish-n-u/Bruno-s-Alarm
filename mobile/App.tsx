@@ -31,7 +31,8 @@ import BrunosPackScreen from "./screens/BrunosPackScreen";
 import WeatherPreviewScreen from "./screens/WeatherPreviewScreen";
 import { hasOnboarded, markOnboarded } from "./lib/onboarding";
 import { getActiveRingingAlarm, onAlarmRinging } from "./lib/notifications";
-import { refreshAlarmSoundIfStale } from "./lib/alarmSound";
+import { refreshAlarmSoundIfStale, setAlarmRinging } from "./lib/alarmSound";
+import { migrateAlarmSoundPathsOnce } from "./lib/alarmSoundMigration";
 import { syncLiveAlarmOnLaunch } from "./lib/liveAlerts";
 import { listenForLiveAlertsInForeground } from "./lib/liveAlertRinger";
 import { registerBackgroundAlarmSoundRefresh } from "./lib/backgroundRefresh";
@@ -109,6 +110,9 @@ function HomeStack() {
 export default function App() {
   const [screen, setScreen] = useState<Screen>("checking");
   const [ringingAlarmId, setRingingAlarmId] = useState<string | null>(null);
+  // Which tab the navigator opens on when it mounts — it's unmounted while an alarm rings, so
+  // "Bruno's live — watch" on the ringing screen sets this to land on the Live tab afterwards.
+  const [initialTab, setInitialTab] = useState<"HomeTab" | "LiveTab">("HomeTab");
   const colors = useThemeColors();
   const timeOfDay = useTimeOfDay();
   // Night is the only phase with a dark background — everything else (dawn/midday/sunset)
@@ -136,11 +140,24 @@ export default function App() {
     // ringing before this listener could attach, so that initial event is missed and
     // must be checked for explicitly instead of only watching for future changes.
     getActiveRingingAlarm().then((id) => {
-      if (id) setRingingAlarmId(id);
+      if (id) {
+        setRingingAlarmId(id);
+      } else {
+        // Re-schedules alarms set by older versions — only when nothing is ringing, since
+        // re-scheduling could cancel the alarm that's ringing.
+        migrateAlarmSoundPathsOnce().catch(() => {});
+      }
     });
     const subscription = onAlarmRinging(setRingingAlarmId);
     return () => subscription?.remove();
   }, []);
+
+  // While an alarm rings, the saved recording must not be swapped (see lib/alarmSound.ts), and
+  // each new ring starts from the Home tab unless "watch live" is chosen.
+  useEffect(() => {
+    setAlarmRinging(ringingAlarmId !== null);
+    if (ringingAlarmId !== null) setInitialTab("HomeTab");
+  }, [ringingAlarmId]);
 
   useEffect(() => {
     registerBackgroundAlarmSoundRefresh();
@@ -196,12 +213,13 @@ export default function App() {
     <SafeAreaProvider style={[styles.root, { backgroundColor: colors.background }]}>
       <StatusBar style={isNight ? "light" : "dark"} />
       {ringingAlarmId ? (
-        <AlarmRingingScreen alarmId={ringingAlarmId} />
+        <AlarmRingingScreen alarmId={ringingAlarmId} onWatchLive={() => setInitialTab("LiveTab")} />
       ) : screen === "onboarding" ? (
         <Onboarding onDone={completeOnboarding} />
       ) : screen === "home" ? (
         <NavigationContainer theme={navigationTheme}>
           <Tab.Navigator
+            initialRouteName={initialTab}
             screenOptions={{
               headerShown: false,
               tabBarActiveTintColor: colors.accent,

@@ -1,8 +1,9 @@
+import AsyncStorage from "@react-native-async-storage/async-storage";
 import * as IntentLauncher from "expo-intent-launcher";
 import * as Notifications from "expo-notifications";
 import { Platform } from "react-native";
 import RNAlarmModule, { type AlarmSubscription } from "react-native-alarmageddon";
-import { getCachedAlarmSoundPath, refreshAlarmSound } from "./alarmSound";
+import { getAlarmSoundFilePath, refreshAlarmSound } from "./alarmSound";
 import { toAlarmDatetime } from "./alarmDateTime";
 import {
   armIOSBackgroundAlarms,
@@ -80,7 +81,7 @@ export async function scheduleUpcomingSessions(): Promise<void> {
   await refreshAlarmSound();
 
   if (Platform.OS === "android") {
-    const soundPath = await getCachedAlarmSoundPath();
+    const soundPath = getAlarmSoundFilePath();
     for (const timestamp of nextSessions(SESSIONS_TO_SCHEDULE)) {
       await RNAlarmModule.scheduleAlarm({
         id: `${ID_PREFIX}${timestamp}`,
@@ -133,7 +134,7 @@ export async function scheduleTestAlarmSoon(): Promise<void> {
   );
   // Uses whatever sound is currently cached (if any) so this debug button doubles as a way
   // to verify the refreshed alarm sound actually plays, without waiting for a real session.
-  const soundPath = await getCachedAlarmSoundPath();
+  const soundPath = getAlarmSoundFilePath();
   await RNAlarmModule.scheduleAlarm({
     id: `${TEST_PREFIX}${Date.now()}`,
     datetimeISO: toAlarmDatetime(Date.now() + 90000),
@@ -177,7 +178,7 @@ export async function ringForLiveStart(): Promise<void> {
   });
   if (alreadyCovered) return;
 
-  const soundPath = await getCachedAlarmSoundPath();
+  const soundPath = getAlarmSoundFilePath();
   const at = now + LIVE_LEAD_MS;
   await RNAlarmModule.scheduleAlarm({
     id: `${LIVE_PREFIX}${at}`,
@@ -214,11 +215,32 @@ export async function getActiveRingingAlarm(): Promise<string | null> {
 export async function stopRingingAlarm(alarmId: string): Promise<void> {
   if (Platform.OS === "android") await RNAlarmModule.stopCurrentAlarm(alarmId);
   else await stopIOSRingingAlarm(alarmId);
+  AsyncStorage.removeItem(`${SNOOZED_UNTIL_PREFIX}${alarmId}`).catch(() => {});
 }
 
 export async function snoozeRingingAlarm(alarmId: string): Promise<void> {
   if (Platform.OS === "android") await RNAlarmModule.snoozeCurrentAlarm(alarmId, SNOOZE_MINUTES);
   else await snoozeIOSRingingAlarm(alarmId);
+  // A snoozed alarm rings again under the same id, so its id no longer says when it started.
+  AsyncStorage.setItem(`${SNOOZED_UNTIL_PREFIX}${alarmId}`, String(Date.now() + SNOOZE_MINUTES * 60000)).catch(() => {});
+}
+
+const SNOOZED_UNTIL_PREFIX = "bruno-alarm-snoozed-until-";
+// A ringing alarm stops by itself after 10 minutes (the patched library's auto-stop).
+const MAX_RING_MS = 11 * 60 * 1000;
+
+/** Roughly when the currently ringing alarm's sound started, so the ringing screen's video can
+ * start at the same point in the clip. Exact alarms fire at their scheduled time, which is the
+ * number at the end of every alarm id; a snoozed alarm fires at the time saved when it was
+ * snoozed. Falls back to "now" if neither is plausible. */
+export async function getRingStartedAt(alarmId: string): Promise<number> {
+  const now = Date.now();
+  const plausible = (t: number) => Number.isFinite(t) && t <= now + 5000 && t >= now - MAX_RING_MS;
+  const snoozedUntil = Number(await AsyncStorage.getItem(`${SNOOZED_UNTIL_PREFIX}${alarmId}`).catch(() => null));
+  if (plausible(snoozedUntil)) return Math.min(snoozedUntil, now);
+  const scheduledAt = Number(alarmId.slice(alarmId.lastIndexOf("-") + 1));
+  if (plausible(scheduledAt)) return Math.min(scheduledAt, now);
+  return now;
 }
 
 /** Opens the system "Alarms & reminders" screen for this app (Android 12+). */

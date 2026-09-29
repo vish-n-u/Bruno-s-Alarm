@@ -5,6 +5,7 @@ import AsyncStorage from "@react-native-async-storage/async-storage";
 // classes).
 import * as FileSystem from "expo-file-system/legacy";
 import { fetchLatestRecording } from "./latestRecording";
+import { startsNearSession } from "./schedule";
 
 // Keeps the guaranteed native alarm sound (played by react-native-alarmageddon's own
 // MediaPlayer, bypassing DND — see AlarmReceiver.kt's soundPath support, added via
@@ -63,6 +64,52 @@ export async function getCachedAlarmSoundPath(): Promise<string | undefined> {
   return record.path.startsWith("file://") ? record.path.slice("file://".length) : record.path;
 }
 
+function stripFileScheme(path: string): string {
+  return path.startsWith("file://") ? path.slice("file://".length) : path;
+}
+
+/** The sound file every Android alarm is scheduled with — always this one fixed path, whether or
+ * not a recording has been downloaded yet. At ring time the native player uses it if the file
+ * exists and plays, and the built-in howl otherwise. Because every alarm points at the same path,
+ * the ringing screen can tell which clip is actually sounding (see getAlarmClipVideoUri) — which
+ * wasn't possible when alarms set before any download silently used the built-in howl. */
+export function getAlarmSoundFilePath(): string {
+  return stripFileScheme(FINAL_PATH);
+}
+
+/** The clip the alarm sound is playing right now, as a URI for the ringing screen's video: the
+ * saved recording if it's on the phone (the same check the native player makes), otherwise
+ * undefined — meaning the built-in howl, whose matching video is the bundled clip. */
+export async function getAlarmClipVideoUri(): Promise<string | undefined> {
+  const info = await FileSystem.getInfoAsync(FINAL_PATH);
+  return info.exists ? FINAL_PATH : undefined;
+}
+
+// While an alarm is ringing, the saved file must not change: the native player keeps playing the
+// old audio, so swapping it would put a different clip on screen than the one you hear.
+let alarmRinging = false;
+
+export function setAlarmRinging(ringing: boolean): void {
+  alarmRinging = ringing;
+}
+
+/** Deletes a saved clip that isn't from a real 06:00/18:00 session (e.g. a test stream saved
+ * before the server started filtering those out), so alarms fall back to the built-in howl
+ * instead of playing it. Also clears a record whose file is gone. */
+async function removeInvalidSavedRecording(): Promise<void> {
+  if (alarmRinging) return;
+  const record = await getCacheRecord();
+  const info = await FileSystem.getInfoAsync(FINAL_PATH);
+  const recordedAt = record ? Date.parse(record.recordedAt) : NaN;
+  const valid = record !== null && record.path === FINAL_PATH && Number.isFinite(recordedAt) && startsNearSession(recordedAt);
+  if (info.exists && !valid) {
+    await FileSystem.deleteAsync(FINAL_PATH, { idempotent: true });
+    await AsyncStorage.removeItem(CACHE_KEY);
+  } else if (!info.exists && record) {
+    await AsyncStorage.removeItem(CACHE_KEY);
+  }
+}
+
 /** The cached recording as a file:// URI, suitable for expo-video (unlike
  * getCachedAlarmSoundPath(), this keeps the file:// scheme — VideoView needs a real URI,
  * not a bare filesystem path). Same underlying file as the native alarm sound; showing it as
@@ -103,8 +150,11 @@ let lastAttemptAt = 0;
 
 /** One refresh attempt. Resolves true if it failed in a way that is worth retrying soon. */
 async function attemptRefresh(): Promise<boolean> {
+  // Try again shortly rather than touch the file under a ringing alarm.
+  if (alarmRinging) return true;
   try {
     AsyncStorage.removeItem(LEGACY_CACHE_KEY).catch(() => {});
+    await removeInvalidSavedRecording();
 
     const result = await fetchLatestRecording();
     if (result.status === "not_ready") {
@@ -140,6 +190,8 @@ async function attemptRefresh(): Promise<boolean> {
         return true;
       }
 
+      // An alarm started ringing during the download — keep its clip; retry the swap later.
+      if (alarmRinging) return true;
       await FileSystem.deleteAsync(FINAL_PATH, { idempotent: true });
       await FileSystem.moveAsync({ from: TEMP_PATH, to: FINAL_PATH });
       const record: CacheRecord = { path: FINAL_PATH, recordedAt: latest.recordedAt, size };

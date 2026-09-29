@@ -127,7 +127,26 @@ Contact email used in the app, site and policies: `vishnuna26@gmail.com`.
   approach was tried and failed; don't go back to it.
 - The ringing UI is the app's own `MainActivity` shown over the lock screen
   (`plugins/withLockScreenAlarmActivity.js`), rendered as `components/AlarmRingingScreen.tsx`:
-  full-screen Bruno video (muted) + **Stop** and **Snooze 10 min**.
+  full-screen Bruno video (muted) + **Stop** and **Snooze 10 min**, plus a
+  **"Bruno's live — watch"** button when he's live (stops the alarm, opens the Live tab).
+- **Sound and video always come from the same clip** (decided 29 Sep, "Option A"):
+  - Every Android alarm is scheduled with the same fixed sound path
+    (`getAlarmSoundFilePath()`); the native player plays that file if it exists and plays,
+    else the built-in howl.
+  - The ringing video (`components/AlarmClipVideo.tsx`, not VideoPanel) applies the same rule
+    (`getAlarmClipVideoUri()`): the saved file if present, else the bundled
+    `Bruno Howl Alarm.mp4` — the same 26 s clip the built-in howl was cut from. If the saved file
+    won't play, it switches to the built-in clip too (the native player would have).
+  - It never shows the live stream, never downloads, and the saved file is never replaced while
+    an alarm rings (`setAlarmRinging()` in `lib/alarmSound.ts`).
+  - Sync: the video starts where the sound is, from when the alarm started
+    (`getRingStartedAt()`: the id's timestamp, or the saved snooze time). Two separate players,
+    so ~1 s, not frame-perfect. Re-syncs when the screen comes back on.
+  - Saved clips that aren't from a real session (legacy test clips) are deleted
+    (`removeInvalidSavedRecording()`), so alarms fall back to the built-in howl.
+  - Alarms set by versions before 16 are re-scheduled once on launch
+    (`lib/alarmSoundMigration.ts`, never while an alarm rings). An alarm that rings before the
+    app is first opened after updating can still mismatch once.
 - Alarm IDs encode their type and time: `bruno-session-<ms>`, `bruno-custom-<…>-<ms>`,
   `bruno-live-<ms>`, `bruno-test-<ms>`. The ringing screen's title depends on the prefix:
   live → "Bruno is live!", session → "It's Bruno time", custom → "Your Bruno alarm".
@@ -329,7 +348,7 @@ cd mobile/android && ./gradlew bundleRelease
 
 Releasing a new Play build:
 1. Bump **`versionCode` in BOTH `mobile/app.json` and `mobile/android/app/build.gradle`**
-   (the android folder isn't regenerated automatically). Current: **15**. Play rejects a
+   (the android folder isn't regenerated automatically). Current: **16**. Play rejects a
    versionCode it has already seen.
 2. Build the AAB, upload in Play Console. Commit the version bump.
 3. Store assets: `mobile/assets/play-store-icon.png` (512×512) and
@@ -391,13 +410,8 @@ logs, Diagnostics, Device IDs; nothing shared; encrypted in transit; deletion vi
    real stream stop.
    A 5-minute replay of the stream that just ended was added back the right way (its own
    recording, labelled REPLAY). Needs a real test: how soon Cloudflare makes it playable.
-   **To discuss (owner parked it):** the alarm's sound and ringing-screen video should come from
-   the same clip and stay in sync. Today the sound is the saved recording (native player) while
-   the video can be the live stream or a different clip; and a saved test clip (older phones)
-   is still used. Proposal on the table: ringing video = exactly the clip the sound plays (saved
-   real-session recording → built-in clip, which is the same 26 s clip as the built-in howl),
-   ignore saved clips that aren't from a real session, start the video where the sound is
-   (~1 s sync), and a "Bruno's live — watch" button when an alarm rings during a live stream.
+   Alarm sound and ringing video matching — **built 29 Sep (Option A, §4.1), app v16**; needs an
+   on-device test (normal ring, snooze, ring during a live stream, first ring after updating).
 5. **Bruno's Pack 200-message cap** — decided, not built (§4.5).
 6. ~~Discoverability of Bruno's daily alarm~~ — **FIXED 28 Sep (app v15)**: a dismissible
    "Turn on" card on Home (`components/HomeScreen.tsx`).

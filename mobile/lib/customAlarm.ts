@@ -2,7 +2,7 @@ import AsyncStorage from "@react-native-async-storage/async-storage";
 import * as Notifications from "expo-notifications";
 import { Platform } from "react-native";
 import RNAlarmModule from "react-native-alarmageddon";
-import { getCachedAlarmSoundPath, refreshAlarmSound } from "./alarmSound";
+import { getAlarmSoundFilePath, refreshAlarmSound } from "./alarmSound";
 import { toAlarmDatetime } from "./alarmDateTime";
 import { armIOSBackgroundAlarms } from "./iosAlarmEngine";
 
@@ -137,7 +137,7 @@ async function applySchedule(alarm: CustomAlarm): Promise<void> {
     // Best-effort refresh of the guaranteed alarm sound to Bruno's latest real recording —
     // never blocks scheduling if it's unconfigured, offline, or fails for any reason.
     await refreshAlarmSound();
-    const soundPath = await getCachedAlarmSoundPath();
+    const soundPath = getAlarmSoundFilePath();
     const timestamps =
       alarm.repeatMode === "once"
         ? [nextLocalOccurrence(alarm.hour, alarm.minute)]
@@ -205,6 +205,14 @@ async function applySchedule(alarm: CustomAlarm): Promise<void> {
       iosEngineGroupId(alarm.id),
       timestamps.map((timestamp) => ({ id: `${prefix}${timestamp}`, timestamp, title, body: ALARM_BODY }))
     );
+  }
+}
+
+/** Re-applies every saved alarm's schedule — used once after an update that changes how alarms
+ * are scheduled (see lib/alarmSoundMigration.ts). */
+export async function rescheduleAllCustomAlarms(): Promise<void> {
+  for (const alarm of await getCustomAlarms()) {
+    await applySchedule(alarm);
   }
 }
 

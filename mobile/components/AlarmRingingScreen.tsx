@@ -1,18 +1,54 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { ActivityIndicator, StyleSheet, Text, View } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { Ionicons } from "@expo/vector-icons";
+import AlarmClipVideo from "./AlarmClipVideo";
 import Touchable from "./Touchable";
-import VideoPanel from "./VideoPanel";
-import { snoozeRingingAlarm, stopRingingAlarm } from "../lib/notifications";
+import { getRingStartedAt, snoozeRingingAlarm, stopRingingAlarm } from "../lib/notifications";
 import { disableOnceAlarmIfFired } from "../lib/customAlarm";
 import { success, tapMedium } from "../lib/haptics";
+import { getCloudflareLiveStatus } from "../lib/liveStatus";
 import { fonts, radius, spacing, useThemeColors, type ThemeColors } from "../lib/theme";
 
-export default function AlarmRingingScreen({ alarmId }: { alarmId: string }) {
+const LIVE_POLL_MS = 15_000;
+
+export default function AlarmRingingScreen({
+  alarmId,
+  onWatchLive,
+}: {
+  alarmId: string;
+  /** Called after the alarm is stopped via "Bruno's live — watch", so the app opens the Live tab. */
+  onWatchLive: () => void;
+}) {
   const colors = useThemeColors();
   const styles = createStyles(colors);
   const [busy, setBusy] = useState(false);
+  const [startedAt, setStartedAt] = useState<number | null>(null);
+  // The video always shows the alarm's own clip (so it matches the sound); if Bruno happens to be
+  // live, a button offers the real stream instead of mixing live video with recorded sound.
+  const [brunoLive, setBrunoLive] = useState(false);
+
+  useEffect(() => {
+    getRingStartedAt(alarmId)
+      .then(setStartedAt)
+      .catch(() => setStartedAt(Date.now()));
+  }, [alarmId]);
+
+  useEffect(() => {
+    let cancelled = false;
+    let timer: ReturnType<typeof setTimeout>;
+    const check = async () => {
+      const status = await getCloudflareLiveStatus();
+      if (cancelled) return;
+      setBrunoLive(status.live);
+      timer = setTimeout(check, LIVE_POLL_MS);
+    };
+    check();
+    return () => {
+      cancelled = true;
+      clearTimeout(timer);
+    };
+  }, []);
 
   // Only bruno-live- alarms are triggered by the camera actually going live, so only they say
   // he's live. bruno-session- alarms fire on the clock at his usual time (he's sometimes late),
@@ -43,6 +79,19 @@ export default function AlarmRingingScreen({ alarmId }: { alarmId: string }) {
     }
   }
 
+  async function handleWatchLive() {
+    if (busy) return;
+    success();
+    setBusy(true);
+    try {
+      onWatchLive();
+      await stopRingingAlarm(alarmId);
+      await disableOnceAlarmIfFired(alarmId);
+    } finally {
+      setBusy(false);
+    }
+  }
+
   async function handleSnooze() {
     if (busy) return;
     tapMedium();
@@ -59,7 +108,7 @@ export default function AlarmRingingScreen({ alarmId }: { alarmId: string }) {
       {/* Video fills the entire screen — the ringing take-over IS the video, not a card
           floating inside a UI. Text/buttons sit on solid scrim bands over it, since video
           content isn't theme-aware and can't guarantee contrast against arbitrary footage. */}
-      <VideoPanel allowUnmute={false} alwaysCheckLive={alarmId.startsWith("bruno-live-")} />
+      {startedAt !== null && <AlarmClipVideo startedAt={startedAt} />}
 
       <SafeAreaView style={styles.overlay} edges={["top", "bottom"]}>
         <View style={styles.topScrim}>
@@ -71,6 +120,13 @@ export default function AlarmRingingScreen({ alarmId }: { alarmId: string }) {
         </View>
 
         <View style={styles.bottomScrim}>
+          {brunoLive && (
+            <Touchable style={[styles.liveButton, busy && styles.buttonBusy]} onPress={handleWatchLive} disabled={busy}>
+              <View style={[styles.liveDot, { backgroundColor: colors.live }]} />
+              <Text style={styles.liveButtonText}>Bruno's live — watch</Text>
+            </Touchable>
+          )}
+
           <Touchable style={[styles.stopButton, busy && styles.buttonBusy]} onPress={handleStop} disabled={busy}>
             {busy
               ? <ActivityIndicator color={colors.accentText} />
@@ -137,6 +193,26 @@ function createStyles(colors: ThemeColors) {
       color: colors.accentText,
       fontFamily: fonts.bodyBold,
       fontSize: 18,
+    },
+    liveButton: {
+      width: "100%",
+      flexDirection: "row",
+      paddingVertical: spacing.lg,
+      borderRadius: radius.md + 2,
+      backgroundColor: "rgba(255,255,255,0.92)",
+      alignItems: "center",
+      justifyContent: "center",
+      gap: spacing.sm,
+    },
+    liveDot: {
+      width: 9,
+      height: 9,
+      borderRadius: 5,
+    },
+    liveButtonText: {
+      color: "#111",
+      fontFamily: fonts.bodyBold,
+      fontSize: 16,
     },
     snoozeButton: {
       width: "100%",

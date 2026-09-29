@@ -35,7 +35,7 @@ What a user sees in the app:
   weather preview, clear all alarms).
 
 Status: **Android beta**, being submitted to Google Play (package `com.brunosalarm.app`).
-iOS code paths exist but iOS has never been built or shipped (no `ios/` folder) — see §12 for
+iOS code paths exist but iOS has never been built or shipped (no `ios/` folder) — see §11 for
 the current plan (AlarmKit, cloud builds via EAS).
 
 ---
@@ -425,14 +425,14 @@ logs, Diagnostics, Device IDs; nothing shared; encrypted in transit; deletion vi
    "Turn on" card on Home (`components/HomeScreen.tsx`).
 7. **Unexplained "alarm stopped after ~22 s" report** — investigation deferred by the owner;
    native logging was added so the next occurrence can be diagnosed from logcat.
-8. Deferred by the owner: volume lock as a user setting; iOS release (plan in §12); cleaning up
+8. Deferred by the owner: volume lock as a user setting; iOS release (plan in §11); cleaning up
    the legacy web player code and routes.
 9. Untested on device: tapping Undo was removed (delete is immediate again); the live-alert
    dedupe with a real reconnecting stream; volume-key blocking end to end.
 
 ---
 
-## 12. iOS — current state and plan (discussed 29 Sep, not started)
+## 11. iOS — current state and plan (discussed 29 Sep, not started)
 
 **Status:** Android first. iOS waits until the Android app is launched and stable. Nothing has
 been built for iPhone yet; the owner hasn't yet confirmed an Apple Developer account or an
@@ -489,7 +489,7 @@ react-native-alarmageddon) don't carry over.
 
 ---
 
-## 11. Working style the owner expects
+## 12. Working style the owner expects
 
 - Say what was **verified** (ran it, saw it on the phone, read the logs) versus **assumed**.
   Check real data (logs, recordings, the live API) before explaining a bug.

@@ -35,7 +35,8 @@ What a user sees in the app:
   weather preview, clear all alarms).
 
 Status: **Android beta**, being submitted to Google Play (package `com.brunosalarm.app`).
-iOS code paths exist but iOS has never been built or shipped (no `ios/` folder).
+iOS code paths exist but iOS has never been built or shipped (no `ios/` folder) — see §12 for
+the current plan (AlarmKit, cloud builds via EAS).
 
 ---
 
@@ -424,10 +425,67 @@ logs, Diagnostics, Device IDs; nothing shared; encrypted in transit; deletion vi
    "Turn on" card on Home (`components/HomeScreen.tsx`).
 7. **Unexplained "alarm stopped after ~22 s" report** — investigation deferred by the owner;
    native logging was added so the next occurrence can be diagnosed from logcat.
-8. Deferred by the owner: volume lock as a user setting; iOS release; cleaning up the legacy
-   web player code and routes.
+8. Deferred by the owner: volume lock as a user setting; iOS release (plan in §12); cleaning up
+   the legacy web player code and routes.
 9. Untested on device: tapping Undo was removed (delete is immediate again); the live-alert
    dedupe with a real reconnecting stream; volume-key blocking end to end.
+
+---
+
+## 12. iOS — current state and plan (discussed 29 Sep, not started)
+
+**Status:** Android first. iOS waits until the Android app is launched and stable. Nothing has
+been built for iPhone yet; the owner hasn't yet confirmed an Apple Developer account or an
+iPhone to test on.
+
+**What exists (never run):** `lib/iosAlarmEngine.ts` — the Alarmy-style "keep the app awake"
+trick (near-silent looping background audio keeps the app alive; an in-app timer rings the
+alarm), wired into `lib/notifications.ts` and `lib/customAlarm.ts`, with
+`UIBackgroundModes: ["audio"]` in `app.json`. Background in `mobile/docs/ios-real-alarm.md`;
+five known bugs in `mobile/docs/ios-alarm-issues.md`. Weaknesses: swiping the app away means
+the alarm never rings, battery drain, up to 15 s late, and Apple may reject background-audio
+abuse.
+
+**Recommended direction: replace that with Apple's AlarmKit (iOS 26+).**
+- Real system alarms like the Clock app: ring through silent mode and Focus, work after the app
+  is swiped away or the phone restarts, lock screen + Dynamic Island with Stop/Snooze, custom
+  sound (could be Bruno's latest recording).
+- Limits: iOS 26 and newer only. The alarm UI is Apple's, so **no full-screen Bruno video on
+  the lock screen** — the video shows only when the user taps into the app (biggest difference
+  from Android). Needs a small native Swift module. Verify details (sound length limits, where
+  the sound file must live) against Apple's docs before building.
+- iOS 26 runs on **iPhone 11 and later, and iPhone SE (2nd gen) and later** (it dropped XS, XS
+  Max, XR) — nearly every iPhone in use, once updated.
+
+**Rest of the app on iPhone:** live video easy (HLS is Apple's format); chat easy (Firebase —
+needs `GoogleService-Info.plist`); "Bruno is live" push medium (upload an APNs key to
+Firebase); "Ring when Bruno goes live" hard (iOS won't reliably let a push start an alarm —
+likely a plain notification on iPhone); shared screens/website/legal pages need little. The
+Android-only pieces (lock-screen activity plugin, volume-key block, patched
+react-native-alarmageddon) don't carry over.
+
+**Building without a Mac — Expo EAS Build (cloud Macs):**
+1. One-time: Apple Developer account ($99/yr); `npm install -g eas-cli`; `eas login` (Expo
+   owner `vishnuna123`); `eas build:configure` (creates `eas.json` with an iOS profile);
+   `eas device:create` (link opened on the iPhone registers it for test builds).
+2. `eas build --platform ios` uploads the project; a cloud Mac generates the iOS project from
+   `app.json`, installs pods, compiles with Xcode and signs it (EAS creates/manages Apple
+   certificates after one Apple login). ~15–30 min (longer on the free queue). Install via the
+   link/QR it returns.
+3. Day to day: JS-only changes don't need a rebuild — run `npx expo start` on the PC and the
+   test app on the iPhone reloads over Wi-Fi. Native changes (AlarmKit module, permissions,
+   app.json) need a new cloud build.
+4. Testers / release: `eas submit --platform ios` → App Store Connect → TestFlight for testers,
+   then the App Store listing (screenshots, privacy labels) and Apple review (stricter than
+   Play; chat already has report/block, which Apple requires).
+5. Without a Mac there's no Xcode debugger or iPhone system logs — only the app's own logs and
+   Crashlytics. Native (AlarmKit) bugs mean build-test-guess cycles; renting a cloud Mac for a
+   few hours is the fallback.
+6. Cost: Apple $99/yr; EAS free tier has limited monthly builds and slower queues (check
+   Expo's current pricing).
+
+**Open questions for the owner:** Apple account + iPhone? iOS 26+ only acceptable? Confirm
+"after Android launch".
 
 ---
 

@@ -103,6 +103,17 @@ Contact email used in the app, site and policies: `vishnuna26@gmail.com`.
 - **`functions/.env`**: `CF_WEBHOOK_SECRET` (shared secret Cloudflare sends in the
   `cf-webhook-auth` header), `CF_LIVE_INPUT_UID`.
 
+### Costs (decided 29 Sep: keep as is for now)
+
+- **R2** (the alarm clip): free downloads, ~3 small files stored → pennies. That's why the alarm
+  clip is served from R2 rather than straight from Stream.
+- **Cloudflare Stream** is the real cost: roughly $1 per 1,000 minutes *watched* (live + the
+  5-minute replay — the replay can double or triple watch minutes) and roughly $5 per 1,000
+  minutes *stored* per month (every stream is recorded and kept, tests included). Check
+  Cloudflare's current pricing.
+- Levers if it grows: shorten or drop the replay (`REPLAY_MS` in `screens/LiveScreen.tsx`),
+  auto-delete old recordings (a Live Input setting), use a separate test input.
+
 ---
 
 ## 4. How the Android app works

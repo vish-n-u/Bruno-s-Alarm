@@ -165,7 +165,13 @@ Contact email used in the app, site and policies: `vishnuna26@gmail.com`.
     `components/EditCustomAlarmModal.tsx` (custom scroll-wheel picker that marks Bruno's slots).
 - **Permissions** (`lib/alarmPermissions.ts`): notifications, exact alarms ("Alarms &
   reminders"), full-screen intent. Asked when the user first turns on an alarm, with plain
-  explanations. Onboarding no longer asks for anything.
+  explanations, and **only if actually missing** — normally all three are already granted, so
+  nothing is shown. Onboarding no longer asks for anything.
+  - Full-screen intent (Android 14+) is what puts the ringing screen over the lock screen. Play
+    grants it automatically to apps whose Play Console "Full-screen intent" declaration says
+    *alarm* (that's why Alarmy never asks). Keep that declaration filled in, or Play revokes it
+    and every user would get the "Show alarms over the lock screen" prompt.
+  - `USE_EXACT_ALARM` is likewise auto-granted to declared alarm apps.
 - The patched library auto-stops a ringing alarm after **600 s** and has a volume guard; the
   ringing screen also swallows the hardware volume keys (`plugins/withVolumeKeyBlock.js`).
 
@@ -213,8 +219,12 @@ Contact email used in the app, site and policies: `vishnuna26@gmail.com`.
   and a data push. `lib/liveAlertRinger.ts` (registered at app entry, `index.ts`) turns the
   data push into a real `bruno-live-` alarm via `ringForLiveStart` in `lib/notifications.ts`,
   skipping it if a daily alarm is about to ring anyway or a live alarm just rang.
-- Less reliable than the daily alarm by nature (needs the OS to wake the app for a push);
-  `components/LiveAlarmSetupSheet.tsx` says so and walks through battery settings.
+- Less reliable than the daily alarm by nature (needs the OS to wake the app for a push).
+  `components/LiveAlarmSetupSheet.tsx` is a short sheet (what it is + one line on the catch);
+  its "Turn on" runs `ensureLiveAlarmPermissions()` (`lib/alarmPermissions.ts`): the normal
+  alarm permissions, then — only if the app is battery-restricted (native
+  `isIgnoringBatteryOptimizations`, added by the alarmageddon patch) — offers the app's settings
+  page to set Battery → Unrestricted. Skippable.
 
 ### 4.5 Live chat
 

@@ -18,7 +18,7 @@ index 84502ce..88e3df8 100644
              }
              reactApplicationContext.sendBroadcast(intent)
              promise.resolve(null)
-@@ -85,6 +87,22 @@ class AlarmModule(reactContext: ReactApplicationContext) : ReactContextBaseJavaM
+@@ -85,6 +87,28 @@ class AlarmModule(reactContext: ReactApplicationContext) : ReactContextBaseJavaM
          }
      }
  
@@ -38,10 +38,16 @@ index 84502ce..88e3df8 100644
 +        promise.resolve(ok)
 +    }
 +
++    @ReactMethod
++    fun isIgnoringBatteryOptimizations(promise: Promise) {
++        val power = reactApplicationContext.getSystemService(Context.POWER_SERVICE) as android.os.PowerManager
++        promise.resolve(power.isIgnoringBatteryOptimizations(reactApplicationContext.packageName))
++    }
++
      @ReactMethod
      fun requestPermissions(promise: Promise) {
          val granted = if (Build.VERSION.SDK_INT >= 33) {
-@@ -104,6 +122,7 @@ class AlarmModule(reactContext: ReactApplicationContext) : ReactContextBaseJavaM
+@@ -104,6 +128,7 @@ class AlarmModule(reactContext: ReactApplicationContext) : ReactContextBaseJavaM
              val body = alarm.getString("body") ?: ""
              val snoozeEnabled = if (alarm.hasKey("snoozeEnabled")) alarm.getBoolean("snoozeEnabled") else true
              val snoozeInterval = if (alarm.hasKey("snoozeInterval")) alarm.getInt("snoozeInterval") else 5
@@ -49,7 +55,7 @@ index 84502ce..88e3df8 100644
  
              val sdf = SimpleDateFormat(DATE_PATTERN, Locale.getDefault())
              val date = sdf.parse(datetimeISO) ?: throw Exception("Invalid date format")
-@@ -121,6 +140,7 @@ class AlarmModule(reactContext: ReactApplicationContext) : ReactContextBaseJavaM
+@@ -121,6 +146,7 @@ class AlarmModule(reactContext: ReactApplicationContext) : ReactContextBaseJavaM
                  putExtra("body", body)
                  putExtra("snoozeEnabled", snoozeEnabled)
                  putExtra("snoozeInterval", snoozeInterval)
@@ -57,7 +63,7 @@ index 84502ce..88e3df8 100644
              }
  
              val pendingIntent = PendingIntent.getBroadcast(
-@@ -137,7 +157,7 @@ class AlarmModule(reactContext: ReactApplicationContext) : ReactContextBaseJavaM
+@@ -137,7 +163,7 @@ class AlarmModule(reactContext: ReactApplicationContext) : ReactContextBaseJavaM
                  alarmManager.setExact(AlarmManager.RTC_WAKEUP, triggerAt, pendingIntent)
              }
  
@@ -66,7 +72,7 @@ index 84502ce..88e3df8 100644
              Log.d(TAG, "Scheduled alarm id=$id at=$datetimeISO")
              promise.resolve(null)
          } catch (e: Exception) {
-@@ -186,6 +206,7 @@ class AlarmModule(reactContext: ReactApplicationContext) : ReactContextBaseJavaM
+@@ -186,6 +212,7 @@ class AlarmModule(reactContext: ReactApplicationContext) : ReactContextBaseJavaM
              map.putString("body", obj.optString("body"))
              map.putBoolean("snoozeEnabled", obj.optBoolean("snoozeEnabled", true))
              map.putInt("snoozeInterval", obj.optInt("snoozeInterval", 5))
@@ -74,7 +80,7 @@ index 84502ce..88e3df8 100644
              arr.pushMap(map)
          }
          promise.resolve(arr)
-@@ -232,7 +253,7 @@ class AlarmModule(reactContext: ReactApplicationContext) : ReactContextBaseJavaM
+@@ -232,7 +259,7 @@ class AlarmModule(reactContext: ReactApplicationContext) : ReactContextBaseJavaM
          // Required for NativeEventEmitter
      }
  
@@ -83,7 +89,7 @@ index 84502ce..88e3df8 100644
          val obj = JSONObject()
              .put("id", id)
              .put("datetimeISO", datetimeISO)
-@@ -240,6 +261,7 @@ class AlarmModule(reactContext: ReactApplicationContext) : ReactContextBaseJavaM
+@@ -240,6 +267,7 @@ class AlarmModule(reactContext: ReactApplicationContext) : ReactContextBaseJavaM
              .put("body", body)
              .put("snoozeEnabled", snoozeEnabled)
              .put("snoozeInterval", snoozeInterval)

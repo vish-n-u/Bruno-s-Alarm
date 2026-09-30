@@ -17,6 +17,7 @@ import {
 type NativeChecks = {
   canScheduleExactAlarms?: () => Promise<boolean>;
   canUseFullScreenIntent?: () => Promise<boolean>;
+  isIgnoringBatteryOptimizations?: () => Promise<boolean>;
 };
 const native = NativeModules.AlarmModule as NativeChecks | undefined;
 
@@ -33,6 +34,14 @@ async function canScheduleExactAlarms(): Promise<boolean> {
 async function canUseFullScreenIntent(): Promise<boolean> {
   try {
     return (await native?.canUseFullScreenIntent?.()) ?? true;
+  } catch {
+    return true;
+  }
+}
+
+async function isIgnoringBatteryOptimizations(): Promise<boolean> {
+  try {
+    return (await native?.isIgnoringBatteryOptimizations?.()) ?? true;
   } catch {
     return true;
   }
@@ -94,5 +103,24 @@ export async function ensureAlarmPermissions(): Promise<boolean> {
     if (open) await openFullScreenIntentSettings().catch(() => {});
   }
 
+  return true;
+}
+
+/** Everything the scheduled alarms need, plus one extra for the live alarm: it rings off a push
+ * that has to wake the app, and a battery-restricted app often doesn't get woken. Recommended,
+ * not required — the person can skip it and still turn the live alarm on. */
+export async function ensureLiveAlarmPermissions(): Promise<boolean> {
+  if (!(await ensureAlarmPermissions())) return false;
+  if (Platform.OS !== "android") return true;
+
+  if (!(await isIgnoringBatteryOptimizations())) {
+    const open = await confirm(
+      "Let it run in the background",
+      "So the live alarm can wake your phone when Bruno goes live. On the next screen, tap Battery and choose Unrestricted.",
+      "Open settings",
+      "Skip",
+    );
+    if (open) await openAppSettings().catch(() => {});
+  }
   return true;
 }

@@ -7,8 +7,8 @@ import { disableLiveAlarm, enableLiveAlarm, isLiveAlarmEnabled } from "../lib/li
 import { fonts, radius, spacing, useThemeColors, type ThemeColors } from "../lib/theme";
 
 // Separate from NotifyToggle ("Bruno's daily alarm" = the reliable scheduled alarms). Turning
-// this ON never happens directly — it opens the setup sheet, which states the drawbacks and asks
-// for the permissions first. Turning it OFF is immediate.
+// this ON never happens directly — it opens the setup sheet, which says what it is and asks for
+// the permissions first. Turning it OFF is immediate.
 export default function LiveAlarmToggle() {
   const colors = useThemeColors();
   const styles = createStyles(colors);
@@ -44,11 +44,7 @@ export default function LiveAlarmToggle() {
         </View>
         <View style={styles.textWrap}>
           <Text style={styles.title}>Ring when Bruno goes live</Text>
-          <Text style={styles.subtitle}>
-            {enabled
-              ? "On. Rings whenever he goes live, even off schedule"
-              : "Rings whenever he goes live, even off schedule. Less reliable"}
-          </Text>
+          <Text style={styles.subtitle}>Even when he's off schedule</Text>
         </View>
         <Switch
           value={enabled}

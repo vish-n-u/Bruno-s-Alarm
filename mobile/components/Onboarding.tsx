@@ -6,7 +6,6 @@ import {
   NativeSyntheticEvent,
   StyleSheet,
   Text,
-  TextInput,
   View,
   useWindowDimensions,
   type ScrollView,
@@ -15,21 +14,19 @@ import { Ionicons } from "@expo/vector-icons";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import Touchable from "./Touchable";
 import { tapLight } from "../lib/haptics";
-import { generateGuestName, setDisplayName } from "../lib/profile";
 import { sessionTimesLabel } from "../lib/schedule";
 import { fonts, radius, spacing, useThemeColors, type ThemeColors } from "../lib/theme";
 
-type ImageSlide = { kind: "image"; image: number; title: string; body?: string };
-type IconSlide = { kind: "icon"; icon: keyof typeof Ionicons.glyphMap; title: string; body?: string };
-type NameInputSlide = { kind: "name-input"; title: string; body?: string };
-type Slide = ImageSlide | IconSlide | NameInputSlide;
+type ImageSlide = { kind: "image"; image: number; title: string; body: string };
+type IconSlide = { kind: "icon"; icon: keyof typeof Ionicons.glyphMap; title: string; body: string };
+type Slide = ImageSlide | IconSlide;
 
-// Three facts, each with one short line of personality, and nothing else: he's live twice a
-// day, you can pick your own alarm time (it plays his latest howl), and there's a live chat.
-// Jokes are about Bruno, never about whether the alarm works. The chat slide doubles as the
-// optional display-name input (see lib/chat.ts) — skipping it saves a "GuestNNNN" instead.
-// Keep it this short; permissions are asked for later, when someone actually sets an alarm.
-export default function Onboarding({ onDone }: { onDone: () => void }) {
+// One simple story, main thing first: it's an alarm clock with a real dog → pick any time →
+// and you can catch him live too. (An earlier version led with the live stream and never said
+// it was an alarm, which confused people.) The chat name isn't asked for here — it's asked the
+// first time someone actually sends a chat message (components/ChatTermsGate.tsx). Permissions
+// are asked later too, when someone actually sets an alarm.
+export default function Onboarding({ onDone }: { onDone: (openNewAlarm: boolean) => void }) {
   const colors = useThemeColors();
   const styles = createStyles(colors);
   const { width } = useWindowDimensions();
@@ -39,7 +36,6 @@ export default function Onboarding({ onDone }: { onDone: () => void }) {
   const insets = useSafeAreaInsets();
   const scrollRef = useRef<ScrollView>(null);
   const [index, setIndex] = useState(0);
-  const [nameInput, setNameInput] = useState("");
   // Drives the page dots' width/opacity continuously as you swipe, instead of them snapping
   // between two fixed states only once a page settles — the same "growing pill" feel iOS/
   // Android's own page indicators have.
@@ -52,19 +48,20 @@ export default function Onboarding({ onDone }: { onDone: () => void }) {
       {
         kind: "image",
         image: require("../assets/bruno-photo.jpg"),
-        title: "Bruno howls live, twice a day.",
-        body: `Around ${sessionTimesLabel()}, when the church bell rings. He takes it very seriously.`,
+        title: "An alarm clock with a real dog.",
+        body: "Wake up to Bruno howling. He's a real dog, and his howl is recorded fresh every day.",
       },
       {
         kind: "icon",
         icon: "alarm-outline",
-        title: "Or pick your own time.",
-        body: "Your alarm plays his latest howl. Same enthusiasm, your schedule.",
+        title: "Pick any time.",
+        body: "Your alarm plays his newest howl, and it rings even on silent.",
       },
       {
-        kind: "name-input",
-        title: "Chat while he's live.",
-        body: "Say hi to everyone else a dog just woke up.",
+        kind: "icon",
+        icon: "videocam-outline",
+        title: "Catch him live, too.",
+        body: `Twice a day he howls at a church bell, around ${sessionTimesLabel()}. Watch live and chat with everyone else watching.`,
       },
     ],
     []
@@ -82,22 +79,14 @@ export default function Onboarding({ onDone }: { onDone: () => void }) {
     setIndex(Math.round(e.nativeEvent.contentOffset.x / width));
   }
 
-  // Saved exactly once, at actual completion, rather than per-slide — slides page via a
-  // swipeable ScrollView, so someone could swipe straight past the name slide without ever
-  // tapping its "Next," and this still needs to record a guest name for them either way.
-  async function persistDisplayName() {
-    await setDisplayName(nameInput.trim() || generateGuestName());
-  }
-
-  async function handleDone() {
+  function finish(openNewAlarm: boolean) {
     tapLight();
-    await persistDisplayName();
-    onDone();
+    onDone(openNewAlarm);
   }
 
   return (
     <View style={styles.container}>
-      <Touchable style={[styles.skip, { top: insets.top + spacing.sm }]} onPress={handleDone} hitSlop={12}>
+      <Touchable style={[styles.skip, { top: insets.top + spacing.sm }]} onPress={() => finish(false)} hitSlop={12}>
         <Text style={styles.skipText}>Skip</Text>
       </Touchable>
 
@@ -115,25 +104,11 @@ export default function Onboarding({ onDone }: { onDone: () => void }) {
           <View key={slide.title} style={[styles.slide, { width }]}>
             {slide.kind === "image" ? (
               <Image source={slide.image} style={styles.slideImage} resizeMode="cover" />
-            ) : slide.kind === "icon" ? (
-              <Ionicons name={slide.icon} size={56} color={colors.accent} style={styles.icon} />
             ) : (
-              <Ionicons name="chatbubbles-outline" size={56} color={colors.accent} style={styles.icon} />
+              <Ionicons name={slide.icon} size={56} color={colors.accent} style={styles.icon} />
             )}
             <Text style={styles.title}>{slide.title}</Text>
-            {slide.body && <Text style={styles.body}>{slide.body}</Text>}
-            {slide.kind === "name-input" && (
-              <TextInput
-                value={nameInput}
-                onChangeText={setNameInput}
-                placeholder="Your name in chat (optional)"
-                placeholderTextColor={colors.textSecondary}
-                style={styles.nameInput}
-                maxLength={24}
-                autoCapitalize="words"
-                returnKeyType="done"
-              />
-            )}
+            <Text style={styles.body}>{slide.body}</Text>
           </View>
         ))}
       </Animated.ScrollView>
@@ -157,8 +132,8 @@ export default function Onboarding({ onDone }: { onDone: () => void }) {
 
       <View style={[styles.footer, { paddingBottom: insets.bottom + spacing.xl }]}>
         {isLast ? (
-          <Touchable style={styles.primaryButton} onPress={handleDone}>
-            <Text style={styles.primaryButtonText}>Get started</Text>
+          <Touchable style={styles.primaryButton} onPress={() => finish(true)}>
+            <Text style={styles.primaryButtonText}>Set my first alarm</Text>
           </Touchable>
         ) : (
           <Touchable style={styles.primaryButton} onPress={() => goTo(index + 1)}>
@@ -221,20 +196,6 @@ function createStyles(colors: ThemeColors) {
       fontSize: 15,
       textAlign: "center",
       lineHeight: 22,
-    },
-    nameInput: {
-      marginTop: spacing.xl,
-      width: "100%",
-      paddingVertical: spacing.md,
-      paddingHorizontal: spacing.lg,
-      borderRadius: radius.md,
-      borderWidth: 1,
-      borderColor: colors.border,
-      backgroundColor: colors.surface,
-      color: colors.textPrimary,
-      fontFamily: fonts.body,
-      fontSize: 16,
-      textAlign: "center",
     },
     dots: {
       flexDirection: "row",

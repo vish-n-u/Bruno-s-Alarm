@@ -20,6 +20,7 @@ import { ensureAlarmPermissions } from "../lib/alarmPermissions";
 import { tapLight } from "../lib/haptics";
 import { animateNextLayout } from "../lib/layoutAnim";
 import { isSubscribed, scheduleUpcomingSessions } from "../lib/notifications";
+import { consumeNewAlarmRequest } from "../lib/onboarding";
 import { sessionTimesLabel, todaysSessions } from "../lib/schedule";
 import { fonts, radius, shadow, spacing, useNow, useThemeColors, type ThemeColors } from "../lib/theme";
 import { useWeatherCondition } from "../lib/weather";
@@ -75,6 +76,12 @@ export default function HomeScreen({ navigation }: Props) {
   // Starts true so the card doesn't flash in for a moment before the saved choice loads.
   const [dailyCardDismissed, setDailyCardDismissed] = useState(true);
   const [turningOnDaily, setTurningOnDaily] = useState(false);
+
+  // Onboarding's "Set my first alarm" lands here — open the new-alarm sheet straight away.
+  useEffect(() => {
+    if (consumeNewAlarmRequest()) openNewAlarm();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   useEffect(() => {
     AsyncStorage.getItem(DAILY_ALARM_CARD_DISMISSED_KEY)

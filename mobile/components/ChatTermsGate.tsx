@@ -1,6 +1,8 @@
-import { Modal, Pressable, StyleSheet, Text, View } from "react-native";
+import { useEffect, useState } from "react";
+import { Modal, Pressable, StyleSheet, Text, TextInput, View } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { Ionicons } from "@expo/vector-icons";
+import { getDisplayName, setDisplayName } from "../lib/profile";
 import { fonts, radius, spacing, useThemeColors, type ThemeColors } from "../lib/theme";
 
 const RULES = [
@@ -18,10 +20,27 @@ type Props = {
 // A true one-time gate: shown only right before a device's very first-ever chat send (see
 // hasAcceptedChatTerms()/acceptChatTerms() in lib/chat.ts), never before viewing chat and
 // never again once accepted. Same in-place popup pattern as EditCustomAlarmModal.tsx, not a
-// navigator route.
+// navigator route. It's also where the chat name is asked for — the moment it's actually
+// useful, rather than during onboarding. Skipping it leaves the server's generated
+// "Viewer NNNN" name.
 export default function ChatTermsGate({ visible, onAccept, onCancel }: Props) {
   const colors = useThemeColors();
   const styles = createStyles(colors);
+  const [name, setName] = useState("");
+
+  // Prefill with a name saved earlier (older versions asked for it during onboarding).
+  useEffect(() => {
+    if (!visible) return;
+    getDisplayName()
+      .then((saved) => setName(saved ?? ""))
+      .catch(() => {});
+  }, [visible]);
+
+  async function handleAccept() {
+    const trimmed = name.trim();
+    if (trimmed) await setDisplayName(trimmed).catch(() => {});
+    onAccept();
+  }
 
   return (
     <Modal visible={visible} animationType="slide" transparent onRequestClose={onCancel}>
@@ -33,6 +52,16 @@ export default function ChatTermsGate({ visible, onAccept, onCancel }: Props) {
             <Ionicons name="chatbubble-ellipses-outline" size={22} color={colors.accent} />
             <Text style={styles.title}>Before you chat</Text>
           </View>
+          <TextInput
+            value={name}
+            onChangeText={setName}
+            placeholder="Your name in chat (optional)"
+            placeholderTextColor={colors.textSecondary}
+            style={styles.nameInput}
+            maxLength={24}
+            autoCapitalize="words"
+            returnKeyType="done"
+          />
           <View style={styles.rules}>
             {RULES.map((rule) => (
               <View key={rule} style={styles.ruleRow}>
@@ -41,7 +70,7 @@ export default function ChatTermsGate({ visible, onAccept, onCancel }: Props) {
               </View>
             ))}
           </View>
-          <Pressable style={styles.acceptButton} onPress={onAccept}>
+          <Pressable style={styles.acceptButton} onPress={handleAccept}>
             <Text style={styles.acceptButtonText}>I agree, let me chat</Text>
           </Pressable>
           <Pressable style={styles.cancelButton} onPress={onCancel}>
@@ -87,6 +116,18 @@ function createStyles(colors: ThemeColors) {
       color: colors.textPrimary,
       fontFamily: fonts.displaySemiBold,
       fontSize: 18,
+    },
+    nameInput: {
+      borderWidth: 1,
+      borderColor: colors.border,
+      backgroundColor: colors.surface,
+      borderRadius: radius.md,
+      paddingVertical: spacing.md,
+      paddingHorizontal: spacing.lg,
+      color: colors.textPrimary,
+      fontFamily: fonts.body,
+      fontSize: 15,
+      marginBottom: spacing.lg,
     },
     rules: {
       gap: spacing.md,

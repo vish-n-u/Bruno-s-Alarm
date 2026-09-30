@@ -57,7 +57,7 @@ export default function PrivacyPage() {
           <strong>If you use live chat:</strong> an anonymous device ID (created by Firebase
           Anonymous Authentication, with no name, email, or phone attached), the text of any
           message you send, a display name, and a timestamp. The display name is the nickname
-          you typed during onboarding or, if you skipped that, a generated one like{" "}
+          you typed before your first chat message or, if you skipped that, a generated one like{" "}
           <code>Viewer 4821</code>. Either way it&rsquo;s never linked to your real name. A typed
           nickname is automatically checked and replaced with a generated one if it&rsquo;s
           inappropriate or impersonates staff. These are stored in a shared database (Cloud
@@ -85,7 +85,7 @@ export default function PrivacyPage() {
       <ul>
         <li>Your scheduled alarm times, held by Android&rsquo;s own <code>AlarmManager</code>.</li>
         <li>Whether you&rsquo;ve finished onboarding, and whether you turned on the live alarm.</li>
-        <li>The nickname you optionally typed during onboarding (it&rsquo;s only sent along with a chat message you choose to send).</li>
+        <li>The nickname you optionally typed before your first chat message (it&rsquo;s only sent along with a chat message you choose to send).</li>
         <li>
           Whether you&rsquo;ve accepted live chat&rsquo;s rules, and anyone you&rsquo;ve blocked.
           Blocking is local only: it hides that person&rsquo;s messages on your device, and

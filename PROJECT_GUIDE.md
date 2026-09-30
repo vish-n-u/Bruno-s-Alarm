@@ -27,8 +27,12 @@ What a user sees in the app:
   button to add their own alarm, a gear to Settings. Animated sky that follows the real time of day.
 - **Live tab** — the live camera when Bruno is on, a "NO SIGNAL" test card when he isn't, and a
   live chat overlay during a stream.
-- **Onboarding** (first launch) — three short slides: he's live twice a day; or pick your own
-  time (alarm plays his latest howl); chat while he's live (+ optional chat name).
+- **Onboarding** (first launch) — three short slides telling one story, main thing first:
+  "An alarm clock with a real dog." → "Pick any time." (plays his newest howl, rings on
+  silent) → "Catch him live, too." (his times in the user's timezone, live + chat). Last button
+  "Set my first alarm" opens the new-alarm sheet on Home; Skip just goes to Home. No questions,
+  no permissions. (An earlier version led with the live stream and never said it was an alarm —
+  the owner found it confusing, 30 Sep.)
 - **Settings** — Bruno's daily alarm toggle, "Ring when Bruno goes live" toggle (Android),
   list of scheduled alarms, Privacy/Terms links, version. **Tap "Version" 7× to unlock a hidden
   Debug section** (test alarm in 90s, force-live, preview onboarding, saved-recording status,
@@ -215,8 +219,10 @@ Contact email used in the app, site and policies: `vishnuna26@gmail.com`.
 ### 4.5 Live chat
 
 - `components/LiveChat.tsx` + `lib/chat.ts`. Only shown and subscribed while live.
-- Identity: Firebase **Anonymous Auth** (no accounts). Display name = the onboarding nickname
-  or a generated guest name; the server re-cleans it (`functions/src/chatName.ts`: strips
+- Identity: Firebase **Anonymous Auth** (no accounts). Display name = an optional name typed on
+  the one-time "Before you chat" screen (`components/ChatTermsGate.tsx`, shown before the first
+  message; older versions asked during onboarding and that saved name is kept), otherwise the
+  server's generated "Viewer NNNN"; the server re-cleans it (`functions/src/chatName.ts`: strips
   control chars, collapses spaces, max 24 chars, replaces profane or staff-impersonating names).
 - **Writes only through the `sendChatMessage` Cloud Function**; Firestore rules forbid direct
   client writes. The function enforces: max 200 characters, profanity filter, **1 message per

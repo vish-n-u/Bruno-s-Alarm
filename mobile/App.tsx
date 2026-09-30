@@ -29,7 +29,7 @@ import CustomAlarmScreen from "./screens/CustomAlarmScreen";
 import LiveScreen from "./screens/LiveScreen";
 import BrunosPackScreen from "./screens/BrunosPackScreen";
 import WeatherPreviewScreen from "./screens/WeatherPreviewScreen";
-import { hasOnboarded, markOnboarded } from "./lib/onboarding";
+import { hasOnboarded, markOnboarded, requestNewAlarmOnHome } from "./lib/onboarding";
 import { getActiveRingingAlarm, onAlarmRinging } from "./lib/notifications";
 import { refreshAlarmSoundIfStale, setAlarmRinging } from "./lib/alarmSound";
 import { migrateAlarmSoundPathsOnce } from "./lib/alarmSoundMigration";
@@ -190,8 +190,9 @@ export default function App() {
     }
   }, [fontsLoaded, screen]);
 
-  async function completeOnboarding() {
+  async function completeOnboarding(openNewAlarm: boolean) {
     await markOnboarded();
+    if (openNewAlarm) requestNewAlarmOnHome();
     setScreen("home");
   }
 

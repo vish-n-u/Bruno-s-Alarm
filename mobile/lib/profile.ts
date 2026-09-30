@@ -1,8 +1,9 @@
 import AsyncStorage from "@react-native-async-storage/async-storage";
 
-// The name collected during onboarding. Stored on the phone, and sent along with each chat
-// message (see lib/chat.ts) to be shown next to it. Kept separate from lib/onboarding.ts's
-// "have they seen onboarding" flag since it's a different concern.
+// The chat name — asked for on the one-time "Before you chat" screen (components/
+// ChatTermsGate.tsx; older versions asked during onboarding). Stored on the phone, and sent
+// along with each chat message (see lib/chat.ts) to be shown next to it. If none is saved, the
+// server shows a generated "Viewer NNNN" name.
 const KEY = "bruno-display-name";
 
 export async function getDisplayName(): Promise<string | null> {

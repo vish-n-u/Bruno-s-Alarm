@@ -1,7 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import {
   ActivityIndicator,
-  Alert,
   Animated,
   Modal,
   Pressable,
@@ -14,6 +13,7 @@ import {
   type NativeSyntheticEvent,
   type NativeScrollEvent,
 } from "react-native";
+import { showDialog } from "../lib/dialog";
 import { SafeAreaView } from "react-native-safe-area-context";
 import Touchable from "./Touchable";
 import { ensureAlarmPermissions } from "../lib/alarmPermissions";
@@ -339,7 +339,12 @@ export default function EditCustomAlarmModal({ visible, alarmId, onClose, onSave
     if (saving) return;
 
     if (repeatMode === "custom" && customDays.length === 0) {
-      Alert.alert("Pick at least one day", "Choose which days this alarm should repeat on.");
+      showDialog({
+        icon: "calendar-outline",
+        title: "Pick at least one day",
+        body: "Choose which days it repeats on.",
+        buttons: [{ label: "OK", style: "primary" }],
+      });
       return;
     }
 

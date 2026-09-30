@@ -167,9 +167,10 @@ Contact email used in the app, site and policies: `vishnuna26@gmail.com`.
   reminders"), full-screen intent. Asked when the user first turns on an alarm, with plain
   explanations, and **only if actually missing** — normally all three are already granted, so
   nothing is shown. Onboarding no longer asks for anything.
-  - The dialogs are the app's own, not system Alerts: `askPermission()` in
-    `lib/permissionPrompt.ts`, rendered by `components/PermissionPromptHost.tsx` (mounted once in
-    `App.tsx`). Each is a looping illustration (`components/PermissionIllustration.tsx`: a mini
+  - The dialogs are the app's own, not system Alerts: `askPermission()` in `lib/dialog.ts`,
+    rendered by `components/AppDialogHost.tsx` (mounted once in `App.tsx`). **Every** user-facing
+    pop-up in the app goes through `showDialog()` there (chat Report/Block menu, "Clear all
+    alarms?", "Pick at least one day"); only debug tools still use `Alert`. Each is a looping illustration (`components/PermissionIllustration.tsx`: a mini
     switch flips on, then the payoff — e.g. Bruno filling a locked phone) + a title + one short
     line (+ "1 of 2" when chained) — the owner wants these as short as possible. Copy for
     every prompt lives in `PROMPTS` in `lib/alarmPermissions.ts`.

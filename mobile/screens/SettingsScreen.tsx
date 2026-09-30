@@ -1,5 +1,6 @@
 import { useCallback, useState } from "react";
 import { Alert, Linking, Platform, ScrollView, StyleSheet, Text, View } from "react-native";
+import { showDialog } from "../lib/dialog";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { Ionicons } from "@expo/vector-icons";
 import { useFocusEffect } from "@react-navigation/native";
@@ -160,13 +161,13 @@ export default function SettingsScreen({ navigation }: Props) {
   useFocusEffect(refreshAlarms);
 
   function handleClearAll() {
-    Alert.alert(
-      "Clear all scheduled alarms?",
-      "Cancels every alarm: real sessions, your custom alarm, and any leftover test alarms. You'll need to re-subscribe/re-enable afterward.",
-      [
-        { text: "Cancel", style: "cancel" },
+    showDialog({
+      icon: "trash-outline",
+      title: "Clear all alarms?",
+      body: "Every scheduled alarm is cancelled. You'll need to turn them back on.",
+      buttons: [
         {
-          text: "Clear all",
+          label: "Clear all",
           style: "destructive",
           onPress: async () => {
             warning();
@@ -174,8 +175,9 @@ export default function SettingsScreen({ navigation }: Props) {
             refreshAlarms();
           },
         },
-      ]
-    );
+        { label: "Cancel", style: "cancel" },
+      ],
+    });
   }
 
   const groups: { kind: ScheduledAlarmKind; items: ScheduledAlarmSummary[] }[] = (

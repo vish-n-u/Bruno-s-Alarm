@@ -1,7 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 import {
   ActivityIndicator,
-  Alert,
   FlatList,
   KeyboardAvoidingView,
   Platform,
@@ -11,6 +10,7 @@ import {
   TextInput,
   View,
 } from "react-native";
+import { showDialog } from "../lib/dialog";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { Ionicons } from "@expo/vector-icons";
 import LottieView from "lottie-react-native";
@@ -145,18 +145,22 @@ export default function BrunosPackScreen() {
   }
 
   function handleMessageLongPress(message: ChatMessage) {
-    Alert.alert(message.displayName, undefined, [
-      { text: "Report message", onPress: () => setReportTarget(message) },
-      {
-        text: "Block this viewer",
-        style: "destructive",
-        onPress: () => {
-          blockDevice(message.deviceId).catch(() => {});
-          setBlockedIds((prev) => [...prev, message.deviceId]);
+    showDialog({
+      icon: "person-circle-outline",
+      title: message.displayName,
+      buttons: [
+        { label: "Report message", onPress: () => setReportTarget(message) },
+        {
+          label: "Block this viewer",
+          style: "destructive",
+          onPress: () => {
+            blockDevice(message.deviceId).catch(() => {});
+            setBlockedIds((prev) => [...prev, message.deviceId]);
+          },
         },
-      },
-      { text: "Cancel", style: "cancel" },
-    ]);
+        { label: "Cancel", style: "cancel" },
+      ],
+    });
   }
 
   async function handleConfirmReport(reason: string) {

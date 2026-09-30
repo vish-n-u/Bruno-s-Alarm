@@ -5,13 +5,13 @@ import {
   openFullScreenIntentSettings,
   requestPermission,
 } from "./notifications";
-import { askPermission, type PermissionPrompt } from "./permissionPrompt";
+import { askPermission, type PermissionPrompt } from "./dialog";
 
 // One place that asks for everything an alarm needs, at the moment the person actually tries to
 // set one (saving/enabling a custom alarm, turning on the daily alarm or the live alarm) —
 // instead of a permissions page in Settings they'd have to know to visit. Only asks about what's
 // still missing, so once everything is granted it's silent. The dialogs are the app's own
-// (lib/permissionPrompt.ts), each followed by the phone's settings page for that one switch.
+// (lib/dialog.ts), each followed by the phone's settings page for that one switch.
 //
 // The native checks below are methods added to react-native-alarmageddon by
 // patches/react-native-alarmageddon+*.patch (the library itself only checks notifications).

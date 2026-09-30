@@ -1,7 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 import {
   ActivityIndicator,
-  Alert,
   FlatList,
   Keyboard,
   Platform,
@@ -11,6 +10,7 @@ import {
   TextInput,
   View,
 } from "react-native";
+import { showDialog } from "../lib/dialog";
 import { Ionicons } from "@expo/vector-icons";
 import ChatTermsGate from "./ChatTermsGate";
 import ReportMessageModal from "./ReportMessageModal";
@@ -172,18 +172,22 @@ export default function LiveChat({ sessionId, live }: Props) {
   }
 
   function handleMessageLongPress(message: ChatMessage) {
-    Alert.alert(message.displayName, undefined, [
-      { text: "Report message", onPress: () => setReportTarget(message) },
-      {
-        text: "Block this viewer",
-        style: "destructive",
-        onPress: () => {
-          blockDevice(message.deviceId).catch(() => {});
-          setBlockedIds((prev) => [...prev, message.deviceId]);
+    showDialog({
+      icon: "person-circle-outline",
+      title: message.displayName,
+      buttons: [
+        { label: "Report message", onPress: () => setReportTarget(message) },
+        {
+          label: "Block this viewer",
+          style: "destructive",
+          onPress: () => {
+            blockDevice(message.deviceId).catch(() => {});
+            setBlockedIds((prev) => [...prev, message.deviceId]);
+          },
         },
-      },
-      { text: "Cancel", style: "cancel" },
-    ]);
+        { label: "Cancel", style: "cancel" },
+      ],
+    });
   }
 
   async function handleConfirmReport(reason: string) {

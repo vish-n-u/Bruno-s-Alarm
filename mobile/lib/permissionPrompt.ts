@@ -9,10 +9,6 @@ export type PermissionPrompt = {
   icon: keyof typeof Ionicons.glyphMap;
   title: string;
   body: string;
-  /** What to tap on the phone's settings screen, in order. */
-  steps?: string[];
-  /** Small print under the steps, e.g. a different name some phones use. */
-  stepsNote?: string;
   /** "1 of 2" when several settings are asked for in a row. */
   progress?: string;
   confirmLabel: string;

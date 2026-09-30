@@ -3,18 +3,12 @@ import { ActivityIndicator, Modal, Pressable, StyleSheet, Text, View } from "rea
 import { SafeAreaView } from "react-native-safe-area-context";
 import { Ionicons } from "@expo/vector-icons";
 import Touchable from "./Touchable";
-import {
-  ALARM_SETTING_LABELS,
-  ensureLiveAlarmPermissions,
-  missingLiveAlarmSettings,
-  type AlarmSetting,
-} from "../lib/alarmPermissions";
+import { ensureLiveAlarmPermissions } from "../lib/alarmPermissions";
 import { tapLight } from "../lib/haptics";
 import { fonts, radius, spacing, useThemeColors, type ThemeColors } from "../lib/theme";
 
-// Shown before the Live alarm can be switched on: what it does, the one honest catch, and which
-// phone settings it'll ask for next. "Turn it on" then walks through only those
-// (lib/alarmPermissions.ts, one app-styled dialog each).
+// Shown before the Live alarm can be switched on — one line on what it does. "Turn it on" then
+// asks for whatever settings are still missing (lib/alarmPermissions.ts, one dialog each).
 type Props = {
   visible: boolean;
   onConfirm: () => Promise<void>;
@@ -26,12 +20,9 @@ export default function LiveAlarmSetupSheet({ visible, onConfirm, onCancel }: Pr
   const styles = createStyles(colors);
   const [busy, setBusy] = useState(false);
   const [blocked, setBlocked] = useState(false);
-  const [needs, setNeeds] = useState<AlarmSetting[]>([]);
 
   useEffect(() => {
-    if (!visible) return;
-    setBlocked(false);
-    missingLiveAlarmSettings().then(setNeeds);
+    if (visible) setBlocked(false);
   }, [visible]);
 
   async function handleTurnOn() {
@@ -61,30 +52,11 @@ export default function LiveAlarmSetupSheet({ visible, onConfirm, onCancel }: Pr
             <Ionicons name="flash" size={22} color={colors.accent} />
           </View>
           <Text style={styles.title}>Ring when Bruno goes live</Text>
-          <Text style={styles.body}>
-            Bruno doesn't always keep to his schedule. Turn this on and your phone rings the moment
-            he's on camera, day or night.
-          </Text>
-          <Text style={styles.note}>
-            It depends on your phone waking the app, so now and then it may ring a little late. Your
-            daily alarm doesn't rely on this.
-          </Text>
-
-          {needs.length > 0 && (
-            <View style={styles.needsBox}>
-              <Text style={styles.needsLabel}>You'll be asked to allow</Text>
-              {needs.map((need) => (
-                <View key={need} style={styles.needRow}>
-                  <Ionicons name={ALARM_SETTING_LABELS[need].icon} size={18} color={colors.accent} />
-                  <Text style={styles.needText}>{ALARM_SETTING_LABELS[need].label}</Text>
-                </View>
-              ))}
-            </View>
-          )}
+          <Text style={styles.body}>Your phone rings the moment he's on camera, day or night.</Text>
 
           {blocked && (
             <Text style={styles.blockedText}>
-              It can't ring without notifications and exact alarms. Allow both, then try again.
+              Allow notifications and alarms, then try again.
             </Text>
           )}
 
@@ -156,40 +128,7 @@ function createStyles(colors: ThemeColors) {
       fontFamily: fonts.body,
       fontSize: 15,
       lineHeight: 21,
-      marginBottom: spacing.sm,
-    },
-    note: {
-      color: colors.textSecondary,
-      fontFamily: fonts.body,
-      fontSize: 13,
-      lineHeight: 18,
-      marginBottom: spacing.lg,
-    },
-    needsBox: {
-      backgroundColor: colors.surface,
-      borderColor: colors.border,
-      borderWidth: 1,
-      borderRadius: radius.lg,
-      padding: spacing.md,
-      gap: spacing.sm,
-      marginBottom: spacing.lg,
-    },
-    needsLabel: {
-      color: colors.textSecondary,
-      fontFamily: fonts.bodyMedium,
-      fontSize: 11,
-      letterSpacing: 1,
-      textTransform: "uppercase",
-    },
-    needRow: {
-      flexDirection: "row",
-      alignItems: "center",
-      gap: spacing.sm,
-    },
-    needText: {
-      color: colors.textPrimary,
-      fontFamily: fonts.bodyMedium,
-      fontSize: 14,
+      marginBottom: spacing.xl,
     },
     blockedText: {
       color: colors.danger,

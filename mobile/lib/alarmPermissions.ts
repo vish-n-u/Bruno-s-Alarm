@@ -29,49 +29,35 @@ export type AlarmSetting = "exactAlarms" | "lockScreen" | "background";
 const DAILY_SETTINGS: AlarmSetting[] = ["exactAlarms", "lockScreen"];
 const LIVE_SETTINGS: AlarmSetting[] = ["exactAlarms", "lockScreen", "background"];
 
-/** Short names for a checklist, e.g. the live alarm sheet's "you'll be asked to allow". */
-export const ALARM_SETTING_LABELS: Record<AlarmSetting, { icon: PermissionPrompt["icon"]; label: string }> = {
-  exactAlarms: { icon: "alarm-outline", label: "Ring at the exact minute" },
-  lockScreen: { icon: "phone-portrait-outline", label: "Show on the lock screen" },
-  background: { icon: "battery-charging-outline", label: "Wake up in the background" },
-};
-
 const NOTIFICATIONS_PROMPT: PermissionPrompt = {
   icon: "notifications-off-outline",
-  title: "Notifications are off",
-  body: "Every Bruno alarm rings through a notification, so with them off, nothing can ring. Switch them on and come back.",
-  steps: ["Notifications", "Allow notifications"],
+  title: "Turn on notifications",
+  body: "Bruno can't ring without them.",
   confirmLabel: "Open settings",
   cancelLabel: "Cancel",
 };
 
+// exactAlarms is required (an alarm that can't fire on time is worse than none); the other two
+// are recommended and skippable.
 const PROMPTS: Record<AlarmSetting, PermissionPrompt> = {
-  // Required: an alarm that can't fire on time is worse than none.
   exactAlarms: {
     icon: "alarm-outline",
-    title: "Let Bruno ring on time",
-    body: "Android asks before any app can ring at an exact minute. Without it, your alarm could go off late.",
-    steps: ["Allow setting alarms and reminders"],
+    title: "Allow alarms",
+    body: "So Bruno rings right on time.",
     confirmLabel: "Open settings",
     cancelLabel: "Cancel",
   },
-  // Recommended: without it the alarm still rings, but as a plain notification.
   lockScreen: {
     icon: "phone-portrait-outline",
-    title: "Show Bruno on your lock screen",
-    body: "So he fills your screen, howling, when the alarm goes off. Skip it and it still rings, you'll just see a notification.",
-    steps: ["Allow full screen notifications"],
+    title: "Show on lock screen",
+    body: "So Bruno fills your screen when he rings.",
     confirmLabel: "Open settings",
     cancelLabel: "Not now",
   },
-  // Recommended, live alarm only: it rings off a push, and a battery-restricted app often isn't
-  // woken for one.
   background: {
     icon: "battery-charging-outline",
-    title: "Let the app wake up",
-    body: "Your phone is keeping Bruno's Alarm asleep to save battery, so it might sleep through Bruno going live.",
-    steps: ["Battery", "Unrestricted"],
-    stepsNote: "Some phones call it “Allow background activity”.",
+    title: "Allow background activity",
+    body: "So the app wakes up when Bruno goes live.",
     confirmLabel: "Open settings",
     cancelLabel: "Skip",
   },
@@ -108,11 +94,6 @@ async function missing(settings: AlarmSetting[]): Promise<AlarmSetting[]> {
   if (Platform.OS !== "android") return [];
   const allowed = await Promise.all(settings.map(isAllowed));
   return settings.filter((_, i) => !allowed[i]);
-}
-
-/** What the live alarm would still ask for, without asking. */
-export function missingLiveAlarmSettings(): Promise<AlarmSetting[]> {
-  return missing(LIVE_SETTINGS);
 }
 
 async function ensure(settings: AlarmSetting[]): Promise<boolean> {

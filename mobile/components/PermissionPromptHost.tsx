@@ -1,4 +1,4 @@
-import { Fragment, useEffect, useState } from "react";
+import { useEffect, useState } from "react";
 import { Modal, Pressable, StyleSheet, Text, View } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import Touchable from "./Touchable";
@@ -43,20 +43,6 @@ export default function PermissionPromptHost() {
             <Text style={styles.title}>{prompt.title}</Text>
             <Text style={styles.body}>{prompt.body}</Text>
 
-            {prompt.steps && prompt.steps.length > 0 && (
-              <View style={styles.stepsBox}>
-                <Text style={styles.stepsLabel}>In settings, tap</Text>
-                <View style={styles.stepsRow}>
-                  {prompt.steps.map((step, i) => (
-                    <Fragment key={step}>
-                      {i > 0 && <Ionicons name="chevron-forward" size={14} color={colors.textSecondary} />}
-                      <Text style={styles.step}>{step}</Text>
-                    </Fragment>
-                  ))}
-                </View>
-                {prompt.stepsNote && <Text style={styles.stepsNote}>{prompt.stepsNote}</Text>}
-              </View>
-            )}
 
             <Touchable style={styles.primaryButton} onPress={() => close(true)}>
               <Text style={styles.primaryButtonText}>{prompt.confirmLabel}</Text>
@@ -120,39 +106,7 @@ function createStyles(colors: ThemeColors) {
       fontFamily: fonts.body,
       fontSize: 15,
       lineHeight: 21,
-      marginBottom: spacing.lg,
-    },
-    stepsBox: {
-      backgroundColor: colors.surfaceAlt,
-      borderRadius: radius.md,
-      padding: spacing.md,
-      gap: spacing.xs,
       marginBottom: spacing.xl,
-    },
-    stepsLabel: {
-      color: colors.textSecondary,
-      fontFamily: fonts.bodyMedium,
-      fontSize: 11,
-      letterSpacing: 1,
-      textTransform: "uppercase",
-    },
-    stepsRow: {
-      flexDirection: "row",
-      flexWrap: "wrap",
-      alignItems: "center",
-      gap: spacing.xs,
-    },
-    step: {
-      color: colors.textPrimary,
-      fontFamily: fonts.monoBold,
-      fontSize: 14,
-    },
-    stepsNote: {
-      color: colors.textSecondary,
-      fontFamily: fonts.body,
-      fontSize: 12,
-      lineHeight: 17,
-      marginTop: spacing.xs,
     },
     primaryButton: {
       paddingVertical: spacing.lg - 2,

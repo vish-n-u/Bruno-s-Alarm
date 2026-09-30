@@ -24,6 +24,7 @@ import { Ionicons } from "@expo/vector-icons";
 import Onboarding from "./components/Onboarding";
 import HomeScreen from "./components/HomeScreen";
 import AlarmRingingScreen from "./components/AlarmRingingScreen";
+import PermissionPromptHost from "./components/PermissionPromptHost";
 import SettingsScreen from "./screens/SettingsScreen";
 import CustomAlarmScreen from "./screens/CustomAlarmScreen";
 import LiveScreen from "./screens/LiveScreen";
@@ -274,6 +275,7 @@ export default function App() {
           </Tab.Navigator>
         </NavigationContainer>
       ) : null}
+      <PermissionPromptHost />
     </SafeAreaProvider>
   );
 }

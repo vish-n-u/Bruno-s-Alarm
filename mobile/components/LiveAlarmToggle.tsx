@@ -44,7 +44,7 @@ export default function LiveAlarmToggle() {
         </View>
         <View style={styles.textWrap}>
           <Text style={styles.title}>Ring when Bruno goes live</Text>
-          <Text style={styles.subtitle}>Even when he's off schedule</Text>
+          <Text style={styles.subtitle}>Rings the moment he's on camera</Text>
         </View>
         <Switch
           value={enabled}

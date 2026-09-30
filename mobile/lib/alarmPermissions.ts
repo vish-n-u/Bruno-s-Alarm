@@ -1,17 +1,19 @@
-import { Alert, NativeModules, Platform } from "react-native";
+import { NativeModules, Platform } from "react-native";
 import {
   openAlarmPermissionSettings,
   openAppSettings,
   openFullScreenIntentSettings,
   requestPermission,
 } from "./notifications";
+import { askPermission, type PermissionPrompt } from "./permissionPrompt";
 
 // One place that asks for everything an alarm needs, at the moment the person actually tries to
-// set one (saving/enabling a custom alarm, turning on the 6AM/6PM alarm) — instead of a
-// permissions page in Settings they'd have to know to visit. Only asks about what's still
-// missing, so once everything is granted it's silent.
+// set one (saving/enabling a custom alarm, turning on the daily alarm or the live alarm) —
+// instead of a permissions page in Settings they'd have to know to visit. Only asks about what's
+// still missing, so once everything is granted it's silent. The dialogs are the app's own
+// (lib/permissionPrompt.ts), each followed by the phone's settings page for that one switch.
 //
-// The two checks below are native methods added to react-native-alarmageddon by
+// The native checks below are methods added to react-native-alarmageddon by
 // patches/react-native-alarmageddon+*.patch (the library itself only checks notifications).
 
 type NativeChecks = {
@@ -21,106 +23,127 @@ type NativeChecks = {
 };
 const native = NativeModules.AlarmModule as NativeChecks | undefined;
 
+/** The settings (beyond notifications) an alarm can need. */
+export type AlarmSetting = "exactAlarms" | "lockScreen" | "background";
+
+const DAILY_SETTINGS: AlarmSetting[] = ["exactAlarms", "lockScreen"];
+const LIVE_SETTINGS: AlarmSetting[] = ["exactAlarms", "lockScreen", "background"];
+
+/** Short names for a checklist, e.g. the live alarm sheet's "you'll be asked to allow". */
+export const ALARM_SETTING_LABELS: Record<AlarmSetting, { icon: PermissionPrompt["icon"]; label: string }> = {
+  exactAlarms: { icon: "alarm-outline", label: "Ring at the exact minute" },
+  lockScreen: { icon: "phone-portrait-outline", label: "Show on the lock screen" },
+  background: { icon: "battery-charging-outline", label: "Wake up in the background" },
+};
+
+const NOTIFICATIONS_PROMPT: PermissionPrompt = {
+  icon: "notifications-off-outline",
+  title: "Notifications are off",
+  body: "Every Bruno alarm rings through a notification, so with them off, nothing can ring. Switch them on and come back.",
+  steps: ["Notifications", "Allow notifications"],
+  confirmLabel: "Open settings",
+  cancelLabel: "Cancel",
+};
+
+const PROMPTS: Record<AlarmSetting, PermissionPrompt> = {
+  // Required: an alarm that can't fire on time is worse than none.
+  exactAlarms: {
+    icon: "alarm-outline",
+    title: "Let Bruno ring on time",
+    body: "Android asks before any app can ring at an exact minute. Without it, your alarm could go off late.",
+    steps: ["Allow setting alarms and reminders"],
+    confirmLabel: "Open settings",
+    cancelLabel: "Cancel",
+  },
+  // Recommended: without it the alarm still rings, but as a plain notification.
+  lockScreen: {
+    icon: "phone-portrait-outline",
+    title: "Show Bruno on your lock screen",
+    body: "So he fills your screen, howling, when the alarm goes off. Skip it and it still rings, you'll just see a notification.",
+    steps: ["Allow full screen notifications"],
+    confirmLabel: "Open settings",
+    cancelLabel: "Not now",
+  },
+  // Recommended, live alarm only: it rings off a push, and a battery-restricted app often isn't
+  // woken for one.
+  background: {
+    icon: "battery-charging-outline",
+    title: "Let the app wake up",
+    body: "Your phone is keeping Bruno's Alarm asleep to save battery, so it might sleep through Bruno going live.",
+    steps: ["Battery", "Unrestricted"],
+    stepsNote: "Some phones call it “Allow background activity”.",
+    confirmLabel: "Open settings",
+    cancelLabel: "Skip",
+  },
+};
+
+const OPEN: Record<AlarmSetting, () => Promise<void>> = {
+  exactAlarms: openAlarmPermissionSettings,
+  lockScreen: openFullScreenIntentSettings,
+  background: openAppSettings,
+};
+
 // A failed/absent check is treated as "fine" — better to let the alarm be set than to block
 // someone on a check that couldn't run.
-async function canScheduleExactAlarms(): Promise<boolean> {
+async function check(fn: (() => Promise<boolean>) | undefined): Promise<boolean> {
   try {
-    return (await native?.canScheduleExactAlarms?.()) ?? true;
+    return (await fn?.()) ?? true;
   } catch {
     return true;
   }
 }
 
-async function canUseFullScreenIntent(): Promise<boolean> {
-  try {
-    return (await native?.canUseFullScreenIntent?.()) ?? true;
-  } catch {
-    return true;
+function isAllowed(setting: AlarmSetting): Promise<boolean> {
+  switch (setting) {
+    case "exactAlarms":
+      return check(native?.canScheduleExactAlarms);
+    case "lockScreen":
+      return check(native?.canUseFullScreenIntent);
+    case "background":
+      return check(native?.isIgnoringBatteryOptimizations);
   }
 }
 
-async function isIgnoringBatteryOptimizations(): Promise<boolean> {
-  try {
-    return (await native?.isIgnoringBatteryOptimizations?.()) ?? true;
-  } catch {
-    return true;
-  }
+async function missing(settings: AlarmSetting[]): Promise<AlarmSetting[]> {
+  if (Platform.OS !== "android") return [];
+  const allowed = await Promise.all(settings.map(isAllowed));
+  return settings.filter((_, i) => !allowed[i]);
 }
 
-function confirm(title: string, message: string, actionLabel: string, cancelLabel: string): Promise<boolean> {
-  return new Promise((resolve) => {
-    Alert.alert(
-      title,
-      message,
-      [
-        { text: cancelLabel, style: "cancel", onPress: () => resolve(false) },
-        { text: actionLabel, onPress: () => resolve(true) },
-      ],
-      { cancelable: true, onDismiss: () => resolve(false) },
-    );
-  });
+/** What the live alarm would still ask for, without asking. */
+export function missingLiveAlarmSettings(): Promise<AlarmSetting[]> {
+  return missing(LIVE_SETTINGS);
 }
 
-/** Resolves true when the alarm can be set. False means something required is still off and the
- * person was told what and offered the settings page — callers should just not proceed.
- *
- * Required: notifications, exact alarms (an alarm that can't fire on time is worse than none).
- * Recommended only: full-screen alerts (without it the alarm still rings, but shows as a plain
- * notification, not the full ringing screen, over the lock screen). */
-export async function ensureAlarmPermissions(): Promise<boolean> {
+async function ensure(settings: AlarmSetting[]): Promise<boolean> {
   if (Platform.OS !== "android") return requestPermission();
 
   if (!(await requestPermission())) {
-    const open = await confirm(
-      "Allow notifications",
-      "Bruno's Alarm needs notifications to ring your alarm. Turn them on for this app in your phone's settings.",
-      "Open settings",
-      "Cancel",
-    );
-    if (open) await openAppSettings().catch(() => {});
-    return false;
+    if (!(await askPermission(NOTIFICATIONS_PROMPT))) return false;
+    await openAppSettings().catch(() => {});
+    if (!(await requestPermission())) return false;
   }
 
-  if (!(await canScheduleExactAlarms())) {
-    const open = await confirm(
-      "Allow exact alarms",
-      "Without this your alarm can't ring on time. On the next screen, turn on \"Alarms & reminders\" for Bruno's Alarm, then come back.",
-      "Open settings",
-      "Cancel",
-    );
-    if (!open) return false;
-    await openAlarmPermissionSettings().catch(() => {});
-    if (!(await canScheduleExactAlarms())) return false;
+  const todo = await missing(settings);
+  for (let i = 0; i < todo.length; i++) {
+    const setting = todo[i];
+    const progress = todo.length > 1 ? `${i + 1} of ${todo.length}` : undefined;
+    const open = await askPermission({ ...PROMPTS[setting], progress });
+    if (open) await OPEN[setting]().catch(() => {});
+    if (setting === "exactAlarms" && !(await isAllowed(setting))) return false;
   }
-
-  if (!(await canUseFullScreenIntent())) {
-    const open = await confirm(
-      "Show alarms over the lock screen",
-      "Turn this on so the alarm and Bruno's video appear when your phone is locked. Without it the alarm still rings, but you'll only see a notification.",
-      "Open settings",
-      "Not now",
-    );
-    if (open) await openFullScreenIntentSettings().catch(() => {});
-  }
-
   return true;
 }
 
-/** Everything the scheduled alarms need, plus one extra for the live alarm: it rings off a push
- * that has to wake the app, and a battery-restricted app often doesn't get woken. Recommended,
- * not required — the person can skip it and still turn the live alarm on. */
-export async function ensureLiveAlarmPermissions(): Promise<boolean> {
-  if (!(await ensureAlarmPermissions())) return false;
-  if (Platform.OS !== "android") return true;
+/** Resolves true when the alarm can be set. False means something required (notifications,
+ * exact alarms) is still off and the person was told what and offered the settings page —
+ * callers should just not proceed. The lock-screen setting is recommended only. */
+export function ensureAlarmPermissions(): Promise<boolean> {
+  return ensure(DAILY_SETTINGS);
+}
 
-  if (!(await isIgnoringBatteryOptimizations())) {
-    const open = await confirm(
-      "Let it run in the background",
-      "So the live alarm can wake your phone when Bruno goes live. On the next screen, tap Battery and choose Unrestricted.",
-      "Open settings",
-      "Skip",
-    );
-    if (open) await openAppSettings().catch(() => {});
-  }
-  return true;
+/** Same as ensureAlarmPermissions, plus (recommended, skippable) letting the app run in the
+ * background — the live alarm rings off a push that has to wake the app. */
+export function ensureLiveAlarmPermissions(): Promise<boolean> {
+  return ensure(LIVE_SETTINGS);
 }

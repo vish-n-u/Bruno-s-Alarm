@@ -167,6 +167,10 @@ Contact email used in the app, site and policies: `vishnuna26@gmail.com`.
   reminders"), full-screen intent. Asked when the user first turns on an alarm, with plain
   explanations, and **only if actually missing** — normally all three are already granted, so
   nothing is shown. Onboarding no longer asks for anything.
+  - The dialogs are the app's own, not system Alerts: `askPermission()` in
+    `lib/permissionPrompt.ts`, rendered by `components/PermissionPromptHost.tsx` (mounted once in
+    `App.tsx`). Each shows what to tap in the phone's settings and "1 of 2" when chained. Copy for
+    every prompt lives in `PROMPTS` in `lib/alarmPermissions.ts`.
   - Full-screen intent (Android 14+) is what puts the ringing screen over the lock screen. Play
     grants it automatically to apps whose Play Console "Full-screen intent" declaration says
     *alarm* (that's why Alarmy never asks). Keep that declaration filled in, or Play revokes it
@@ -220,7 +224,8 @@ Contact email used in the app, site and policies: `vishnuna26@gmail.com`.
   data push into a real `bruno-live-` alarm via `ringForLiveStart` in `lib/notifications.ts`,
   skipping it if a daily alarm is about to ring anyway or a live alarm just rang.
 - Less reliable than the daily alarm by nature (needs the OS to wake the app for a push).
-  `components/LiveAlarmSetupSheet.tsx` is a short sheet (what it is + one line on the catch);
+  `components/LiveAlarmSetupSheet.tsx` is a short sheet (what it is, one line on the catch, and
+  a checklist of the settings still missing, from `missingLiveAlarmSettings()`);
   its "Turn on" runs `ensureLiveAlarmPermissions()` (`lib/alarmPermissions.ts`): the normal
   alarm permissions, then — only if the app is battery-restricted (native
   `isIgnoringBatteryOptimizations`, added by the alarmageddon patch) — offers the app's settings

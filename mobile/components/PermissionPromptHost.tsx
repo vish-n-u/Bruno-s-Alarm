@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { Modal, Pressable, StyleSheet, Text, View } from "react-native";
-import { Ionicons } from "@expo/vector-icons";
+import PermissionIllustration from "./PermissionIllustration";
 import Touchable from "./Touchable";
 import { tapLight } from "../lib/haptics";
 import { registerPermissionPromptHost, type PendingPrompt } from "../lib/permissionPrompt";
@@ -33,16 +33,11 @@ export default function PermissionPromptHost() {
         <Pressable style={StyleSheet.absoluteFill} onPress={() => close(false)} />
         {prompt && (
           <View style={styles.card}>
-            <View style={styles.topRow}>
-              <View style={styles.iconChip}>
-                <Ionicons name={prompt.icon} size={22} color={colors.accent} />
-              </View>
-              {prompt.progress && <Text style={styles.progress}>{prompt.progress}</Text>}
-            </View>
+            {prompt.progress && <Text style={styles.progress}>{prompt.progress}</Text>}
+            <PermissionIllustration kind={prompt.illustration} />
 
             <Text style={styles.title}>{prompt.title}</Text>
             <Text style={styles.body}>{prompt.body}</Text>
-
 
             <Touchable style={styles.primaryButton} onPress={() => close(true)}>
               <Text style={styles.primaryButtonText}>{prompt.confirmLabel}</Text>
@@ -73,26 +68,14 @@ function createStyles(colors: ThemeColors) {
       padding: spacing.xl,
       ...shadow,
     },
-    topRow: {
-      flexDirection: "row",
-      alignItems: "center",
-      justifyContent: "space-between",
-      marginBottom: spacing.lg,
-    },
-    iconChip: {
-      width: 44,
-      height: 44,
-      borderRadius: radius.md,
-      backgroundColor: colors.accentBg,
-      alignItems: "center",
-      justifyContent: "center",
-    },
     progress: {
       color: colors.textSecondary,
       fontFamily: fonts.monoBold,
       fontSize: 13,
       letterSpacing: 1,
       textTransform: "uppercase",
+      textAlign: "right",
+      marginBottom: spacing.sm,
     },
     title: {
       color: colors.textPrimary,

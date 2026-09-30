@@ -1,12 +1,13 @@
 import { Alert } from "react-native";
-import type { Ionicons } from "@expo/vector-icons";
+import type { PermissionIllustrationKind } from "../components/PermissionIllustration";
 
 // The app's own "we need a setting" dialog, styled like the rest of the app instead of the grey
 // system Alert. lib/alarmPermissions.ts calls askPermission() from plain async code; the single
 // <PermissionPromptHost /> mounted in App.tsx renders it.
 
 export type PermissionPrompt = {
-  icon: keyof typeof Ionicons.glyphMap;
+  /** The looping picture at the top (components/PermissionIllustration.tsx). */
+  illustration: PermissionIllustrationKind;
   title: string;
   body: string;
   /** "1 of 2" when several settings are asked for in a row. */

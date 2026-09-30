@@ -30,7 +30,7 @@ const DAILY_SETTINGS: AlarmSetting[] = ["exactAlarms", "lockScreen"];
 const LIVE_SETTINGS: AlarmSetting[] = ["exactAlarms", "lockScreen", "background"];
 
 const NOTIFICATIONS_PROMPT: PermissionPrompt = {
-  icon: "notifications-off-outline",
+  illustration: "notifications",
   title: "Turn on notifications",
   body: "Bruno can't ring without them.",
   confirmLabel: "Open settings",
@@ -41,21 +41,21 @@ const NOTIFICATIONS_PROMPT: PermissionPrompt = {
 // are recommended and skippable.
 const PROMPTS: Record<AlarmSetting, PermissionPrompt> = {
   exactAlarms: {
-    icon: "alarm-outline",
+    illustration: "exactAlarms",
     title: "Allow alarms",
     body: "So Bruno rings right on time.",
     confirmLabel: "Open settings",
     cancelLabel: "Cancel",
   },
   lockScreen: {
-    icon: "phone-portrait-outline",
+    illustration: "lockScreen",
     title: "Show on lock screen",
     body: "So Bruno fills your screen when he rings.",
     confirmLabel: "Open settings",
     cancelLabel: "Not now",
   },
   background: {
-    icon: "battery-charging-outline",
+    illustration: "background",
     title: "Allow background activity",
     body: "So the app wakes up when Bruno goes live.",
     confirmLabel: "Open settings",

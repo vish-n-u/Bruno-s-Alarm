@@ -455,7 +455,7 @@ logs, Diagnostics, Device IDs; nothing shared; encrypted in transit; deletion vi
 
 ---
 
-## 11. iOS — current state and plan (discussed 29 Sep, not started)
+## 11. iOS — current state and plan (discussed 29 Sep–1 Oct, not started)
 
 **Status:** Android first. iOS waits until the Android app is launched and stable. Nothing has
 been built for iPhone yet; the owner hasn't yet confirmed an Apple Developer account or an
@@ -507,8 +507,34 @@ react-native-alarmageddon) don't carry over.
 6. Cost: Apple $99/yr; EAS free tier has limited monthly builds and slower queues (check
    Expo's current pricing).
 
-**Open questions for the owner:** Apple account + iPhone? iOS 26+ only acceptable? Confirm
-"after Android launch".
+**Owner decisions (1 Oct):** Android first, iOS after. iOS 26+ only is fine. Test device:
+iPhone 15. Apple Developer account not bought yet.
+
+**Alarmy tested on the owner's iPhone 15, iOS 26 (1 Oct)** — the model for our iOS build:
+- First launch asks Apple's AlarmKit permission ("Allow … to schedule alarms and timers? … even
+  if a Focus is active"), plus notifications (and ad tracking — not relevant to us, no ads).
+- **Rang with the app swiped away, in Do Not Disturb and on silent.** AlarmKit is reliable.
+- Ringing screen is **Apple's**: alarm title ("Wake up early"), big time, app name, "slide to
+  stop". No custom screen/video. (No snooze shown — Alarmy's choice; AlarmKit allows one extra
+  button, e.g. Snooze or "Watch Bruno" opening the app — verify.)
+- Volume rose gradually ("Gentle wake-up") even with the app swiped away — unclear whether
+  AlarmKit fades in or the sound file itself does. Not needed for us.
+- Swiping Alarmy away triggers its notification "Open Alarmy again — If app is closed, only
+  basic sound rings". We could copy this nag.
+
+**The fresh-howl problem on iOS:** with the app closed, iOS plays the alarm sound itself from a
+file named in advance — either in the app bundle (fixed until an app update) or in
+`Library/Sounds` (where a downloaded daily howl would go). Apple documents `Library/Sounds` as
+supported, but developers report it's **ignored (falls back to the default sound)** — Apple
+Developer Forums thread 798140, FB19779004, filed Aug 2025, still open Feb 2026. Likely why
+Alarmy plays "only basic sound" when closed.
+- **First thing to test in the first iOS build** (before building the rest): download a howl
+  into `Library/Sounds`, schedule an AlarmKit alarm with it, swipe the app away, see what plays.
+- Works → fresh howl daily, same as Android.
+- Still broken → fallback: the alarm rings with a **bundled** Bruno howl; tapping it opens the
+  app, which plays today's fresh howl + video; if the app is still alive in the background it
+  plays the fresh howl itself; each app update can bundle a newer howl.
+- The owner wants the fresh howl, so this test decides the iOS sound design.
 
 ---
 

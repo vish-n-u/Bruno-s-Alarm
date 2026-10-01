@@ -461,6 +461,9 @@ logs, Diagnostics, Device IDs; nothing shared; encrypted in transit; deletion vi
 been built for iPhone yet; the owner hasn't yet confirmed an Apple Developer account or an
 iPhone to test on.
 
+**iPhone work in progress lives on the `ios` git branch** (AlarmKit module, iOS alarm path; not
+merged, never built) — its copy of this section has the details. Below is the state of `main`.
+
 **What exists (never run):** `lib/iosAlarmEngine.ts` — the Alarmy-style "keep the app awake"
 trick (near-silent looping background audio keeps the app alive; an in-app timer rings the
 alarm), wired into `lib/notifications.ts` and `lib/customAlarm.ts`, with

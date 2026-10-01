@@ -6,12 +6,16 @@ import RNAlarmModule, { type AlarmSubscription } from "react-native-alarmageddon
 import { getAlarmSoundFilePath, refreshAlarmSound } from "./alarmSound";
 import { toAlarmDatetime } from "./alarmDateTime";
 import {
-  armIOSBackgroundAlarms,
-  getIOSActiveRingingAlarm,
-  onIOSAlarmRinging,
-  snoozeIOSRingingAlarm,
-  stopIOSRingingAlarm,
-} from "./iosAlarmEngine";
+  cancelAllIOSAlarms,
+  cancelIOSAlarmsWithPrefix,
+  getAlertingIOSAlarm,
+  getIOSAlarmSoundName,
+  listIOSAlarms,
+  onIOSAlarmAlerting,
+  scheduleIOSAlarm,
+  snoozeIOSAlarm,
+  stopIOSAlarm,
+} from "./iosAlarms";
 import { isLiveAlarmEnabled } from "./liveAlerts";
 import { nextSessions } from "./schedule";
 
@@ -22,8 +26,9 @@ const SESSIONS_TO_SCHEDULE = 14; // ~1 week of 6AM/6PM sessions
 const SNOOZE_MINUTES = 10;
 const ANDROID_PACKAGE_NAME = "com.brunosalarm.app"; // matches app.json's android.package
 
-// --- iOS: unchanged best-effort local notifications. A true alarm on iOS needs the
-// background-audio-session approach — see mobile/docs/ios-real-alarm.md (deferred). ---
+// --- iOS: real alarms through Apple's AlarmKit (lib/iosAlarms.ts, iOS 26+). expo-notifications
+// stays for ordinary notifications (e.g. the "Bruno is live" push) and to clear notifications
+// left scheduled by older iPhone builds. ---
 Notifications.setNotificationHandler({
   handleNotification: async () => ({
     shouldShowBanner: true,
@@ -44,8 +49,17 @@ export async function isSubscribed(): Promise<boolean> {
     const alarms = await RNAlarmModule.listAlarms();
     return alarms.some((a) => a.id.startsWith(ID_PREFIX));
   }
-  const scheduled = await Notifications.getAllScheduledNotificationsAsync();
-  return scheduled.some((n) => n.identifier.startsWith(ID_PREFIX));
+  return (await listIOSAlarms()).some((a) => a.id.startsWith(ID_PREFIX));
+}
+
+/** Older iPhone builds scheduled plain notifications; clear any matching the prefix. */
+async function clearLegacyIOSNotifications(prefix: string): Promise<void> {
+  const scheduled = await Notifications.getAllScheduledNotificationsAsync().catch(() => []);
+  await Promise.all(
+    scheduled
+      .filter((n) => n.identifier.startsWith(prefix))
+      .map((n) => Notifications.cancelScheduledNotificationAsync(n.identifier).catch(() => {}))
+  );
 }
 
 async function clearScheduled(): Promise<void> {
@@ -56,13 +70,8 @@ async function clearScheduled(): Promise<void> {
     );
     return;
   }
-  const scheduled = await Notifications.getAllScheduledNotificationsAsync();
-  await Promise.all(
-    scheduled
-      .filter((n) => n.identifier.startsWith(ID_PREFIX))
-      .map((n) => Notifications.cancelScheduledNotificationAsync(n.identifier))
-  );
-  await armIOSBackgroundAlarms("session", []);
+  await cancelIOSAlarmsWithPrefix(ID_PREFIX);
+  await clearLegacyIOSNotifications(ID_PREFIX);
 }
 
 // Scheduled session alarms fire on the clock, not when the camera actually goes live (he's
@@ -75,9 +84,9 @@ const LIVE_TITLE = "🐕 Bruno is live!";
 /** Schedules the next batch of session notifications, replacing any previously scheduled. */
 export async function scheduleUpcomingSessions(): Promise<void> {
   await clearScheduled();
-  // Best-effort refresh of Bruno's latest real recording — used as the guaranteed alarm
-  // sound on Android (its own native MediaPlayer) and iOS (lib/iosAlarmEngine.ts's ringing
-  // player) alike. Never blocks scheduling if it's unconfigured, offline, or fails.
+  // Best-effort refresh of Bruno's latest real recording — the alarm sound on Android (its own
+  // native MediaPlayer), and on iPhone when the downloaded-howl switch is on (lib/iosAlarms.ts).
+  // Never blocks scheduling if it's unconfigured, offline, or fails.
   await refreshAlarmSound();
 
   if (Platform.OS === "android") {
@@ -96,28 +105,10 @@ export async function scheduleUpcomingSessions(): Promise<void> {
     return;
   }
 
-  const timestamps = nextSessions(SESSIONS_TO_SCHEDULE);
-  for (const timestamp of timestamps) {
-    await Notifications.scheduleNotificationAsync({
-      identifier: `${ID_PREFIX}${timestamp}`,
-      content: {
-        title: SESSION_TITLE,
-        body: SESSION_BODY,
-        sound: true,
-      },
-      trigger: {
-        type: Notifications.SchedulableTriggerInputTypes.DATE,
-        date: new Date(timestamp),
-      },
-    });
+  const soundName = await getIOSAlarmSoundName();
+  for (const timestamp of nextSessions(SESSIONS_TO_SCHEDULE)) {
+    await scheduleIOSAlarm({ id: `${ID_PREFIX}${timestamp}`, title: SESSION_TITLE, timestamp, soundName });
   }
-  // Additive companion to the notification above, not a replacement — see
-  // docs/ios-real-alarm.md. This is what actually gives sessions a shot at ringing through
-  // silent mode/lock screen, via the background-audio-session mechanism.
-  await armIOSBackgroundAlarms(
-    "session",
-    timestamps.map((timestamp) => ({ id: `${ID_PREFIX}${timestamp}`, timestamp, title: SESSION_TITLE, body: SESSION_BODY }))
-  );
 }
 
 export async function unsubscribe(): Promise<void> {
@@ -125,8 +116,14 @@ export async function unsubscribe(): Promise<void> {
 }
 
 /** TEMPORARY test hook — schedules one real alarm ~90s out via the exact same path as a
- * real session, for on-device testing without waiting for 6AM/6PM. Android only. */
+ * real session, for on-device testing without waiting for 6AM/6PM. */
 export async function scheduleTestAlarmSoon(): Promise<void> {
+  if (Platform.OS === "ios") {
+    await cancelIOSAlarmsWithPrefix(TEST_PREFIX);
+    const timestamp = Date.now() + 90000;
+    await scheduleIOSAlarm({ id: `${TEST_PREFIX}${timestamp}`, title: "🐕 TEST ALARM", timestamp, soundName: await getIOSAlarmSoundName() });
+    return;
+  }
   if (Platform.OS !== "android") return;
   const existing = await RNAlarmModule.listAlarms();
   await Promise.all(
@@ -193,11 +190,11 @@ export async function ringForLiveStart(): Promise<void> {
 
 /** Subscribes to the alarm actually ringing right now (or stopping) — drives the in-app
  * "ringing" screen, since the notification shade may not be reachable while the app is
- * full-screen over the lock screen (Android) or the background-audio engine is what's
- * actually firing it (iOS; see lib/iosAlarmEngine.ts). */
+ * full-screen over the lock screen (Android), or iOS's own alarm screen is showing (AlarmKit;
+ * the app shows Bruno's video once opened). */
 export function onAlarmRinging(callback: (alarmId: string | null) => void): AlarmSubscription | null {
   if (Platform.OS === "android") return RNAlarmModule.onAlarmStateChange(callback);
-  return onIOSAlarmRinging(callback);
+  return onIOSAlarmAlerting(callback);
 }
 
 /** Whether an alarm is already ringing right this moment, checked once on app startup — this
@@ -209,18 +206,18 @@ export async function getActiveRingingAlarm(): Promise<string | null> {
     const active = await RNAlarmModule.getCurrentAlarmPlaying();
     return active?.activeAlarmId ?? null;
   }
-  return getIOSActiveRingingAlarm();
+  return getAlertingIOSAlarm();
 }
 
 export async function stopRingingAlarm(alarmId: string): Promise<void> {
   if (Platform.OS === "android") await RNAlarmModule.stopCurrentAlarm(alarmId);
-  else await stopIOSRingingAlarm(alarmId);
+  else await stopIOSAlarm(alarmId);
   AsyncStorage.removeItem(`${SNOOZED_UNTIL_PREFIX}${alarmId}`).catch(() => {});
 }
 
 export async function snoozeRingingAlarm(alarmId: string): Promise<void> {
   if (Platform.OS === "android") await RNAlarmModule.snoozeCurrentAlarm(alarmId, SNOOZE_MINUTES);
-  else await snoozeIOSRingingAlarm(alarmId);
+  else await snoozeIOSAlarm(alarmId);
   // A snoozed alarm rings again under the same id, so its id no longer says when it started.
   AsyncStorage.setItem(`${SNOOZED_UNTIL_PREFIX}${alarmId}`, String(Date.now() + SNOOZE_MINUTES * 60000)).catch(() => {});
 }
@@ -299,16 +296,8 @@ export async function getAllScheduledAlarms(): Promise<ScheduledAlarmSummary[]> 
       }))
       .sort((a, b) => a.timestamp - b.timestamp);
   }
-  const scheduled = await Notifications.getAllScheduledNotificationsAsync();
-  return scheduled
-    .map((n) => {
-      const trigger = n.trigger as { type?: string; value?: number; date?: number | Date } | null;
-      const timestamp =
-        trigger?.type === "date" && trigger.date
-          ? new Date(trigger.date).getTime()
-          : (trigger?.value ?? NaN);
-      return { id: n.identifier, timestamp, kind: classifyAlarmId(n.identifier) };
-    })
+  return (await listIOSAlarms())
+    .map((a) => ({ id: a.id, timestamp: a.timestamp ?? NaN, kind: classifyAlarmId(a.id) }))
     .sort((a, b) => a.timestamp - b.timestamp);
 }
 
@@ -321,8 +310,8 @@ export async function cancelAllScheduledAlarms(): Promise<void> {
     await Promise.all(alarms.map((a) => RNAlarmModule.cancelAlarm(a.id)));
     return;
   }
-  const scheduled = await Notifications.getAllScheduledNotificationsAsync();
-  await Promise.all(scheduled.map((n) => Notifications.cancelScheduledNotificationAsync(n.identifier)));
+  await cancelAllIOSAlarms();
+  await clearLegacyIOSNotifications("");
 }
 
 export async function requestPermission(): Promise<boolean> {

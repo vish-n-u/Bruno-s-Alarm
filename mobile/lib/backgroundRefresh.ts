@@ -20,14 +20,13 @@ TaskManager.defineTask(TASK_NAME, async () => {
   }
 });
 
-/** Registers the periodic background refresh — Android only, since the guaranteed native
- * alarm sound (and its soundPath override) is an Android-only mechanism; there's nothing
- * for this task to keep fresh on iOS. Safe to call on every app launch — registering an
- * already-registered task is a no-op. Best-effort: the OS doesn't guarantee background
+/** Registers the periodic background refresh. Safe to call on every app launch — registering
+ * an already-registered task is a no-op. Best-effort: the OS doesn't guarantee background
  * execution on every device (OEM battery management can throttle it further), this only
- * improves on the schedule-time-only refresh, it doesn't replace it. */
+ * improves on the schedule-time-only refresh, it doesn't replace it. On iPhone it runs only
+ * when iOS chooses to, and a new recording reaches alarms through lib/iosAlarmResync.ts. */
 export async function registerBackgroundAlarmSoundRefresh(): Promise<void> {
-  if (Platform.OS !== "android") return;
+  if (Platform.OS !== "android" && Platform.OS !== "ios") return;
   try {
     await BackgroundTask.registerTaskAsync(TASK_NAME, { minimumInterval: 15 });
   } catch {

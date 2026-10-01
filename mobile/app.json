@@ -11,9 +11,7 @@
       "supportsTablet": true,
       "bundleIdentifier": "com.brunosalarm.app",
       "infoPlist": {
-        "UIBackgroundModes": [
-          "audio"
-        ]
+        "NSAlarmKitUsageDescription": "Bruno's Alarm rings your alarms, even on silent or in a Focus."
       }
     },
     "android": {
@@ -58,6 +56,7 @@
       "./plugins/withVolumeKeyBlock",
       "./plugins/withIPv4GradleFix",
       "./plugins/withAlarmSound",
+      "./plugins/withIOSAlarmSound",
       "./plugins/withReleaseSigning",
       "expo-video",
       "expo-font",

@@ -1,8 +1,7 @@
 import { createAudioPlayer, type AudioPlayer } from "expo-audio";
 
 // One-shot UI sound effects — separate from lib/alarmSound.ts (the guaranteed native alarm
-// clip) and lib/iosAlarmEngine.ts (the background keep-alive/ringing players). These are short,
-// bundled, fire-and-forget confirmation sounds, same expo-audio player API those already use.
+// clip). These are short, bundled, fire-and-forget confirmation sounds.
 
 let deletePlayer: AudioPlayer | null = null;
 

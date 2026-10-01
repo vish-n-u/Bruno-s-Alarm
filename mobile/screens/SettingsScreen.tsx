@@ -1,4 +1,4 @@
-import { useCallback, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { Alert, Linking, Platform, ScrollView, StyleSheet, Text, View } from "react-native";
 import { showDialog } from "../lib/dialog";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
@@ -19,6 +19,9 @@ import {
   type ScheduledAlarmSummary,
 } from "../lib/notifications";
 import { describeSavedRecording, getCachedAlarmSoundPath, refreshAlarmSound } from "../lib/alarmSound";
+import { ensureAlarmPermissions } from "../lib/alarmPermissions";
+import { rescheduleIOSAlarmsForSound } from "../lib/iosAlarmResync";
+import { getIOSUseDownloadedSound, setIOSUseDownloadedSound } from "../lib/iosSoundPref";
 import { success, tapLight, warning } from "../lib/haptics";
 import { animateNextLayout } from "../lib/layoutAnim";
 import { setDebugForceLive } from "../lib/schedule";
@@ -121,6 +124,7 @@ export default function SettingsScreen({ navigation }: Props) {
   const styles = createStyles(colors);
   const insets = useSafeAreaInsets();
   const [forcingLive, setForcingLive] = useState(false);
+  const [iosDownloadedHowl, setIOSDownloadedHowl] = useState(false);
   const [alarms, setAlarms] = useState<ScheduledAlarmSummary[]>([]);
   // The Debug section's own copy claims these tools aren't visible to real users — that was
   // only true in wording, not in practice, since every build (including what testers install
@@ -159,6 +163,10 @@ export default function SettingsScreen({ navigation }: Props) {
   // reflects whatever just changed (subscribed/unsubscribed, set a custom alarm, ran a
   // debug test) without needing a manual pull-to-refresh.
   useFocusEffect(refreshAlarms);
+
+  useEffect(() => {
+    if (Platform.OS === "ios") getIOSUseDownloadedSound().then(setIOSDownloadedHowl);
+  }, []);
 
   function handleClearAll() {
     showDialog({
@@ -346,6 +354,57 @@ export default function SettingsScreen({ navigation }: Props) {
                 >
                   <Text style={styles.consoleText}>&gt; run background sound refresh now</Text>
                 </Touchable>
+                <Touchable
+                  style={styles.consoleRow}
+                  onPress={async () => {
+                    tapLight();
+                    Alert.alert("Saved recording", await describeSavedRecording());
+                  }}
+                >
+                  <Text style={styles.consoleText}>&gt; saved recording status</Text>
+                </Touchable>
+              </>
+            )}
+            {Platform.OS === "ios" && (
+              <>
+                <View style={styles.rowDivider} />
+                <Touchable
+                  style={styles.consoleRow}
+                  onPress={async () => {
+                    tapLight();
+                    if (!(await ensureAlarmPermissions())) return;
+                    await scheduleTestAlarmSoon();
+                    refreshAlarms();
+                    Alert.alert("Test alarm set", "Rings in ~90 seconds. Swipe the app away, lock the phone, try silent/Focus.");
+                  }}
+                >
+                  <Text style={styles.consoleText}>&gt; test alarm in 90s</Text>
+                </Touchable>
+                <View style={styles.rowDivider} />
+                <Touchable
+                  style={styles.consoleRow}
+                  onPress={async () => {
+                    // The Library/Sounds test (PROJECT_GUIDE.md §11): switch to the downloaded
+                    // howl, set a test alarm, swipe the app away — does Bruno's latest play, or
+                    // iOS's default sound?
+                    tapLight();
+                    const next = !iosDownloadedHowl;
+                    await setIOSUseDownloadedSound(next);
+                    setIOSDownloadedHowl(next);
+                    await refreshAlarmSound();
+                    await rescheduleIOSAlarmsForSound();
+                    refreshAlarms();
+                    Alert.alert(
+                      next ? "Using the downloaded howl" : "Using the built-in howl",
+                      (await describeSavedRecording()) + "\n\nAlarms rescheduled. Set a test alarm to hear it."
+                    );
+                  }}
+                >
+                  <Text style={styles.consoleText}>
+                    {iosDownloadedHowl ? "> howl: downloaded (tap for built-in)" : "> howl: built-in (tap for downloaded)"}
+                  </Text>
+                </Touchable>
+                <View style={styles.rowDivider} />
                 <Touchable
                   style={styles.consoleRow}
                   onPress={async () => {

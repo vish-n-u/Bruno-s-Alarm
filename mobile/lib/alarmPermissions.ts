@@ -1,11 +1,12 @@
-import { NativeModules, Platform } from "react-native";
+import { Linking, NativeModules, Platform } from "react-native";
 import {
   openAlarmPermissionSettings,
   openAppSettings,
   openFullScreenIntentSettings,
   requestPermission,
 } from "./notifications";
-import { askPermission, type PermissionPrompt } from "./dialog";
+import { askPermission, showDialog, type PermissionPrompt } from "./dialog";
+import { iosAlarmsSupported, requestIOSAlarmAuthorization } from "./iosAlarms";
 
 // One place that asks for everything an alarm needs, at the moment the person actually tries to
 // set one (saving/enabling a custom alarm, turning on the daily alarm or the live alarm) —
@@ -96,7 +97,34 @@ async function missing(settings: AlarmSetting[]): Promise<AlarmSetting[]> {
   return settings.filter((_, i) => !allowed[i]);
 }
 
+/** iPhone: AlarmKit permission is what lets an alarm ring (through silent mode and Focus).
+ * Notifications are only for extras like the "Bruno is live" alert, so they're asked for but
+ * never block an alarm. */
+async function ensureIOS(): Promise<boolean> {
+  await requestPermission().catch(() => false);
+  if (!iosAlarmsSupported()) {
+    await showDialog({
+      illustration: "exactAlarms",
+      title: "Update your iPhone",
+      body: "Bruno's alarms need iOS 26 or newer.",
+      buttons: [{ label: "OK", style: "primary" }],
+    });
+    return false;
+  }
+  if (await requestIOSAlarmAuthorization()) return true;
+  const open = await askPermission({
+    illustration: "exactAlarms",
+    title: "Allow alarms",
+    body: "Bruno can't ring without it.",
+    confirmLabel: "Open settings",
+    cancelLabel: "Cancel",
+  });
+  if (open) await Linking.openSettings().catch(() => {});
+  return false;
+}
+
 async function ensure(settings: AlarmSetting[]): Promise<boolean> {
+  if (Platform.OS === "ios") return ensureIOS();
   if (Platform.OS !== "android") return requestPermission();
 
   if (!(await requestPermission())) {

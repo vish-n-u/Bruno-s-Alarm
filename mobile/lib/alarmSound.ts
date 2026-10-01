@@ -4,6 +4,8 @@ import AsyncStorage from "@react-native-async-storage/async-storage";
 // what this file uses (simple imperative file ops, no need for the new API's File/Directory
 // classes).
 import * as FileSystem from "expo-file-system/legacy";
+import { Platform } from "react-native";
+import { getIOSUseDownloadedSound } from "./iosSoundPref";
 import { fetchLatestRecording } from "./latestRecording";
 import { startsNearSession } from "./schedule";
 
@@ -81,6 +83,9 @@ export function getAlarmSoundFilePath(): string {
  * saved recording if it's on the phone (the same check the native player makes), otherwise
  * undefined — meaning the built-in howl, whose matching video is the bundled clip. */
 export async function getAlarmClipVideoUri(): Promise<string | undefined> {
+  // iPhone alarms ring with the built-in howl unless the downloaded-howl switch is on
+  // (lib/iosSoundPref.ts), so show the built-in clip to match.
+  if (Platform.OS === "ios" && !(await getIOSUseDownloadedSound())) return undefined;
   const info = await FileSystem.getInfoAsync(FINAL_PATH);
   return info.exists ? FINAL_PATH : undefined;
 }
@@ -108,6 +113,15 @@ async function removeInvalidSavedRecording(): Promise<void> {
   } else if (!info.exists && record) {
     await AsyncStorage.removeItem(CACHE_KEY);
   }
+}
+
+/** The saved recording and when it was recorded, if one is on the phone. Used on iPhone to
+ * convert it into an alarm sound once per recording (lib/iosAlarms.ts). */
+export async function getSavedRecording(): Promise<{ uri: string; recordedAt: string } | undefined> {
+  const record = await getCacheRecord();
+  if (!record) return undefined;
+  const info = await FileSystem.getInfoAsync(record.path);
+  return info.exists ? { uri: record.path, recordedAt: record.recordedAt } : undefined;
 }
 
 /** The cached recording as a file:// URI, suitable for expo-video (unlike

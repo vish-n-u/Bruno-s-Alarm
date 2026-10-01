@@ -461,13 +461,39 @@ logs, Diagnostics, Device IDs; nothing shared; encrypted in transit; deletion vi
 been built for iPhone yet; the owner hasn't yet confirmed an Apple Developer account or an
 iPhone to test on.
 
-**What exists (never run):** `lib/iosAlarmEngine.ts` — the Alarmy-style "keep the app awake"
-trick (near-silent looping background audio keeps the app alive; an in-app timer rings the
-alarm), wired into `lib/notifications.ts` and `lib/customAlarm.ts`, with
-`UIBackgroundModes: ["audio"]` in `app.json`. Background in `mobile/docs/ios-real-alarm.md`;
-five known bugs in `mobile/docs/ios-alarm-issues.md`. Weaknesses: swiping the app away means
-the alarm never rings, battery drain, up to 15 s late, and Apple may reject background-audio
-abuse.
+**Work in progress on the `ios` git branch (started 1 Oct; NOT merged to `main`, never built):**
+- `mobile/modules/bruno-alarmkit/` — local Expo module (iPhone-only: `expo-module.config.json`
+  platforms `["apple"]`, so Android autolinking ignores it — verified). Swift
+  (`ios/BrunoAlarmKitModule.swift`): AlarmKit authorization, schedule (fixed time, title, sound
+  name, snooze minutes), cancel/stop/snooze(countdown)/list, `onAlarmsChanged` event from
+  `alarmUpdates`, and `prepareSound()` (recording MP4 → first 30 s → 16-bit PCM `.caf` in
+  `Library/Sounds`). Keeps a UUID → app-id map in UserDefaults. Written without a Mac against
+  WWDC/docs — **expect small compile fixes on the first EAS build** (e.g. the
+  `AlarmPresentation.Alert` init: the 26.0 form with `stopButton:` is used).
+- `lib/iosAlarms.ts` (JS wrapper), `lib/iosSoundPref.ts` (downloaded-howl switch, off by
+  default), `lib/iosAlarmResync.ts` (reschedules alarms when a new recording arrives, only with
+  the switch on). iOS branches of `lib/notifications.ts`, `lib/customAlarm.ts`,
+  `lib/alarmPermissions.ts` (AlarmKit permission; "Update your iPhone" below iOS 26) now use it;
+  Android branches untouched. Custom alarms use the same 14-occurrence batch as Android.
+- Built-in howl for iPhone: `assets/audio/bruno_alarm.caf` (same clip as Android's
+  `alarm_default.mp3`), added to the app bundle by `plugins/withIOSAlarmSound.js` (iOS-only).
+- `app.json`: `NSAlarmKitUsageDescription`; background-audio mode removed. `eas.json`: iOS
+  device builds, `image: latest`. Background howl refresh also registered on iOS.
+- Removed the old keep-awake engine (`lib/iosAlarmEngine.ts`, `keep_alive_silence.mp3`).
+- Hidden debug section (iPhone): test alarm in 90 s, built-in/downloaded howl switch (the
+  Library/Sounds test), saved recording status.
+- Verified on the branch: `tsc` clean; Android autolinking excludes the module; Android
+  release build succeeds.
+- **Blocked on the owner:** Apple Developer account; Firebase iPhone app +
+  `GoogleService-Info.plist` (`expo config` fails without it — set `ios.googleServicesFile`);
+  APNs key uploaded to Firebase. Not done yet: iPhone versions of the permission
+  illustrations, hiding "Ring when Bruno goes live" fully on iPhone (already Android-only),
+  privacy manifest, legal pages, store listing.
+- Open questions to verify on device: snooze countdown without a widget extension (Apple
+  recommends a Live Activity widget for countdown UI); any limit on how many alarms AlarmKit
+  holds (we schedule 14 sessions + 14 per custom alarm); whether the Library/Sounds bug is fixed.
+- Older docs `mobile/docs/ios-real-alarm.md` / `ios-alarm-issues.md` describe the removed
+  keep-awake approach.
 
 **Recommended direction: replace that with Apple's AlarmKit (iOS 26+).**
 - Real system alarms like the Clock app: ring through silent mode and Focus, work after the app

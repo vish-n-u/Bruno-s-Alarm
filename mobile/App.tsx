@@ -37,7 +37,7 @@ import { migrateAlarmSoundPathsOnce } from "./lib/alarmSoundMigration";
 import { syncLiveAlarmOnLaunch } from "./lib/liveAlerts";
 import { listenForLiveAlertsInForeground } from "./lib/liveAlertRinger";
 import { registerBackgroundAlarmSoundRefresh } from "./lib/backgroundRefresh";
-import { resumeIOSAlarmEngineIfNeeded } from "./lib/iosAlarmEngine";
+import { startIOSAlarmSoundResync } from "./lib/iosAlarmResync";
 import { useThemeColors, useTimeOfDay } from "./lib/theme";
 
 type Screen = "checking" | "onboarding" | "home";
@@ -165,11 +165,14 @@ export default function App() {
     // Re-asserts the live-alarm topic membership if the user opted in, and drops it otherwise
     // (also cleans up anyone who joined under the earlier, 6AM-toggle-tied version).
     syncLiveAlarmOnLaunch().catch(() => {});
-    // No-ops on Android. On iOS, re-establishes the keep-alive background audio session if
-    // an alarm was still armed from before this app process started — e.g. the OS restarted
-    // it, as opposed to the user force-quitting it (which this can't recover from).
-    resumeIOSAlarmEngineIfNeeded();
-    return listenForLiveAlertsInForeground();
+    // No-ops on Android. On iPhone, reschedules alarms when a new recording arrives (only while
+    // the downloaded-howl switch is on — see lib/iosAlarmResync.ts).
+    const stopIOSResync = startIOSAlarmSoundResync();
+    const stopLiveAlerts = listenForLiveAlertsInForeground();
+    return () => {
+      stopIOSResync();
+      stopLiveAlerts();
+    };
   }, []);
 
   // Keeps the saved alarm recording current without needing a schedule change: once when the app

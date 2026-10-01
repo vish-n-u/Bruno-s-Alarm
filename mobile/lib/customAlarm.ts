@@ -4,7 +4,7 @@ import { Platform } from "react-native";
 import RNAlarmModule from "react-native-alarmageddon";
 import { getAlarmSoundFilePath, refreshAlarmSound } from "./alarmSound";
 import { toAlarmDatetime } from "./alarmDateTime";
-import { armIOSBackgroundAlarms } from "./iosAlarmEngine";
+import { cancelIOSAlarmsWithPrefix, getIOSAlarmSoundName, scheduleIOSAlarm } from "./iosAlarms";
 
 // A second, independent alarm path alongside lib/notifications.ts's Bruno-session
 // scheduling — lets someone set genuinely free-choice wake times, unrelated to when Bruno
@@ -91,14 +91,9 @@ function resolveDays(repeatMode: RepeatMode, customDays: number[]): number[] {
 }
 
 /** Every alarm config gets its own id-scoped OS-level id prefix (bruno-custom-<alarmId>-...)
- * so clearing/rescheduling one alarm never touches another's already-scheduled occurrences.
- * The same scoping carries over to lib/iosAlarmEngine.ts's group ids, for the same reason. */
+ * so clearing/rescheduling one alarm never touches another's already-scheduled occurrences. */
 function scopedPrefix(alarmId: string): string {
   return `${ID_PREFIX}${alarmId}-`;
-}
-
-function iosEngineGroupId(alarmId: string): string {
-  return `custom-${alarmId}`;
 }
 
 async function clearScheduledForAlarm(alarmId: string): Promise<void> {
@@ -110,13 +105,14 @@ async function clearScheduledForAlarm(alarmId: string): Promise<void> {
     );
     return;
   }
-  const scheduled = await Notifications.getAllScheduledNotificationsAsync();
+  await cancelIOSAlarmsWithPrefix(prefix);
+  // Older iPhone builds scheduled plain notifications for custom alarms.
+  const scheduled = await Notifications.getAllScheduledNotificationsAsync().catch(() => []);
   await Promise.all(
     scheduled
       .filter((n) => n.identifier.startsWith(prefix))
-      .map((n) => Notifications.cancelScheduledNotificationAsync(n.identifier))
+      .map((n) => Notifications.cancelScheduledNotificationAsync(n.identifier).catch(() => {}))
   );
-  await armIOSBackgroundAlarms(iosEngineGroupId(alarmId), []);
 }
 
 function alarmTitle(name: string): string {
@@ -153,58 +149,18 @@ async function applySchedule(alarm: CustomAlarm): Promise<void> {
         ...(soundPath ? { soundPath } : {}),
       });
     }
-  } else if (alarm.repeatMode === "once") {
-    await Notifications.scheduleNotificationAsync({
-      identifier: `${prefix}once`,
-      content: { title, body: ALARM_BODY, sound: true },
-      trigger: {
-        type: Notifications.SchedulableTriggerInputTypes.DATE,
-        date: new Date(nextLocalOccurrence(alarm.hour, alarm.minute)),
-      },
-    });
-  } else if (alarm.repeatMode === "everyday") {
-    await Notifications.scheduleNotificationAsync({
-      identifier: `${prefix}daily`,
-      content: { title, body: ALARM_BODY, sound: true },
-      trigger: {
-        type: Notifications.SchedulableTriggerInputTypes.CALENDAR,
-        hour: alarm.hour,
-        minute: alarm.minute,
-        repeats: true,
-      },
-    });
-  } else {
-    // "weekdays" / "custom" — expo-notifications' CalendarTriggerInput only takes a single
-    // weekday per trigger (1=Sun..7=Sat), so a multi-day pattern needs one notification per
-    // selected day, each independently repeating.
-    for (const day of resolveDays(alarm.repeatMode, alarm.customDays)) {
-      await Notifications.scheduleNotificationAsync({
-        identifier: `${prefix}day-${day}`,
-        content: { title, body: ALARM_BODY, sound: true },
-        trigger: {
-          type: Notifications.SchedulableTriggerInputTypes.CALENDAR,
-          hour: alarm.hour,
-          minute: alarm.minute,
-          weekday: day + 1,
-          repeats: true,
-        },
-      });
-    }
-  }
-
-  if (Platform.OS === "ios") {
-    // expo-notifications' repeating CalendarTriggerInput above has no concept of discrete
-    // future timestamps to hand the background-audio engine — it needs actual dates to poll
-    // against, so compute the same kind of upcoming-occurrence batch Android already uses.
+  } else if (Platform.OS === "ios") {
+    // Same batch of exact times as Android (topped up whenever alarms are rescheduled), so ids,
+    // the scheduled-alarms list and the ringing screen's timing all work the same way.
     await refreshAlarmSound();
+    const soundName = await getIOSAlarmSoundName();
     const timestamps =
       alarm.repeatMode === "once"
         ? [nextLocalOccurrence(alarm.hour, alarm.minute)]
         : nextLocalOccurrences(alarm.hour, alarm.minute, resolveDays(alarm.repeatMode, alarm.customDays), DAYS_TO_SCHEDULE);
-    await armIOSBackgroundAlarms(
-      iosEngineGroupId(alarm.id),
-      timestamps.map((timestamp) => ({ id: `${prefix}${timestamp}`, timestamp, title, body: ALARM_BODY }))
-    );
+    for (const timestamp of timestamps) {
+      await scheduleIOSAlarm({ id: `${prefix}${timestamp}`, title, timestamp, soundName });
+    }
   }
 }
 
@@ -244,9 +200,7 @@ export async function deleteCustomAlarm(id: string): Promise<void> {
 
 /** After a "once" alarm rings and the user stops it, marks it disabled in storage. The
  * OS-level alarm has already fired and removed itself; only the storage state needs updating.
- * Matches by checking whether the OS alarm ID starts with the alarm's own scoped prefix, so
- * it correctly handles both direct fires and iOS snooze re-fires (which use a derived ID that
- * still starts with the same prefix). Silently no-ops for session alarms, repeat alarms, or
+ * Matches by checking whether the OS alarm ID starts with the alarm's own scoped prefix. Silently no-ops for session alarms, repeat alarms, or
  * IDs that don't match any saved alarm. */
 export async function disableOnceAlarmIfFired(osAlarmId: string): Promise<void> {
   if (!osAlarmId.startsWith(ID_PREFIX)) return;

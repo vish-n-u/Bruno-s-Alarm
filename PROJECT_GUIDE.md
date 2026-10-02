@@ -252,10 +252,13 @@ Contact email used in the app, site and policies: `vishnuna26@gmail.com`.
   there's no ID (debug force-live). App versions before 15 still use the clock-based room.
   If the camera drops and Cloudflare starts a new recording, the chat starts a new room.
 - Messages are deleted by `cleanupOldChat` ~2 hours after a room goes quiet.
-- **Bruno's Pack** — a persistent always-open chat tab — is fully built but **hidden**
-  (`CHAT_ENABLED = false` in `mobile/App.tsx`). Decision already made: when it's switched on,
-  it should keep **at most the newest 200 messages** (rolling trim on the server, replacing its
-  current `UNCAPPED_SESSION_IDS` exemption). Not implemented yet. See `mobile/docs/hidden-features.md`.
+- **Bruno's Pack** — a persistent always-open chat tab (`screens/BrunosPackScreen.tsx`, room id
+  `brunos-pack`) — **switched on 2 Oct (app v20)**, `CHAT_ENABLED = true` in `mobile/App.tsx`.
+  Same function, rules, rate limit, terms gate, report/block as live chat. It's exempt from the
+  500-per-session cap and from `cleanupOldChat`; instead `trimPersistentRoom` in
+  `functions/src/index.ts` keeps only the **newest 200 messages** (after each Pack message: a
+  count query, then deletes the oldest extras, archiving any reports on them first). Privacy
+  policy, terms and landing page updated to describe both chats (effective 2 Oct 2026).
 
 ### 4.6 Other pieces
 
@@ -344,7 +347,8 @@ Contact email used in the app, site and policies: `vishnuna26@gmail.com`.
   `rateLimits` private; `reports` create-only for signed-in users; everything else denied.
 - **Deploy:** `cd functions && npm run deploy` — runs `tsc` + unit tests (`node --test lib/`)
   first; `firebase.json`'s predeploy also runs the tests. If deploy fails with "Cannot
-  determine backend specification", just run it again (transient).
+  determine backend specification … Timeout after 10000", run it with a longer load allowance:
+  `FUNCTIONS_DISCOVERY_TIMEOUT=60000 npx firebase deploy --only functions` (worked 2 Oct).
 
 ---
 
@@ -372,7 +376,7 @@ cd mobile/android && ./gradlew bundleRelease
 
 Releasing a new Play build:
 1. Bump **`versionCode` in BOTH `mobile/app.json` and `mobile/android/app/build.gradle`**
-   (the android folder isn't regenerated automatically). Current: **19**. Play rejects a
+   (the android folder isn't regenerated automatically). Current: **20**. Play rejects a
    versionCode it has already seen.
 2. Build the AAB, upload in Play Console. Commit the version bump.
 3. Store assets: `mobile/assets/play-store-icon.png` (512×512) and
@@ -443,7 +447,7 @@ logs, Diagnostics, Device IDs; nothing shared; encrypted in transit; deletion vi
    recording, labelled REPLAY). Needs a real test: how soon Cloudflare makes it playable.
    Alarm sound and ringing video matching — **built 29 Sep (Option A, §4.1), app v16**; needs an
    on-device test (normal ring, snooze, ring during a live stream, first ring after updating).
-5. **Bruno's Pack 200-message cap** — decided, not built (§4.5).
+5. ~~Bruno's Pack 200-message cap~~ — **built and deployed 2 Oct**; the tab is on (§4.5).
 6. ~~Discoverability of Bruno's daily alarm~~ — **FIXED 28 Sep (app v15)**: a dismissible
    "Turn on" card on Home (`components/HomeScreen.tsx`).
 7. **Unexplained "alarm stopped after ~22 s" report** — investigation deferred by the owner;

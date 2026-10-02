@@ -6,37 +6,9 @@ Check here before re-building something from scratch that already exists.
 
 ## "Bruno's Pack" — persistent chat tab
 
-A third bottom-nav tab (`MessagesTab` → `screens/BrunosPackScreen.tsx`) — a real, working,
-backend-wired chat room that's always open, distinct from the per-live-session chat below.
-Not a UI mockup: sending, receiving, reporting, and blocking all work exactly like the live
-chat, because it reuses the same `lib/chat.ts` functions, the same callable Cloud Function,
-and the same Firestore security rules — the only difference is it's passed a fixed session ID
-(`BRUNOS_PACK_SESSION_ID = "brunos-pack"` in `lib/chat.ts`) instead of one derived from the
-real clock, so the "room" never resets.
-
-- **Flag:** `CHAT_ENABLED` in [`App.tsx`](../App.tsx) (currently `false`)
-- **What's hidden:** the tab itself. The backend has no flag of its own and is already live —
-  turning `CHAT_ENABLED` on requires no backend work.
-- **One backend change this needed:** the Cloud Function's per-session 500-message cap
-  (`functions/src/index.ts`) assumed a session eventually resets, which a persistent room
-  never does — it would have permanently "filled up" once and stayed that way forever. Fixed
-  by exempting `"brunos-pack"` specifically (`UNCAPPED_SESSION_IDS`) from that cap; rate
-  limiting (~1 msg/3s/device) still applies normally. **Already deployed** — this fix is live
-  regardless of the `CHAT_ENABLED` flag.
-- **Before this goes live for real users:** reconsider retention/moderation for a room with
-  no natural reset point — the per-session chat's 500-cap and short lifetime meant a bad actor
-  or a moderation backlog was naturally bounded; a persistent room isn't. Worth a real look at
-  message history limits or a cleanup job before flipping this on for the public, not just
-  before/during your own testing.
-- **Important:** this flag does **not** control the per-session live chat overlay —
-  `components/LiveChat.tsx` is unconditionally rendered on the Live screen and is live for
-  real users right now, regardless of this flag. The two are separate chat rooms sharing the
-  same backend, not the same feature.
-- **To re-enable:** set `CHAT_ENABLED = true` in `App.tsx`
-- **Verified working:** confirmed on-device with `CHAT_ENABLED` temporarily flipped on —
-  the tab renders, a message sent via direct API call to the deployed function showed up
-  in the app in real time, and a message sent from the app round-tripped through Firestore
-  correctly (checked via direct Firestore REST read). Flag was set back to `false` afterward.
+**No longer hidden — switched on 2 Oct 2026 (app v20).** See PROJECT_GUIDE.md §4.5. The server
+keeps only the room's newest 200 messages. `CHAT_ENABLED` in `App.tsx` still hides the tab
+again if ever needed.
 
 ## Weather hints on the Home screen sky
 

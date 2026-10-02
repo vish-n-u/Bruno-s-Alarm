@@ -32,7 +32,7 @@ export default function TermsPage() {
       <p>
         Bruno&rsquo;s Alarm streams a real dog&rsquo;s twice-daily howl and lets you set alarms,
         either tied to Bruno&rsquo;s 6AM/6PM IST sessions or at a time you choose, plus a live
-        chat while a session is on. There&rsquo;s no account or sign-up. Bruno is a real dog in a
+        chat while a session is on, and an always-open chat room, Bruno&rsquo;s Pack. There&rsquo;s no account or sign-up. Bruno is a real dog in a
         real home, so sessions, timing, and features can change or be interrupted without
         notice.
       </p>
@@ -47,7 +47,7 @@ export default function TermsPage() {
       </p>
 
       <h2><span className="num">3</span>Live chat: conduct and moderation</h2>
-      <p>Chat is open only while a session is live and is public to everyone watching. By sending a message you agree to:</p>
+      <p>Live chat is open only while a session is live; Bruno&rsquo;s Pack is always open. Both are public to everyone in them. By sending a message you agree to:</p>
       <ul>
         <li>Be respectful: no harassment, hate speech, threats, or targeting anyone, including us or Bruno&rsquo;s household.</li>
         <li>Not spam, flood, or try to disrupt chat for other viewers.</li>

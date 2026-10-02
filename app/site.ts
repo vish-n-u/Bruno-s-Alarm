@@ -10,5 +10,5 @@ export const PLAY_STORE_LIVE = false;
 export const PLAY_STORE_URL = `https://play.google.com/store/apps/details?id=${PACKAGE_NAME}`;
 
 // Keep in step with mobile/privacy-policy.txt and mobile/terms-of-service.txt.
-export const PRIVACY_EFFECTIVE = "September 27, 2026";
-export const TERMS_EFFECTIVE = "September 27, 2026";
+export const PRIVACY_EFFECTIVE = "October 2, 2026";
+export const TERMS_EFFECTIVE = "October 2, 2026";

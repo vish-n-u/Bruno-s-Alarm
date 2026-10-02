@@ -1,5 +1,5 @@
 BRUNO'S ALARM — TERMS OF SERVICE
-Effective September 27, 2026
+Effective October 2, 2026
 Package: com.brunosalarm.app
 
 These terms cover your use of Bruno's Alarm. By installing or using the app, you agree
@@ -9,7 +9,7 @@ separate Privacy Policy — these terms are about conduct and responsibility, no
 1. WHAT BRUNO'S ALARM IS
 Bruno's Alarm streams a real dog's twice-daily howl and lets you set alarms — either
 tied to Bruno's own 6AM/6PM sessions or a custom time you choose — plus an optional
-live chat while a session is on. There's no account or sign-up. The live video, the
+live chat while a session is on, and an always-open chat room, Bruno's Pack. There's no account or sign-up. The live video, the
 schedule, and chat are all provided as-is: Bruno is a real dog in a real home, and
 sessions, timing, and the app's features can change or be interrupted without notice.
 
@@ -22,7 +22,8 @@ appointments, work, flights, exams, and similar. We're not liable for missed ala
 any consequence of one.
 
 3. LIVE CHAT — CONDUCT AND MODERATION
-Chat is open only while a session is live, and is public to everyone watching. By
+Live chat is open only while a session is live; Bruno's Pack is always open. Both
+are public to everyone in them. By
 sending a message you agree to:
 - Be respectful — no harassment, hate speech, threats, or targeting anyone (including
   us or Bruno's household).
@@ -30,7 +31,7 @@ sending a message you agree to:
 - Not impersonate anyone, including using a name reserved for moderators or staff.
 - Not post anything illegal, or anything you don't have the right to share.
 Messages are automatically checked before posting (length, a profanity/impersonation
-filter, and rate limits) and are visible to everyone in that session. We may remove a
+filter, and rate limits) and are visible to everyone in that chat. We may remove a
 message, block a device from chat, or restrict access to chat entirely, at our
 discretion, for violating these rules — without notice and without it being an
 admission of wrongdoing on our part or a promise we'll always catch every violation.
@@ -47,7 +48,7 @@ transfer or recover, and there's no "your account" for us to look up or restore.
 Anything you type into chat (a message or a display name) is yours, but by sending it
 you give us permission to store, display, and moderate it as part of running the
 service — including keeping a copy of a reported message for review. Don't send
-anything you don't want made public to that session's viewers.
+anything you don't want made public to everyone in that chat.
 
 6. INTELLECTUAL PROPERTY
 The Bruno's Alarm name, app design, and Bruno's own video content belong to us (or are

@@ -32,7 +32,7 @@ export default function PrivacyPage() {
           There&rsquo;s no sign-up and we never learn your real name, email, or phone number. Your
           alarms are stored only on your phone. When you use live chat, the app creates an
           anonymous device ID so messages can be moderated and rate-limited, and anything you
-          send in chat is public to everyone watching that session. We use Firebase Analytics
+          send in chat is public to everyone in that chat. We use Firebase Analytics
           and Crashlytics for basic usage and crash data, and Cloudflare to deliver the video.
           No ads, nothing sold to anyone.
         </p>
@@ -61,7 +61,7 @@ export default function PrivacyPage() {
           <code>Viewer 4821</code>. Either way it&rsquo;s never linked to your real name. A typed
           nickname is automatically checked and replaced with a generated one if it&rsquo;s
           inappropriate or impersonates staff. These are stored in a shared database (Cloud
-          Firestore) and are visible to everyone viewing that session&rsquo;s chat, since
+          Firestore) and are visible to everyone in that chat, since
           that&rsquo;s the point of a public chat.
         </li>
         <li>
@@ -97,11 +97,13 @@ export default function PrivacyPage() {
 
       <h2><span className="num">3</span>Live chat and moderation</h2>
       <p>
-        Chat is only open while Bruno is live, and resets with each session. Every message goes
-        through a server-side check before it&rsquo;s posted: length, a language filter, a rate
-        limit, and a per-session cap so chat can&rsquo;t be flooded. Posted messages are public to
-        anyone viewing that session. A session&rsquo;s messages are automatically deleted a couple
-        of hours after it goes quiet, so there&rsquo;s no running chat history. We don&rsquo;t
+        There are two chats. Live chat is open only while Bruno is live and resets with each
+        session; a session&rsquo;s messages are automatically deleted a couple of hours after it
+        goes quiet. Bruno&rsquo;s Pack is one always-open room that keeps only its newest 200
+        messages; older ones are deleted automatically as new ones arrive. Every message goes
+        through a server-side check before it&rsquo;s posted: length, a language filter, and a
+        rate limit so chat can&rsquo;t be flooded. Posted messages are public to anyone in that
+        chat. We don&rsquo;t
         sell or share chat content, and it&rsquo;s never linked to your name, email, or an
         account.
       </p>
@@ -159,7 +161,7 @@ export default function PrivacyPage() {
       <ul>
         <li><strong>Everything on your phone:</strong> uninstall the app. Alarms, your nickname, blocks, and the cached recording are all removed.</li>
         <li><strong>Live alerts:</strong> turn off &ldquo;Ring when Bruno goes live&rdquo; in Settings. Your device is unsubscribed from the alert topic.</li>
-        <li><strong>Chat messages:</strong> these delete themselves a couple of hours after each session ends. You don&rsquo;t need to ask.</li>
+        <li><strong>Chat messages:</strong> live chat messages delete themselves a couple of hours after each session ends, and Bruno&rsquo;s Pack keeps only its newest 200 messages. You don&rsquo;t need to ask.</li>
       </ul>
       <p>
         To have something removed sooner, such as a message you sent or a report you filed,

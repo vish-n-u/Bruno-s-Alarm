@@ -42,10 +42,9 @@ import { useThemeColors, useTimeOfDay } from "./lib/theme";
 
 type Screen = "checking" | "onboarding" | "home";
 
-// Built and working (see docs/live-chat-setup.md), but held back for later — flip this to
-// bring the tab back. Kept as a flag (rather than deleting the screen/import) so re-enabling
-// later is a one-line change. See docs/hidden-features.md.
-const CHAT_ENABLED = false;
+// The "Bruno's Pack" always-open chat tab. Live since v20 (the server keeps only its newest 200
+// messages — functions/src/index.ts trimPersistentRoom). Set false to hide the tab again.
+const CHAT_ENABLED = true;
 
 // The Home tab's own internal stack — Settings/CustomAlarm are reached by pushing on top of
 // Home, same as before the tab bar existed. Editing an alarm is a true in-place popup

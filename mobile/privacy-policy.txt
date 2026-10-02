@@ -1,5 +1,5 @@
 BRUNO'S ALARM — PRIVACY POLICY
-Effective September 27, 2026
+Effective October 2, 2026
 Package: com.brunosalarm.app
 
 Bruno's Alarm wakes you up with a real dog's twice-daily howl, and lets you chat with
@@ -10,7 +10,7 @@ THE SHORT VERSION
 There's no sign-up and we never learn your name, email, or phone number. Your alarms
 are stored only on your phone. When you use live chat, the app creates an anonymous
 device ID (no personal info attached) so messages can be moderated and rate-limited —
-anything you send in chat is public to everyone watching that session. We also use
+anything you send in chat is public to everyone in that chat. We also use
 Firebase Analytics/Crashlytics for basic usage and crash data, and Cloudflare to
 deliver the video. No ads, nothing sold to third parties.
 
@@ -27,7 +27,7 @@ deliver the video. No ads, nothing sold to third parties.
   "Viewer 4821" — either way it's never linked to your real name. A typed nickname
   is automatically checked and replaced with a generated one if it's inappropriate
   or impersonates staff. These are stored in a shared database (Cloud Firestore) and
-  are visible to everyone viewing that session's chat, since that's the point of a
+  are visible to everyone in that chat, since that's the point of a
   public chat.
 - If you report a chat message: the message you reported, your reason, and your
   anonymous device ID, so we can review it.
@@ -54,14 +54,14 @@ Never transmitted anywhere:
 Uninstalling the app removes all of this. Nothing survives anywhere else.
 
 3. LIVE CHAT AND MODERATION
-Chat is only open while Bruno is actually live, and resets with each session — it's
-not one continuous room. Every message goes through a moderated server function
-before it's posted: it checks length, filters certain language, and enforces a
-rate limit and a per-session cap so chat can't be flooded. Messages that get posted
-are public — anyone viewing that session can read them, and they're stored as part
-of that session's chat history for moderation and app functionality. A session's
-messages are automatically deleted a couple of hours after that session goes quiet
-— we don't keep a running chat history. We don't sell or share chat content with
+There are two chats. Live chat is open only while Bruno is live and resets with each
+session; a session's messages are automatically deleted a couple of hours after it
+goes quiet. Bruno's Pack is one always-open room that keeps only its newest 200
+messages; older ones are deleted automatically as new ones arrive. Every message goes
+through a moderated server function before it's posted: it checks length, filters
+certain language, and enforces a rate limit so chat can't be flooded. Messages that
+get posted are public — anyone in that chat can read them — and they're stored only
+as long as described above, for moderation and app functionality. We don't sell or share chat content with
 third parties, and it's never linked to your name, email, or any account.
 
 Two tools if something in chat bothers you:
@@ -112,7 +112,8 @@ There's no account, so most of this you can do yourself, straight away:
   the cached recording are all removed.
 - Live alerts: turn off "Ring when Bruno goes live" in Settings. Your device is
   unsubscribed from the alert topic.
-- Chat messages: these delete themselves a couple of hours after each session ends.
+- Chat messages: live chat messages delete themselves a couple of hours after each
+  session ends, and Bruno's Pack keeps only its newest 200 messages.
 To have something removed sooner, such as a message you sent or a report you filed,
 email vishnuna26@gmail.com with the subject "Delete my data". Because there's no
 account to look up, include the display name you used and roughly when you chatted.

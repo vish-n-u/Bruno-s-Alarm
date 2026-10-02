@@ -34,9 +34,11 @@ const SESSION_MESSAGE_CAP = 500;
 
 // "Bruno's Pack" is a persistent room (see screens/BrunosPackScreen.tsx), not a per-session
 // chat that naturally resets — a lifetime message cap would eventually make it permanently
-// "full" and never recoverable. Exempted here rather than removing the cap outright, so a
-// real live session still gets the backstop. Rate limiting still applies either way.
+// "full", so it's exempt from SESSION_MESSAGE_CAP and from cleanupOldChat. Instead it keeps only
+// its newest PERSISTENT_ROOM_KEEP messages: older ones are deleted as new ones arrive
+// (trimPersistentRoom). Rate limiting still applies either way.
 const UNCAPPED_SESSION_IDS = new Set(["brunos-pack"]);
+const PERSISTENT_ROOM_KEEP = 200;
 
 // Counts Unicode code points, not UTF-16 code units — matches the client's own check in
 // lib/chat.ts so the two never disagree about what "200 characters" means for a
@@ -114,8 +116,52 @@ export const sendChatMessage = onCall<SendChatMessageRequest>(async (request) =>
     });
   });
 
+  if (UNCAPPED_SESSION_IDS.has(sessionId)) {
+    // Best-effort: a failed trim just means the next message trims a little more.
+    await trimPersistentRoom(sessionRef).catch((err) => logger.warn("Trim failed", { sessionId, err }));
+  }
+
   return { ok: true };
 });
+
+/** Deletes everything but the newest PERSISTENT_ROOM_KEEP messages of a persistent room. A
+ * count query first, so the common case (nothing to trim) costs one read. Reports on a deleted
+ * message get its text copied onto them first, same as cleanupOldChat does. */
+async function trimPersistentRoom(sessionRef: FirebaseFirestore.DocumentReference): Promise<void> {
+  const messages = sessionRef.collection("messages");
+  const total = (await messages.count().get()).data().count;
+  const excess = total - PERSISTENT_ROOM_KEEP;
+  if (excess <= 0) return;
+  const oldest = await messages.orderBy("timestamp", "asc").limit(excess).get();
+  for (const doc of oldest.docs) {
+    await archiveReportsFor(sessionRef.id, doc);
+  }
+  const batch = db.batch();
+  oldest.docs.forEach((doc) => batch.delete(doc.ref));
+  await batch.commit();
+}
+
+/** Copies a message's text onto any not-yet-archived report of it (see archiveReportedMessages). */
+async function archiveReportsFor(
+  sessionId: string,
+  message: FirebaseFirestore.QueryDocumentSnapshot,
+): Promise<void> {
+  const reports = await db
+    .collection("reports")
+    .where("sessionId", "==", sessionId)
+    .where("messageId", "==", message.id)
+    .get();
+  const data = message.data();
+  for (const report of reports.docs) {
+    if (report.data().messageText !== undefined) continue;
+    await report.ref.update({
+      messageText: data?.text ?? null,
+      reportedDisplayName: data?.displayName ?? null,
+      reportedUid: data?.deviceId ?? null,
+      archivedAt: FieldValue.serverTimestamp(),
+    });
+  }
+}
 
 // --- Deleting finished chats ------------------------------------------------------------
 // Chat is per live session and only ever shown while that session is live, so nothing needs to

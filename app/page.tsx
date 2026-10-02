@@ -39,11 +39,11 @@ const FEATURES = [
   },
   {
     title: "Your own times too",
-    body: "Set alarms for whenever you actually get up. The time picker marks Bruno's two slots in your timezone, in case you want to line up with the real thing.",
+    body: "Set alarms for whenever you actually get up. Every alarm plays Bruno's latest howl.",
   },
   {
     title: "A chat for the pack",
-    body: "A small public chat opens while he's on. It's moderated, rate-limited, and wiped a couple of hours after each session.",
+    body: "A live chat opens while he's on, and Bruno's Pack is always open. Both are moderated and rate-limited; live chat is wiped after each session and the Pack keeps only its newest 200 messages.",
   },
 ];
 

@@ -31,8 +31,8 @@ import {
 } from "../lib/chat";
 import { fonts, radius, shadow, spacing, useThemeColors, type ThemeColors } from "../lib/theme";
 
-// A real, working, backend-wired chat — hidden behind App.tsx's CHAT_ENABLED flag while it's
-// tested (see docs/hidden-features.md), not a UI mockup. Deliberately its own screen rather
+// The always-open "Bruno's Pack" chat tab (App.tsx's CHAT_ENABLED). The server keeps only the
+// room's newest 200 messages. Deliberately its own screen rather
 // than a variant of components/LiveChat.tsx: that component is built to be a video overlay
 // (dark, semi-transparent, absolutely positioned, box-none pointer events so taps pass
 // through to the video underneath) with a live/not-live distinction baked in. This is a
@@ -41,8 +41,8 @@ import { fonts, radius, shadow, spacing, useThemeColors, type ThemeColors } from
 // everything from lib/chat.ts (and the same Cloud Function, security rules, moderation, rate
 // limiting) with the live chat — the only thing that makes this a persistent room rather than
 // a per-session one is passing a fixed sessionId instead of a real session's derived one; see
-// BRUNOS_PACK_SESSION_ID's own doc for the one backend exception that requires (the message
-// cap, which assumes a session eventually resets).
+// BRUNOS_PACK_SESSION_ID's own doc for the backend difference that requires (no per-session
+// cap; instead a rolling 200-message limit).
 
 const QUICK_EMOJIS = ["🐕", "😂", "❤️", "👏"];
 

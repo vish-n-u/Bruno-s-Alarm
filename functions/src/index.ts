@@ -40,6 +40,20 @@ const SESSION_MESSAGE_CAP = 500;
 const UNCAPPED_SESSION_IDS = new Set(["brunos-pack"]);
 const PERSISTENT_ROOM_KEEP = 200;
 
+// The Bruno's Pack switch, Firestore config/app.packEnabled (the app hides the tab while it's
+// off — mobile/lib/appConfig.ts). Read here too so a closed Pack also refuses messages from any
+// app version. Cached briefly to avoid a read per message.
+const CONFIG_CACHE_MS = 30 * 1000;
+let packEnabledCache: { value: boolean; at: number } | null = null;
+
+async function isPackEnabled(): Promise<boolean> {
+  if (packEnabledCache && Date.now() - packEnabledCache.at < CONFIG_CACHE_MS) return packEnabledCache.value;
+  const snap = await db.collection("config").doc("app").get();
+  const value = snap.data()?.packEnabled === true;
+  packEnabledCache = { value, at: Date.now() };
+  return value;
+}
+
 // Counts Unicode code points, not UTF-16 code units — matches the client's own check in
 // lib/chat.ts so the two never disagree about what "200 characters" means for a
 // surrogate-pair-heavy message (most emoji).
@@ -81,6 +95,10 @@ export const sendChatMessage = onCall<SendChatMessageRequest>(async (request) =>
   // actually matters, since a modified/bypassed client could skip its own copy entirely.
   if (profanityFilter.isProfane(text)) {
     throw new HttpsError("invalid-argument", "Message not allowed.");
+  }
+
+  if (UNCAPPED_SESSION_IDS.has(sessionId) && !(await isPackEnabled())) {
+    throw new HttpsError("failed-precondition", "Bruno's Pack is closed.");
   }
 
   const sessionRef = db.collection("sessions").doc(sessionId);

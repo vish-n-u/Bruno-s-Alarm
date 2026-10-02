@@ -25,6 +25,7 @@ import Onboarding from "./components/Onboarding";
 import HomeScreen from "./components/HomeScreen";
 import AlarmRingingScreen from "./components/AlarmRingingScreen";
 import AppDialogHost from "./components/AppDialogHost";
+import { useAppConfig } from "./lib/appConfig";
 import SettingsScreen from "./screens/SettingsScreen";
 import CustomAlarmScreen from "./screens/CustomAlarmScreen";
 import LiveScreen from "./screens/LiveScreen";
@@ -42,9 +43,9 @@ import { useThemeColors, useTimeOfDay } from "./lib/theme";
 
 type Screen = "checking" | "onboarding" | "home";
 
-// The "Bruno's Pack" always-open chat tab. Live since v20 (the server keeps only its newest 200
-// messages — functions/src/index.ts trimPersistentRoom). Set false to hide the tab again.
-const CHAT_ENABLED = true;
+// The "Bruno's Pack" always-open chat tab is shown or hidden for everyone from the server:
+// packEnabled in the Firestore doc config/app (lib/appConfig.ts). The server keeps only the
+// room's newest 200 messages (functions/src/index.ts trimPersistentRoom).
 
 // The Home tab's own internal stack — Settings/CustomAlarm are reached by pushing on top of
 // Home, same as before the tab bar existed. Editing an alarm is a true in-place popup
@@ -114,6 +115,7 @@ export default function App() {
   // "Bruno's live — watch" on the ringing screen sets this to land on the Live tab afterwards.
   const [initialTab, setInitialTab] = useState<"HomeTab" | "LiveTab">("HomeTab");
   const colors = useThemeColors();
+  const { packEnabled } = useAppConfig();
   const timeOfDay = useTimeOfDay();
   // Night is the only phase with a dark background — everything else (dawn/midday/sunset)
   // wants the light system chrome, matching whichever palette useThemeColors() picked.
@@ -259,7 +261,7 @@ export default function App() {
                 ),
               }}
             />
-            {CHAT_ENABLED && (
+            {packEnabled && (
               <Tab.Screen
                 name="MessagesTab"
                 component={BrunosPackScreen}

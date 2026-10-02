@@ -43,6 +43,13 @@ service cloud.firestore {
       allow read, update, delete: if false;
     }
 
+    // Owner-controlled switches (e.g. packEnabled for the Bruno's Pack tab — see
+    // mobile/lib/appConfig.ts). Edited only in the Firebase console, which bypasses these rules.
+    match /config/{docId} {
+      allow read: if true;
+      allow write: if false;
+    }
+
     // Everything else stays closed by default.
     match /{document=**} {
       allow read, write: if false;

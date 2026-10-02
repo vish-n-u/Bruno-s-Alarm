@@ -7,8 +7,8 @@ Check here before re-building something from scratch that already exists.
 ## "Bruno's Pack" — persistent chat tab
 
 **No longer hidden — switched on 2 Oct 2026 (app v20).** See PROJECT_GUIDE.md §4.5. The server
-keeps only the room's newest 200 messages. `CHAT_ENABLED` in `App.tsx` still hides the tab
-again if ever needed.
+keeps only the room's newest 200 messages. Shown/hidden for everyone by `packEnabled` in the
+Firestore doc `config/app` (no app update needed).
 
 ## Weather hints on the Home screen sky
 

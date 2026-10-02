@@ -92,7 +92,7 @@ JOURNEY.md, bruno-app-build-plan.md   Historical notes from earlier phases
 | Cloudflare R2 | Public copies of recordings for phones to download | bucket served at `https://media.brunos-alarm.com` |
 | Google Play Console | Store listing | package `com.brunosalarm.app` |
 | Expo / EAS | Project ID only (builds are done locally, not on EAS) | owner `vishnuna123` |
-| Larix Broadcaster | The phone app that streams Bruno to Cloudflare (RTMP/SRT) | ⚠ free tier burns in a watermark — see §10 |
+| Camera streaming app | The phone app that streams Bruno to Cloudflare (RTMP/SRT) | Since 2 Oct: a new app sending true portrait, no watermark — see §10 item 2 |
 
 Contact email used in the app, site and policies: `vishnuna26@gmail.com`.
 
@@ -460,9 +460,22 @@ logs, Diagnostics, Device IDs; nothing shared; encrypted in transit; deletion vi
    (the real 18:00 recording on 28 Sep was blocked by a broken one, then replaced by a 22:23
    test stream). It now only serves real-session recordings (§6). Tip: if you test-stream near
    06:00/18:00 IST for more than 30 s, that test *will* count as a session.
-2. **Larix free-tier watermark.** Recordings show a full-screen "TEST STREAM – Powered by
-   Larix Broadcaster" overlay, visible in the live feed and baked into recordings. Needs a Larix
-   subscription (or another encoder). Owner action, not code.
+2. ~~Larix watermark and poor video quality~~ — **FIXED 2 Oct (camera app change, no code).**
+   Cause of the blur: Larix/Streamlabs sent a **landscape frame (1280×720 / 2560×1440) with the
+   upright camera picture pillarboxed in the middle**, so Bruno was only ~400–600 px wide, then
+   the app's full-screen "cover" enlarged that strip ~3×. Not Cloudflare: its API reports the
+   size it *received* (`input.width/height` on the live input's videos), and those were
+   landscape; Cloudflare makes portrait renditions (up to 1080×1920) when it receives portrait.
+   - Tried: Larix (free = watermark), Streamlabs (camera output only landscape for us),
+     PRISM (portrait OK but "PRISM Live" watermark is forced with custom RTMP), IRL Pro (no
+     portrait). The owner now uses **another free app** that sends true **1080×1920**, no
+     watermark (verified 2 Oct: received 1080×1920, top rendition 1080×1920 @ ~4.5 Mbps, 30 fps).
+   - Encoder settings to keep: **1080×1920 portrait output** (not just camera orientation),
+     **30 fps**, **4–5 Mbps**, **2 s keyframe interval**, AAC 128 kbps / 48 kHz.
+   - Check any new setup: stream ~30 s, then list the live input's videos via the Cloudflare
+     API and read `input` width × height — it must be 1080 × 1920.
+   - Follow-up: alarm recordings are bigger now (expect ~20–25 MB per 50 s instead of ~8 MB);
+     measure after the next real session and decide on bitrate / Wi-Fi-only download.
 3. ~~Chat room tied to the clock~~ — **FIXED 28 Sep (app v15)**: one room per Cloudflare
    broadcast (§4.5). Considered alternative, not built: the live webhook writes a room ID to
    Firestore and the app listens to it (instant start/end detection instead of 15 s polling,

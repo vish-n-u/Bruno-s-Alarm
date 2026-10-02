@@ -27,6 +27,7 @@ import {
   type RepeatMode,
 } from "../lib/customAlarm";
 import { fonts, radius, spacing, useThemeColors, type ThemeColors } from "../lib/theme";
+import { track } from "../lib/analytics";
 
 const ROW_HEIGHT = 44;
 const VISIBLE_ROWS = 5;
@@ -373,6 +374,7 @@ export default function EditCustomAlarmModal({ visible, alarmId, onClose, onSave
         customDays,
       };
       await saveCustomAlarm(alarm);
+      track.customAlarmSaved(!alarmId, repeatMode);
       success();
       onSaved();
       onClose();
@@ -386,6 +388,7 @@ export default function EditCustomAlarmModal({ visible, alarmId, onClose, onSave
     warning();
     playDeleteSound();
     await deleteCustomAlarm(alarmId);
+    track.customAlarmDeleted();
     onSaved();
     onClose();
   }

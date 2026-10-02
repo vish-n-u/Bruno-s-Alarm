@@ -6,6 +6,7 @@ import {
   requestPermission,
 } from "./notifications";
 import { askPermission, type PermissionPrompt } from "./dialog";
+import { track } from "./analytics";
 
 // One place that asks for everything an alarm needs, at the moment the person actually tries to
 // set one (saving/enabling a custom alarm, turning on the daily alarm or the live alarm) —
@@ -100,7 +101,9 @@ async function ensure(settings: AlarmSetting[]): Promise<boolean> {
   if (Platform.OS !== "android") return requestPermission();
 
   if (!(await requestPermission())) {
-    if (!(await askPermission(NOTIFICATIONS_PROMPT))) return false;
+    const openNotifications = await askPermission(NOTIFICATIONS_PROMPT);
+    track.permissionPrompt("notifications", openNotifications);
+    if (!openNotifications) return false;
     await openAppSettings().catch(() => {});
     if (!(await requestPermission())) return false;
   }
@@ -110,6 +113,7 @@ async function ensure(settings: AlarmSetting[]): Promise<boolean> {
     const setting = todo[i];
     const progress = todo.length > 1 ? `${i + 1} of ${todo.length}` : undefined;
     const open = await askPermission({ ...PROMPTS[setting], progress });
+    track.permissionPrompt(setting, open);
     if (open) await OPEN[setting]().catch(() => {});
     if (setting === "exactAlarms" && !(await isAllowed(setting))) return false;
   }

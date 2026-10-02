@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { ActivityIndicator, StyleSheet, Text, View } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { Ionicons } from "@expo/vector-icons";
@@ -9,6 +9,7 @@ import { disableOnceAlarmIfFired } from "../lib/customAlarm";
 import { success, tapMedium } from "../lib/haptics";
 import { getCloudflareLiveStatus } from "../lib/liveStatus";
 import { fonts, radius, spacing, useThemeColors, type ThemeColors } from "../lib/theme";
+import { track } from "../lib/analytics";
 
 const LIVE_POLL_MS = 15_000;
 
@@ -64,8 +65,16 @@ export default function AlarmRingingScreen({
     ? new Date(scheduledAt).toLocaleString(undefined, { hour: "numeric", minute: "2-digit" })
     : null;
 
+  // When this ringing screen appeared — for how long the alarm rang before it was dealt with.
+  const shownAtRef = useRef(Date.now());
+  useEffect(() => {
+    shownAtRef.current = Date.now();
+    track.alarmRang(alarmId);
+  }, [alarmId]);
+
   async function handleStop() {
     if (busy) return;
+    track.alarmStopped(alarmId, (Date.now() - shownAtRef.current) / 1000);
     // Fires the instant the tap lands, not after stopRingingAlarm() resolves — the whole point
     // is confirming to a half-asleep thumb that it actually hit the target, which needs to be
     // immediate to mean anything.
@@ -81,6 +90,7 @@ export default function AlarmRingingScreen({
 
   async function handleWatchLive() {
     if (busy) return;
+    track.alarmWatchLive(alarmId);
     success();
     setBusy(true);
     try {
@@ -94,6 +104,7 @@ export default function AlarmRingingScreen({
 
   async function handleSnooze() {
     if (busy) return;
+    track.alarmSnoozed(alarmId);
     tapMedium();
     setBusy(true);
     try {

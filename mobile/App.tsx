@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { AppState, StyleSheet } from "react-native";
 import { StatusBar } from "expo-status-bar";
 import * as SplashScreen from "expo-splash-screen";
@@ -16,6 +16,7 @@ import {
   DarkTheme,
   DefaultTheme,
   getFocusedRouteNameFromRoute,
+  useNavigationContainerRef,
 } from "@react-navigation/native";
 import { createNativeStackNavigator, type NativeStackScreenProps } from "@react-navigation/native-stack";
 import { createBottomTabNavigator } from "@react-navigation/bottom-tabs";
@@ -40,6 +41,7 @@ import { listenForLiveAlertsInForeground } from "./lib/liveAlertRinger";
 import { registerBackgroundAlarmSoundRefresh } from "./lib/backgroundRefresh";
 import { resumeIOSAlarmEngineIfNeeded } from "./lib/iosAlarmEngine";
 import { useThemeColors, useTimeOfDay } from "./lib/theme";
+import { logScreenView, track } from "./lib/analytics";
 
 type Screen = "checking" | "onboarding" | "home";
 
@@ -116,6 +118,20 @@ export default function App() {
   const [initialTab, setInitialTab] = useState<"HomeTab" | "LiveTab">("HomeTab");
   const colors = useThemeColors();
   const { packEnabled } = useAppConfig();
+
+  // Screen views for Firebase Analytics: every navigator screen, plus the two full-screen
+  // takeovers that live outside the navigator (onboarding, the ringing alarm).
+  const navigationRef = useNavigationContainerRef<Record<string, object | undefined>>();
+  const lastScreenRef = useRef<string | null>(null);
+  function reportScreen(name: string | undefined) {
+    if (!name || name === lastScreenRef.current) return;
+    lastScreenRef.current = name;
+    logScreenView(name);
+  }
+  useEffect(() => {
+    if (ringingAlarmId) reportScreen("AlarmRinging");
+    else if (screen === "onboarding") reportScreen("Onboarding");
+  }, [ringingAlarmId, screen]);
   const timeOfDay = useTimeOfDay();
   // Night is the only phase with a dark background — everything else (dawn/midday/sunset)
   // wants the light system chrome, matching whichever palette useThemeColors() picked.
@@ -193,6 +209,7 @@ export default function App() {
   }, [fontsLoaded, screen]);
 
   async function completeOnboarding(openNewAlarm: boolean) {
+    track.onboardingComplete(openNewAlarm);
     await markOnboarded();
     if (openNewAlarm) requestNewAlarmOnHome();
     setScreen("home");
@@ -220,7 +237,12 @@ export default function App() {
       ) : screen === "onboarding" ? (
         <Onboarding onDone={completeOnboarding} />
       ) : screen === "home" ? (
-        <NavigationContainer theme={navigationTheme}>
+        <NavigationContainer
+          ref={navigationRef}
+          theme={navigationTheme}
+          onReady={() => reportScreen(navigationRef.getCurrentRoute()?.name)}
+          onStateChange={() => reportScreen(navigationRef.getCurrentRoute()?.name)}
+        >
           <Tab.Navigator
             initialRouteName={initialTab}
             screenOptions={{

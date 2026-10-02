@@ -281,7 +281,25 @@ Contact email used in the app, site and policies: `vishnuna26@gmail.com`.
   on the pressable itself — splitting it caused a "button doesn't respond" bug before.
 - `lib/schedule.ts`: all IST session maths. `sessionTimesLabel()` gives Bruno's two times in
   the device's own timezone — use it in any copy instead of writing "6AM & 6PM".
-- Analytics/crashes: Firebase Analytics + Crashlytics (`lib/analytics.ts`).
+- Analytics/crashes: Firebase Analytics + Crashlytics (`lib/analytics.ts`). Since v24 the app
+  sends product events through `track.*` (all names/params in that one file), viewed in the
+  Firebase console → Analytics (Explore → funnel/path explorations for "what did they do before
+  uninstalling"). Firebase adds first_open, session_start, user_engagement (time on screen),
+  app_remove (uninstall, Android) on its own. Nothing personal is sent (no names, chat text, ids).
+  - Screens: `screen_view` for every navigator screen (App.tsx `onStateChange`) plus
+    `Onboarding` and `AlarmRinging`.
+  - `onboarding_complete` {set_first_alarm}; `daily_alarm_on|off` {source: settings|home_card};
+    `custom_alarm_saved` {is_new, repeat}, `custom_alarm_on|off`, `custom_alarm_deleted`;
+    `live_alarm_on|off`.
+  - Ringing screen: `alarm_rang`, `alarm_stopped` {seconds_ringing}, `alarm_snoozed`,
+    `alarm_watch_live` — all with {alarm_type: session|custom|live|test}. Only counted when the
+    ringing screen shows (not when stopped from the notification).
+  - `live_watched` {state: live|replay} when it starts showing on an open Live tab.
+  - Chat {room: live|pack}: `chat_terms_accepted`, `chat_message_sent`, `chat_message_reported`,
+    `chat_user_blocked`.
+  - `permission_prompt` {setting, opened_settings} for each of the app's permission dialogs.
+  - To watch events live while testing: `adb shell setprop debug.firebase.analytics.app
+    com.brunosalarm.app`, then Firebase console → Analytics → DebugView.
 - Weather-reactive sky exists but is hidden (`WEATHER_HINTS_ENABLED = false` in `lib/weather.ts`).
 
 ---
@@ -386,7 +404,7 @@ cd mobile/android && ./gradlew bundleRelease
 
 Releasing a new Play build:
 1. Bump **`versionCode` in BOTH `mobile/app.json` and `mobile/android/app/build.gradle`**
-   (the android folder isn't regenerated automatically). Current: **23**. Play rejects a
+   (the android folder isn't regenerated automatically). Current: **24**. Play rejects a
    versionCode it has already seen.
 2. Build the AAB, upload in Play Console. Commit the version bump.
 3. Store assets: `mobile/assets/play-store-icon.png` (512×512) and

@@ -6,6 +6,7 @@ import { tapLight } from "../lib/haptics";
 import { isSubscribed, scheduleUpcomingSessions, unsubscribe } from "../lib/notifications";
 import { sessionTimesLabel } from "../lib/schedule";
 import { fonts, radius, spacing, useThemeColors, type ThemeColors } from "../lib/theme";
+import { track } from "../lib/analytics";
 
 type Status = "checking" | "idle" | "subscribed" | "denied" | "unsupported";
 
@@ -39,9 +40,11 @@ export default function NotifyToggle() {
           return;
         }
         await scheduleUpcomingSessions();
+        track.dailyAlarm(true, "settings");
         setStatus("subscribed");
       } else {
         await unsubscribe();
+        track.dailyAlarm(false, "settings");
         setStatus("idle");
       }
     } finally {

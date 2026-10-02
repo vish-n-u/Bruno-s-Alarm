@@ -5,6 +5,7 @@ import LiveAlarmSetupSheet from "./LiveAlarmSetupSheet";
 import { tapLight } from "../lib/haptics";
 import { disableLiveAlarm, enableLiveAlarm, isLiveAlarmEnabled } from "../lib/liveAlerts";
 import { fonts, radius, spacing, useThemeColors, type ThemeColors } from "../lib/theme";
+import { track } from "../lib/analytics";
 
 // Separate from NotifyToggle ("Bruno's daily alarm" = the reliable scheduled alarms). Turning
 // this ON never happens directly — it opens the setup sheet, which says what it is and asks for
@@ -27,11 +28,13 @@ export default function LiveAlarmToggle() {
     }
     setEnabled(false);
     await disableLiveAlarm();
+    track.liveAlarm(false);
   }
 
   async function handleConfirm() {
     tapLight();
     await enableLiveAlarm();
+    track.liveAlarm(true);
     setEnabled(true);
     setSheetVisible(false);
   }

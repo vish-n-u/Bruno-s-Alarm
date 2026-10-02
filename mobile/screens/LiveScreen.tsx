@@ -8,6 +8,7 @@ import VideoPanel from "../components/VideoPanel";
 import { getCloudflareRecordingManifestUrl } from "../lib/liveStatus";
 import { currentSessionId, nextSessionAt } from "../lib/schedule";
 import { fonts, radius, spacing, useThemeColors } from "../lib/theme";
+import { track } from "../lib/analytics";
 
 function formatTime(timestamp: number): string {
   return new Date(timestamp).toLocaleString(undefined, { hour: "numeric", minute: "2-digit" });
@@ -112,6 +113,14 @@ export default function LiveScreen() {
   const replaying = !live && replay !== null;
   const showNoSignal = !live && !replaying;
   const playing = isFocused && (live || replaying);
+
+  // One event each time Bruno's live stream (or its replay) starts showing on an open Live tab.
+  useEffect(() => {
+    if (isFocused && live) track.liveWatched("live");
+  }, [isFocused, live]);
+  useEffect(() => {
+    if (isFocused && replaying) track.liveWatched("replay");
+  }, [isFocused, replaying]);
   // One chat room per broadcast (Cloudflare's ID for it), so a new stream never shows the
   // previous stream's messages. Falls back to the clock-based room only if the ID is missing
   // (debug "force live", or Cloudflare not configured).

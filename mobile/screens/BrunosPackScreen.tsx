@@ -32,6 +32,7 @@ import {
   type SendMessageResult,
 } from "../lib/chat";
 import { fonts, radius, shadow, spacing, useThemeColors, type ThemeColors } from "../lib/theme";
+import { track } from "../lib/analytics";
 
 // The always-open "Bruno's Pack" chat tab (App.tsx's CHAT_ENABLED). The server keeps only the
 // room's newest 200 messages. Deliberately its own screen rather
@@ -108,6 +109,7 @@ export default function BrunosPackScreen() {
     const result = await sendChatMessage(BRUNOS_PACK_SESSION_ID, text);
     setSending(false);
     if (result.ok) {
+      track.chatSent("pack");
       setInput("");
       return;
     }
@@ -136,6 +138,7 @@ export default function BrunosPackScreen() {
 
   async function handleAcceptTerms() {
     await acceptChatTerms();
+    track.chatTermsAccepted("pack");
     setTermsGateVisible(false);
     const pending = pendingSendRef.current;
     pendingSendRef.current = null;
@@ -157,6 +160,7 @@ export default function BrunosPackScreen() {
           label: "Block this viewer",
           style: "destructive",
           onPress: () => {
+            track.chatBlocked("pack");
             blockDevice(message.deviceId).catch(() => {});
             setBlockedIds((prev) => [...prev, message.deviceId]);
           },
@@ -170,6 +174,7 @@ export default function BrunosPackScreen() {
     const target = reportTarget;
     setReportTarget(null);
     if (!target) return;
+    track.chatReported("pack");
     await reportChatMessage(BRUNOS_PACK_SESSION_ID, target.id, reason).catch(() => {});
   }
 

@@ -24,6 +24,7 @@ import { consumeNewAlarmRequest } from "../lib/onboarding";
 import { sessionTimesLabel, todaysSessions } from "../lib/schedule";
 import { fonts, radius, shadow, spacing, useNow, useThemeColors, type ThemeColors } from "../lib/theme";
 import { useWeatherCondition } from "../lib/weather";
+import { track } from "../lib/analytics";
 
 // Matches screens/CustomAlarmScreen.tsx's own repeat-summary convention exactly, so an
 // alarm reads the same way whether you're looking at it on Home or on the full list.
@@ -97,6 +98,7 @@ export default function HomeScreen({ navigation }: Props) {
       // Asks for whatever is still missing and explains it; false means it already said why.
       if (!(await ensureAlarmPermissions())) return;
       await scheduleUpcomingSessions();
+      track.dailyAlarm(true, "home_card");
       animateNextLayout();
       setBrunoSubscribed(true);
     } finally {
@@ -145,6 +147,7 @@ export default function HomeScreen({ navigation }: Props) {
     if (value && !(await ensureAlarmPermissions())) return;
     setCustomAlarms((prev) => prev.map((a) => (a.id === alarm.id ? { ...a, enabled: value } : a)));
     await setCustomAlarmEnabled(alarm.id, value);
+    track.customAlarmToggled(value);
   }
 
   function openNewAlarm() {

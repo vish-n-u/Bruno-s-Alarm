@@ -18,6 +18,7 @@ import { ensureAlarmPermissions } from "../lib/alarmPermissions";
 import { tapLight } from "../lib/haptics";
 import { animateNextLayout } from "../lib/layoutAnim";
 import { fonts, radius, shadow, spacing, useThemeColors, type ThemeColors } from "../lib/theme";
+import { track } from "../lib/analytics";
 
 const REPEAT_LABEL: Record<RepeatMode, string> = {
   once: "Once",
@@ -86,6 +87,7 @@ export default function CustomAlarmScreen({}: Props) {
     // Update immediately so the switch doesn't visually snap back while scheduling runs.
     setAlarms((prev) => prev.map((a) => (a.id === alarm.id ? { ...a, enabled: value } : a)));
     await setCustomAlarmEnabled(alarm.id, value);
+    track.customAlarmToggled(value);
     refresh();
   }
 

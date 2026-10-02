@@ -29,6 +29,7 @@ import {
   type SendMessageResult,
 } from "../lib/chat";
 import { fonts, radius, shadow, spacing, useThemeColors, type ThemeColors } from "../lib/theme";
+import { track } from "../lib/analytics";
 
 const QUICK_EMOJIS = ["🐕", "😂", "❤️", "👏"];
 // The list only grows to fit its content (up to this cap) rather than always reserving a
@@ -135,6 +136,7 @@ export default function LiveChat({ sessionId, live }: Props) {
     const result = await sendChatMessage(sessionId, text);
     setSending(false);
     if (result.ok) {
+      track.chatSent("live");
       setInput("");
       return;
     }
@@ -163,6 +165,7 @@ export default function LiveChat({ sessionId, live }: Props) {
 
   async function handleAcceptTerms() {
     await acceptChatTerms();
+    track.chatTermsAccepted("live");
     setTermsGateVisible(false);
     const pending = pendingSendRef.current;
     pendingSendRef.current = null;
@@ -184,6 +187,7 @@ export default function LiveChat({ sessionId, live }: Props) {
           label: "Block this viewer",
           style: "destructive",
           onPress: () => {
+            track.chatBlocked("live");
             blockDevice(message.deviceId).catch(() => {});
             setBlockedIds((prev) => [...prev, message.deviceId]);
           },
@@ -197,6 +201,7 @@ export default function LiveChat({ sessionId, live }: Props) {
     const target = reportTarget;
     setReportTarget(null);
     if (!target) return;
+    track.chatReported("live");
     await reportChatMessage(sessionId, target.id, reason).catch(() => {});
   }
 

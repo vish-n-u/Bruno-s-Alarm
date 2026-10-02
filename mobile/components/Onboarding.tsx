@@ -47,7 +47,7 @@ export default function Onboarding({ onDone }: { onDone: (openNewAlarm: boolean)
     () => [
       {
         kind: "image",
-        image: require("../assets/bruno-photo.jpg"),
+        image: require("../assets/bruno-cutout.png"),
         title: "An alarm clock with a real dog.",
         body: "Wake up to Bruno howling. He's a real dog, and his howl is recorded fresh every day.",
       },
@@ -103,7 +103,7 @@ export default function Onboarding({ onDone }: { onDone: (openNewAlarm: boolean)
         {slides.map((slide) => (
           <View key={slide.title} style={[styles.slide, { width }]}>
             {slide.kind === "image" ? (
-              <Image source={slide.image} style={styles.slideImage} resizeMode="cover" />
+              <Image source={slide.image} style={styles.slideImage} resizeMode="contain" />
             ) : (
               <Ionicons name={slide.icon} size={56} color={colors.accent} style={styles.icon} />
             )}
@@ -174,14 +174,11 @@ function createStyles(colors: ThemeColors) {
     icon: {
       marginBottom: spacing.xxl - spacing.xs,
     },
+    // A transparent cut-out of Bruno, so no frame: he sits straight on the background.
     slideImage: {
-      width: 220,
-      height: 220,
-      borderRadius: radius.lg,
-      borderWidth: 1,
-      borderColor: colors.accentBorder,
-      backgroundColor: colors.surface,
-      marginBottom: spacing.xxl - spacing.xs,
+      width: 260,
+      height: 260,
+      marginBottom: spacing.xl,
     },
     title: {
       color: colors.textPrimary,

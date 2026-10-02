@@ -169,7 +169,7 @@ export default function HomeScreen({ navigation }: Props) {
       <Sky now={now} weatherCondition={weatherCondition} />
 
       <ScrollView contentContainerStyle={styles.content}>
-        <View>
+        <View style={styles.main}>
           <View style={styles.header}>
             <View style={styles.headerTitleWrap}>
               <Text style={styles.title}>Bruno's Alarm</Text>
@@ -223,7 +223,7 @@ export default function HomeScreen({ navigation }: Props) {
           {!brunoSubscribed && customAlarms.length === 0 && (
             <View style={styles.emptyState}>
               <LottieView
-                source={require("../assets/animations/dog-saxophone.json")}
+                source={require("../assets/animations/sleepy-dog.json")}
                 autoPlay
                 loop
                 style={styles.emptyLottie}
@@ -434,14 +434,25 @@ function createStyles(colors: ThemeColors) {
       fontFamily: fonts.bodyMedium,
       fontSize: 14,
     },
+    // Fills the space left under the header so the empty state can sit in its middle.
+    main: {
+      flex: 1,
+    },
+    // Takes all the room between the header and the footer and centres the illustration +
+    // caption in it, like a system empty state, instead of stacking right under the header.
     emptyState: {
+      flex: 1,
       alignItems: "center",
-      gap: spacing.sm,
+      justifyContent: "center",
+      gap: spacing.md,
       paddingVertical: spacing.xl,
     },
+    // sleepy-dog.json's canvas is 400x300; keep that ratio so the scene isn't letterboxed
+    // off-centre inside a square box.
     emptyLottie: {
-      width: 180,
-      height: 180,
+      width: "80%",
+      maxWidth: 300,
+      aspectRatio: 4 / 3,
     },
     emptyText: {
       color: colors.textSecondary,

@@ -176,8 +176,8 @@ function createStyles(colors: ThemeColors) {
     },
     // A transparent cut-out of Bruno, so no frame: he sits straight on the background.
     slideImage: {
-      width: 260,
-      height: 260,
+      width: 180,
+      height: 180,
       marginBottom: spacing.xl,
     },
     title: {

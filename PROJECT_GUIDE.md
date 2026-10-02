@@ -259,6 +259,11 @@ Contact email used in the app, site and policies: `vishnuna26@gmail.com`.
   seconds; last value cached for offline launches; missing doc/field = hidden). `sendChatMessage`
   also refuses Pack messages while it's off (30 s cache), so older builds can't post either.
   `config/*` is public-read, no client writes (`firestore.rules`).
+- **DEV badge:** `config/app.developerIds` (array of strings) lists chat ids (anonymous Firebase
+  uids) that get a paw "DEV" pill next to their name in both chats (`components/DevBadge.tsx`).
+  Trusted because a message's `deviceId` is stamped by `sendChatMessage`, never the app. Applies
+  to old messages too. A phone's id: Settings → tap Version 7× → "> my chat id" (Share/copy).
+  Reinstalling the app gives that phone a new id.
   Same function, rules, rate limit, terms gate, report/block as live chat. It's exempt from the
   500-per-session cap and from `cleanupOldChat`; instead `trimPersistentRoom` in
   `functions/src/index.ts` keeps only the **newest 200 messages** (after each Pack message: a
@@ -381,7 +386,7 @@ cd mobile/android && ./gradlew bundleRelease
 
 Releasing a new Play build:
 1. Bump **`versionCode` in BOTH `mobile/app.json` and `mobile/android/app/build.gradle`**
-   (the android folder isn't regenerated automatically). Current: **21**. Play rejects a
+   (the android folder isn't regenerated automatically). Current: **22**. Play rejects a
    versionCode it has already seen.
 2. Build the AAB, upload in Play Console. Commit the version bump.
 3. Store assets: `mobile/assets/play-store-icon.png` (512×512) and

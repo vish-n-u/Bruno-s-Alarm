@@ -11,6 +11,8 @@ import {
   View,
 } from "react-native";
 import { showDialog } from "../lib/dialog";
+import { useAppConfig } from "../lib/appConfig";
+import DevBadge from "../components/DevBadge";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { Ionicons } from "@expo/vector-icons";
 import LottieView from "lottie-react-native";
@@ -67,6 +69,7 @@ function errorMessageFor(reason: Exclude<SendMessageResult, { ok: true }>["reaso
 
 export default function BrunosPackScreen() {
   const colors = useThemeColors();
+  const { developerIds } = useAppConfig();
   const styles = createStyles(colors);
   const listRef = useRef<FlatList<ChatMessage>>(null);
   const pendingSendRef = useRef<string | null>(null);
@@ -193,7 +196,10 @@ export default function BrunosPackScreen() {
           contentContainerStyle={styles.listContent}
           renderItem={({ item }) => (
             <Pressable onLongPress={() => handleMessageLongPress(item)} style={styles.messageRow}>
-              <Text style={styles.messageName}>{item.displayName}</Text>
+              <View style={styles.nameRow}>
+                <Text style={styles.messageName}>{item.displayName}</Text>
+                {developerIds.includes(item.deviceId) && <DevBadge />}
+              </View>
               <Text style={styles.messageText}>{item.text}</Text>
             </Pressable>
           )}
@@ -320,6 +326,11 @@ function createStyles(colors: ThemeColors) {
       paddingHorizontal: spacing.sm,
       paddingVertical: spacing.xs,
       borderRadius: radius.sm,
+    },
+    nameRow: {
+      flexDirection: "row",
+      alignItems: "center",
+      gap: 6,
     },
     messageName: {
       color: colors.live,

@@ -1,5 +1,5 @@
 import { useCallback, useState } from "react";
-import { Alert, Linking, Platform, ScrollView, StyleSheet, Text, View } from "react-native";
+import { Alert, Linking, Platform, ScrollView, Share, StyleSheet, Text, View } from "react-native";
 import { showDialog } from "../lib/dialog";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { Ionicons } from "@expo/vector-icons";
@@ -19,6 +19,7 @@ import {
   type ScheduledAlarmSummary,
 } from "../lib/notifications";
 import { describeSavedRecording, getCachedAlarmSoundPath, refreshAlarmSound } from "../lib/alarmSound";
+import { ensureAnonymousAuth } from "../lib/firebase";
 import { success, tapLight, warning } from "../lib/haptics";
 import { animateNextLayout } from "../lib/layoutAnim";
 import { setDebugForceLive } from "../lib/schedule";
@@ -290,6 +291,25 @@ export default function SettingsScreen({ navigation }: Props) {
               }}
             >
               <Text style={styles.consoleText}>&gt; preview weather &amp; time</Text>
+            </Touchable>
+            <View style={styles.rowDivider} />
+            <Touchable
+              style={styles.consoleRow}
+              onPress={async () => {
+                // For the DEV badge in chat: paste this into developerIds in Firestore config/app.
+                tapLight();
+                const uid = await ensureAnonymousAuth().then((user) => user.uid).catch(() => null);
+                if (!uid) {
+                  Alert.alert("No chat ID yet", "Couldn't reach Firebase. Check the connection and try again.");
+                  return;
+                }
+                Alert.alert("This phone's chat ID", uid, [
+                  { text: "Share / copy", onPress: () => Share.share({ message: uid }).catch(() => {}) },
+                  { text: "OK", style: "cancel" },
+                ]);
+              }}
+            >
+              <Text style={styles.consoleText}>&gt; my chat id</Text>
             </Touchable>
             {Platform.OS === "android" && (
               <>

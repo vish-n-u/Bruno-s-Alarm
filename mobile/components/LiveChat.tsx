@@ -11,6 +11,8 @@ import {
   View,
 } from "react-native";
 import { showDialog } from "../lib/dialog";
+import { useAppConfig } from "../lib/appConfig";
+import DevBadge from "./DevBadge";
 import { Ionicons } from "@expo/vector-icons";
 import ChatTermsGate from "./ChatTermsGate";
 import ReportMessageModal from "./ReportMessageModal";
@@ -92,6 +94,7 @@ function useKeyboardHeight(): number {
 // passes taps through to VideoPanel's own tap-to-mute underneath.
 export default function LiveChat({ sessionId, live }: Props) {
   const colors = useThemeColors();
+  const { developerIds } = useAppConfig();
   const styles = createStyles(colors);
   const keyboardHeight = useKeyboardHeight();
   const listRef = useRef<FlatList<ChatMessage>>(null);
@@ -218,7 +221,10 @@ export default function LiveChat({ sessionId, live }: Props) {
         contentContainerStyle={styles.listContent}
         renderItem={({ item }) => (
           <Pressable onLongPress={() => handleMessageLongPress(item)} style={styles.messageRow}>
-            <Text style={styles.messageName}>{item.displayName}</Text>
+            <View style={styles.nameRow}>
+                <Text style={styles.messageName}>{item.displayName}</Text>
+                {developerIds.includes(item.deviceId) && <DevBadge />}
+              </View>
             <Text style={styles.messageText}>{item.text}</Text>
           </Pressable>
         )}
@@ -314,6 +320,11 @@ function createStyles(colors: ThemeColors) {
       paddingHorizontal: spacing.sm,
       paddingVertical: 3,
       borderRadius: radius.sm,
+    },
+    nameRow: {
+      flexDirection: "row",
+      alignItems: "center",
+      gap: 6,
     },
     messageName: {
       color: colors.live,

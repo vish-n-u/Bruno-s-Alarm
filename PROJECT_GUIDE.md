@@ -303,6 +303,13 @@ Contact email used in the app, site and policies: `vishnuna26@gmail.com`.
     removes `AD_ID` + `ACCESS_ADSERVICES_AD_ID/ATTRIBUTION` (the generated android manifest was
     also patched by hand, since `android/` isn't re-prebuilt). Play Console → App content →
     Advertising ID is answered **No**. Keep it that way unless ads are added.
+  - **No typed foreground service** (since v27): `expo-audio` is configured with
+    `enableBackgroundPlayback: false` (it was on by default and only ever needed for the old
+    iPhone keep-awake engine), which drops `FOREGROUND_SERVICE_MEDIA_PLAYBACK` and its
+    `AudioControlsService` — so Play's "Foreground service permissions" declaration isn't needed.
+    Alarm sound is unaffected (react-native-alarmageddon plays it natively, no foreground
+    service). Plain `FOREGROUND_SERVICE` remains from WorkManager (background refresh); that's
+    untyped and doesn't need the declaration.
   - To watch events live while testing: `adb shell setprop debug.firebase.analytics.app
     com.brunosalarm.app`, then Firebase console → Analytics → DebugView.
 - Weather-reactive sky exists but is hidden (`WEATHER_HINTS_ENABLED = false` in `lib/weather.ts`).
@@ -409,7 +416,7 @@ cd mobile/android && ./gradlew bundleRelease
 
 Releasing a new Play build:
 1. Bump **`versionCode` in BOTH `mobile/app.json` and `mobile/android/app/build.gradle`**
-   (the android folder isn't regenerated automatically). Current: **26**. Play rejects a
+   (the android folder isn't regenerated automatically). Current: **27**. Play rejects a
    versionCode it has already seen.
 2. Build the AAB, upload in Play Console. Commit the version bump.
 3. Store assets: `mobile/assets/play-store-icon.png` (512×512) and

@@ -18,7 +18,7 @@
     },
     "android": {
       "package": "com.brunosalarm.app",
-      "versionCode": 26,
+      "versionCode": 27,
       "googleServicesFile": "./google-services.json",
       "adaptiveIcon": {
         "backgroundColor": "#0f1a14",
@@ -77,7 +77,13 @@
         }
       ],
       "expo-background-task",
-      "expo-audio",
+      [
+        "expo-audio",
+        {
+          "enableBackgroundPlayback": false,
+          "recordAudioAndroid": false
+        }
+      ],
       "expo-asset",
       "@react-native-firebase/app",
       "@react-native-firebase/analytics",

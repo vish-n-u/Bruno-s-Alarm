@@ -298,6 +298,11 @@ Contact email used in the app, site and policies: `vishnuna26@gmail.com`.
   - Chat {room: live|pack}: `chat_terms_accepted`, `chat_message_sent`, `chat_message_reported`,
     `chat_user_blocked`.
   - `permission_prompt` {setting, opened_settings} for each of the app's permission dialogs.
+  - **No advertising ID** (since v25): `mobile/firebase.json` sets
+    `google_analytics_adid_collection_enabled: false`, and `app.json` `blockedPermissions`
+    removes `AD_ID` + `ACCESS_ADSERVICES_AD_ID/ATTRIBUTION` (the generated android manifest was
+    also patched by hand, since `android/` isn't re-prebuilt). Play Console → App content →
+    Advertising ID is answered **No**. Keep it that way unless ads are added.
   - To watch events live while testing: `adb shell setprop debug.firebase.analytics.app
     com.brunosalarm.app`, then Firebase console → Analytics → DebugView.
 - Weather-reactive sky exists but is hidden (`WEATHER_HINTS_ENABLED = false` in `lib/weather.ts`).
@@ -404,7 +409,7 @@ cd mobile/android && ./gradlew bundleRelease
 
 Releasing a new Play build:
 1. Bump **`versionCode` in BOTH `mobile/app.json` and `mobile/android/app/build.gradle`**
-   (the android folder isn't regenerated automatically). Current: **24**. Play rejects a
+   (the android folder isn't regenerated automatically). Current: **25**. Play rejects a
    versionCode it has already seen.
 2. Build the AAB, upload in Play Console. Commit the version bump.
 3. Store assets: `mobile/assets/play-store-icon.png` (512×512) and

@@ -18,7 +18,7 @@
     },
     "android": {
       "package": "com.brunosalarm.app",
-      "versionCode": 25,
+      "versionCode": 26,
       "googleServicesFile": "./google-services.json",
       "adaptiveIcon": {
         "backgroundColor": "#0f1a14",

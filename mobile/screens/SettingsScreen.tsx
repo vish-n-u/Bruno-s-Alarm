@@ -5,6 +5,7 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { Ionicons } from "@expo/vector-icons";
 import { useFocusEffect } from "@react-navigation/native";
 import type { NativeStackScreenProps } from "@react-navigation/native-stack";
+import * as Device from "expo-device";
 import appConfig from "../app.json";
 import LiveAlarmToggle from "../components/LiveAlarmToggle";
 import NotifyToggle from "../components/NotifyToggle";
@@ -28,6 +29,8 @@ import { fonts, radius, shadow, spacing, useThemeColors, type ThemeColors } from
 // Served by the Next.js site at the repo root (app/privacy, app/terms).
 const PRIVACY_POLICY_URL = "https://bruno-s-alarm.vercel.app/privacy";
 const TERMS_URL = "https://bruno-s-alarm.vercel.app/terms";
+const WEBSITE_URL = "https://bruno-s-alarm.vercel.app";
+const CONTACT_EMAIL = "contact@brunos-alarm.com";
 
 const KIND_LABEL: Record<ScheduledAlarmKind, string> = {
   session: "Bruno's real sessions",
@@ -161,6 +164,43 @@ export default function SettingsScreen({ navigation }: Props) {
   // debug test) without needing a manual pull-to-refresh.
   useFocusEffect(refreshAlarms);
 
+  function handleAbout() {
+    tapLight();
+    showDialog({
+      icon: "paw",
+      title: "About Bruno's Alarm",
+      body:
+        "Bruno is a real dog who howls at a church bell twice a day. We film it live and turn his latest howl into your alarm, so every morning you wake up to the real thing.",
+      buttons: [
+        { label: "Visit website", style: "primary", onPress: () => Linking.openURL(WEBSITE_URL).catch(() => {}) },
+        { label: "Close", style: "cancel" },
+      ],
+    });
+  }
+
+  // Opens the phone's email app with the address filled in, plus the app version and phone model
+  // so a report can be acted on. Falls back to showing the address if there's no email app.
+  async function handleContact() {
+    tapLight();
+    const subject = encodeURIComponent("Bruno's Alarm");
+    const details = [
+      `App version: ${appConfig.expo.version} (${Platform.OS === "android" ? appConfig.expo.android.versionCode : Platform.OS})`,
+      `Phone: ${[Device.manufacturer, Device.modelName].filter(Boolean).join(" ") || "unknown"}`,
+      `${Platform.OS === "ios" ? "iOS" : "Android"} ${Device.osVersion ?? Platform.Version}`,
+    ].join("\n");
+    const body = encodeURIComponent(`\n\n\n---\n${details}`);
+    try {
+      await Linking.openURL(`mailto:${CONTACT_EMAIL}?subject=${subject}&body=${body}`);
+    } catch {
+      showDialog({
+        icon: "mail-outline",
+        title: "Contact us",
+        body: `Email us at ${CONTACT_EMAIL}`,
+        buttons: [{ label: "OK", style: "primary" }],
+      });
+    }
+  }
+
   function handleClearAll() {
     showDialog({
       icon: "trash-outline",
@@ -204,6 +244,23 @@ export default function SettingsScreen({ navigation }: Props) {
 
       <SectionLabel variant="secondary">About</SectionLabel>
       <View style={styles.card}>
+        <SettingsRow
+          icon="paw-outline"
+          title="About Bruno's Alarm"
+          onPress={handleAbout}
+          colors={colors}
+          styles={styles}
+        />
+        <View style={styles.rowDivider} />
+        <SettingsRow
+          icon="mail-outline"
+          title="Contact us"
+          subtitle={CONTACT_EMAIL}
+          onPress={handleContact}
+          colors={colors}
+          styles={styles}
+        />
+        <View style={styles.rowDivider} />
         <SettingsRow
           icon="shield-checkmark-outline"
           title="Privacy Policy"

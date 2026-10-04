@@ -98,7 +98,7 @@ index 84502ce..e043fe1 100644
          prefs.edit().putString(id, obj.toString()).apply()
      }
 diff --git a/node_modules/react-native-alarmageddon/android/src/main/java/com/rnalarmmodule/AlarmReceiver.kt b/node_modules/react-native-alarmageddon/android/src/main/java/com/rnalarmmodule/AlarmReceiver.kt
-index 8eb109e..a4bf975 100644
+index 8eb109e..9b92994 100644
 --- a/node_modules/react-native-alarmageddon/android/src/main/java/com/rnalarmmodule/AlarmReceiver.kt
 +++ b/node_modules/react-native-alarmageddon/android/src/main/java/com/rnalarmmodule/AlarmReceiver.kt
 @@ -6,11 +6,17 @@ import android.app.*
@@ -119,7 +119,7 @@ index 8eb109e..a4bf975 100644
  import android.util.Log
  
  class AlarmReceiver : BroadcastReceiver() {
-@@ -22,7 +28,9 @@ class AlarmReceiver : BroadcastReceiver() {
+@@ -22,7 +28,11 @@ class AlarmReceiver : BroadcastReceiver() {
          private const val CHANNEL_ID = "rn_alarm_module_channel"
          private const val RAW_RES = "alarm_default"
          private const val SNOOZE_MINUTES = 5
@@ -127,10 +127,12 @@ index 8eb109e..a4bf975 100644
 +        // A safety cap, not the normal way an alarm ends: it rings until Stop/Snooze. The stock
 +        // library stopped every alarm after 60s, which cut the recording off mid-wake-up.
 +        private const val AUTO_STOP_SECONDS = 600
++        // Same storage AlarmModule saves scheduled alarms in (listAlarms reads it).
++        private const val PREFS = "rn_alarm_module_alarms"
  
          @Volatile
          private var player: MediaPlayer? = null
-@@ -36,8 +44,28 @@ class AlarmReceiver : BroadcastReceiver() {
+@@ -36,8 +46,28 @@ class AlarmReceiver : BroadcastReceiver() {
          @Volatile
          var activeAlarmId: String? = null
  
@@ -159,7 +161,15 @@ index 8eb109e..a4bf975 100644
      }
  
      override fun onReceive(context: Context, intent: Intent?) {
-@@ -64,13 +92,14 @@ class AlarmReceiver : BroadcastReceiver() {
+@@ -50,6 +80,7 @@ class AlarmReceiver : BroadcastReceiver() {
+         when (action) {
+             ACTION_STOP -> {
+                 stopAlarm(context, id)
++                forgetAlarm(context, id)
+                 return
+             }
+ 
+@@ -64,13 +95,14 @@ class AlarmReceiver : BroadcastReceiver() {
          val body = intent.getStringExtra("body") ?: ""
          val snoozeEnabled = intent.getBooleanExtra("snoozeEnabled", true)
          val snoozeInterval = intent.getIntExtra("snoozeInterval", SNOOZE_MINUTES)
@@ -175,7 +185,7 @@ index 8eb109e..a4bf975 100644
          showNotificationWithActions(context, id, title, body, snoozeEnabled, snoozeInterval)
      }
  
-@@ -97,36 +126,101 @@ class AlarmReceiver : BroadcastReceiver() {
+@@ -97,36 +129,101 @@ class AlarmReceiver : BroadcastReceiver() {
              audioManager = context.getSystemService(Context.AUDIO_SERVICE) as AudioManager
          }
          audioManager?.let { am ->
@@ -224,10 +234,9 @@ index 8eb109e..a4bf975 100644
 +            // Not fatal either way (playback doesn't depend on holding focus), but a FAILED
 +            // result here would be a real, previously-invisible clue for a silent-alarm report.
 +            Log.d(TAG, "Audio focus request result: $focusResult")
-         }
-     }
- 
--    private fun playAlarm(context: Context, id: String) {
++        }
++    }
++
 +    private fun startVolumeGuard(context: Context, am: AudioManager, maxVolume: Int) {
 +        if (volumeReceiver != null) return
 +        val appContext = context.applicationContext
@@ -272,17 +281,18 @@ index 8eb109e..a4bf975 100644
 +        if (ctx != null) {
 +            try { volumeReceiver?.let { ctx.unregisterReceiver(it) } } catch (_: Exception) {}
 +            try { volumeObserver?.let { ctx.contentResolver.unregisterContentObserver(it) } } catch (_: Exception) {}
-+        }
+         }
 +        volumeReceiver = null
 +        volumeObserver = null
 +        volumeGuardContext = null
-+    }
-+
+     }
+ 
+-    private fun playAlarm(context: Context, id: String) {
 +    private fun playAlarm(context: Context, id: String, soundPath: String? = null) {
          player?.let {
              try {
                  if (it.isPlaying) it.stop()
-@@ -136,7 +230,19 @@ class AlarmReceiver : BroadcastReceiver() {
+@@ -136,7 +233,19 @@ class AlarmReceiver : BroadcastReceiver() {
          }
  
          player = MediaPlayer().apply {
@@ -303,7 +313,7 @@ index 8eb109e..a4bf975 100644
                  // Try to use custom alarm sound from host app's res/raw folder
                  val resId = context.resources.getIdentifier(RAW_RES, "raw", context.packageName)
                  if (resId != 0) {
-@@ -150,22 +256,63 @@ class AlarmReceiver : BroadcastReceiver() {
+@@ -150,22 +259,63 @@ class AlarmReceiver : BroadcastReceiver() {
                          ?: android.media.RingtoneManager.getDefaultUri(android.media.RingtoneManager.TYPE_NOTIFICATION)
                      setDataSource(context, alarmUri)
                  }
@@ -382,15 +392,35 @@ index 8eb109e..a4bf975 100644
              }
          }
  
-@@ -265,6 +412,7 @@ class AlarmReceiver : BroadcastReceiver() {
+@@ -178,6 +328,7 @@ class AlarmReceiver : BroadcastReceiver() {
+                 if (activeAlarmId == id) {
+                     Log.d(TAG, "Auto-stopping alarm id=$id after ${AUTO_STOP_SECONDS}s")
+                     stopAlarm(context, id)
++                    forgetAlarm(context, id)
+                 }
+             }
+         }.start()
+@@ -263,8 +414,19 @@ class AlarmReceiver : BroadcastReceiver() {
+         Log.d(TAG, "Notification shown for alarm id=$id")
+     }
  
++    /** A stopped alarm is done: drop it from the saved list, which otherwise kept every alarm that
++     * ever rang until something cancelled it, so listAlarms() showed them as still pending.
++     * Not called on snooze — a snoozed alarm rings again. */
++    private fun forgetAlarm(context: Context, id: String) {
++        try {
++            context.getSharedPreferences(PREFS, Context.MODE_PRIVATE).edit().remove(id).apply()
++        } catch (_: Exception) {
++        }
++    }
++
      private fun stopAlarm(context: Context, id: String?) {
          Log.d(TAG, "Stopping alarm id=$id")
 +        stopVolumeGuard()
          
          player?.apply {
              try {
-@@ -281,16 +429,18 @@ class AlarmReceiver : BroadcastReceiver() {
+@@ -281,16 +443,18 @@ class AlarmReceiver : BroadcastReceiver() {
              } catch (_: Exception) {
              }
              @Suppress("DEPRECATION")
@@ -417,7 +447,7 @@ index 8eb109e..a4bf975 100644
          }
  
          releaseWakeLock()
-@@ -310,11 +460,13 @@ class AlarmReceiver : BroadcastReceiver() {
+@@ -310,11 +474,13 @@ class AlarmReceiver : BroadcastReceiver() {
          val title = originalIntent.getStringExtra("title") ?: "Alarm"
          val body = originalIntent.getStringExtra("body") ?: ""
          val minutes = originalIntent.getIntExtra("snoozeMinutes", SNOOZE_MINUTES)

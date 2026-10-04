@@ -291,12 +291,16 @@ function classifyAlarmId(id: string): ScheduledAlarmKind {
 export async function getAllScheduledAlarms(): Promise<ScheduledAlarmSummary[]> {
   if (Platform.OS === "android") {
     const alarms = await RNAlarmModule.listAlarms();
+    // Alarms whose time has passed are history, not "scheduled" — e.g. one that rang while the
+    // phone was off and was never stopped (stopped ones are removed natively since v31).
+    const cutoff = Date.now() - 60_000;
     return alarms
       .map((a) => ({
         id: a.id,
         timestamp: new Date(a.datetimeISO).getTime(),
         kind: classifyAlarmId(a.id),
       }))
+      .filter((a) => !(a.timestamp < cutoff))
       .sort((a, b) => a.timestamp - b.timestamp);
   }
   const scheduled = await Notifications.getAllScheduledNotificationsAsync();

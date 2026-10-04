@@ -183,6 +183,11 @@ Contact email used in the app, site and policies: `vishnuna26@gmail.com`.
   abandons **that** object on stop (v29). Before, it abandoned a freshly built request, which
   Android ignores — the app held focus forever after Stop and the Live tab went silent
   (verified with `adb shell dumpsys audio` → "Audio Focus stack entries").
+- Saved-alarm list: the library keeps every scheduled alarm in SharedPreferences
+  (`rn_alarm_module_alarms`, read by `listAlarms()`) and originally only removed it on cancel, so
+  alarms that already rang stayed "pending" in Settings. Since v31 the patched AlarmReceiver
+  removes it on Stop and on the 600 s auto-stop (not on snooze), and Settings'
+  `getAllScheduledAlarms()` also hides anything more than a minute in the past.
 - The patched library auto-stops a ringing alarm after **600 s** and has a volume guard; the
   ringing screen also swallows the hardware volume keys (`plugins/withVolumeKeyBlock.js`).
 
@@ -427,7 +432,7 @@ cd mobile/android && ./gradlew bundleRelease
 
 Releasing a new Play build:
 1. Bump **`versionCode` in BOTH `mobile/app.json` and `mobile/android/app/build.gradle`**
-   (the android folder isn't regenerated automatically). Current: **30**. Play rejects a
+   (the android folder isn't regenerated automatically). Current: **31**. Play rejects a
    versionCode it has already seen.
 2. Build the AAB, upload in Play Console. Commit the version bump.
 3. Store assets: `mobile/assets/play-store-icon.png` (512×512) and

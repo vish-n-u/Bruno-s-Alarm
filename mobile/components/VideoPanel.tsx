@@ -1,9 +1,11 @@
 import { useEffect, useMemo, useRef, useState } from "react";
-import { Animated, AppState, Pressable, StyleSheet, View } from "react-native";
+import { Animated, AppState, Pressable, StyleSheet, Text, View } from "react-native";
+import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useVideoPlayer, VideoView, type VideoSource } from "expo-video";
 import { Ionicons } from "@expo/vector-icons";
 import { getCachedAlarmVideoUri, onAlarmRecordingChanged, refreshAlarmSound } from "../lib/alarmSound";
 import { tapLight } from "../lib/haptics";
+import { fonts, radius, spacing } from "../lib/theme";
 import { getDebugForceLive, isLiveWindow, isNearLiveWindow } from "../lib/schedule";
 import { getCloudflareLiveManifestUrl, getCloudflareLiveStatus, isCloudflareConfigured } from "../lib/liveStatus";
 
@@ -99,6 +101,7 @@ export default function VideoPanel({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [live, streamId]);
   const [muted, setMuted] = useState(true);
+  const insets = useSafeAreaInsets();
 
   // Bruno's latest saved recording, if one's ever been downloaded — takes priority over the
   // fixed placeholder clip. `version` changes whenever a new recording replaces the file: the
@@ -384,6 +387,21 @@ export default function VideoPanel({
           </Animated.View>
         </Pressable>
       )}
+      {/* Always-visible sound state, top-right — level with the Live tab's LIVE/REPLAY badge on
+          the left. The video starts muted, and the tap-anywhere toggle alone only flashed an
+          icon for a moment, which left people unsure whether sound was on. */}
+      {allowUnmute && (
+        <Pressable
+          style={[styles.soundPill, { top: insets.top + spacing.lg }]}
+          onPress={handleTap}
+          hitSlop={8}
+          accessibilityRole="button"
+          accessibilityLabel={muted ? "Sound off. Tap to turn sound on" : "Sound on. Tap to mute"}
+        >
+          <Ionicons name={muted ? "volume-mute" : "volume-high"} size={14} color="#fff" />
+          <Text style={styles.soundPillText}>{muted ? "Tap for sound" : "Sound on"}</Text>
+        </Pressable>
+      )}
     </View>
   );
 }
@@ -411,6 +429,23 @@ const styles = StyleSheet.create({
     bottom: 0,
     alignItems: "center",
     justifyContent: "center",
+  },
+  soundPill: {
+    position: "absolute",
+    right: spacing.lg,
+    flexDirection: "row",
+    alignItems: "center",
+    gap: spacing.xs,
+    paddingHorizontal: spacing.md,
+    paddingVertical: spacing.xs,
+    borderRadius: radius.pill,
+    backgroundColor: "rgba(0,0,0,0.55)",
+  },
+  soundPillText: {
+    color: "#fff",
+    fontFamily: fonts.bodyBold,
+    fontSize: 12,
+    letterSpacing: 0.5,
   },
   centerIconBubble: {
     width: 64,

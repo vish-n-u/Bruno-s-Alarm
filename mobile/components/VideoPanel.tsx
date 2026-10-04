@@ -43,6 +43,17 @@ const DRAIN_MAX_MS = 30_000;
 const FROZEN_MS = 15_000;
 const MAX_FROZEN_RELOADS = 3;
 const PROGRESS_CHECK_MS = 1_000;
+// One "not live" answer can be a blip (Cloudflare between segments, a stream reconnecting), so
+// a stream we're showing only counts as over after this many "not live" answers in a row, the
+// second one asked for sooner than the normal poll.
+const OFFLINE_CONFIRMATIONS = 2;
+const OFFLINE_CONFIRM_MS = 5_000;
+// A brand-new stream's live feed isn't playable for its first several seconds (Cloudflare is still
+// building the first segments), and a reconnecting encoder causes short gaps too. A playback error
+// while Cloudflare says live means "try again shortly", not "the stream ended" — retry for about
+// half a minute before falling back.
+const LIVE_ERROR_RETRY_MS = 3_000;
+const MAX_LIVE_ERROR_RETRIES = 10;
 
 // The Live tab's player: live stream, the replay of a stream that just ended, or (unused there,
 // hidden behind NO SIGNAL) the saved recording. Starts muted; tap to unmute. The alarm-ringing
@@ -105,6 +116,10 @@ export default function VideoPanel({
   const graceDeadline = useRef(alwaysCheckLive ? Date.now() + LIVE_ALARM_GRACE_MS : 0);
   // Set when Cloudflare says the broadcast stopped but the viewer still has footage to watch.
   const drainStartedAt = useRef<number | null>(null);
+  // "Not live" answers in a row while showing the live feed (see OFFLINE_CONFIRMATIONS).
+  const offlineStreak = useRef(0);
+  // Live-feed playback errors retried so far (see MAX_LIVE_ERROR_RETRIES). Reset once it plays.
+  const liveErrorRetries = useRef(0);
 
   // Reels-style tap-to-mute: tapping anywhere on the video toggles mute and briefly flashes a
   // centered speaker icon that fades back out, instead of a small always-on corner button.
@@ -187,22 +202,30 @@ export default function VideoPanel({
       }
       const status = await getCloudflareLiveStatus();
       if (cancelled) return;
+      let next = inGrace ? LIVE_ALARM_RETRY_MS : POLL_MS;
       if (status.live) {
+        offlineStreak.current = 0;
         drainStartedAt.current = null;
         setStreamId(status.streamId);
         setLive(true);
+      } else if (!status.reachable) {
+        // Couldn't ask Cloudflare — unknown, not "off". Keep showing whatever we're showing.
       } else if (liveRef.current) {
-        // The broadcast just stopped — let the viewer finish the footage they're still behind
-        // on; the progress watcher below switches away once it actually runs out.
-        if (drainStartedAt.current === null) drainStartedAt.current = Date.now();
+        offlineStreak.current += 1;
+        if (offlineStreak.current >= OFFLINE_CONFIRMATIONS) {
+          // The broadcast really stopped — let the viewer finish the footage they're still behind
+          // on; the progress watcher below switches away once it actually runs out.
+          if (drainStartedAt.current === null) drainStartedAt.current = Date.now();
+        } else {
+          next = OFFLINE_CONFIRM_MS;
+        }
       } else {
         setLive(false);
       }
       // Retry quickly while a go-live alarm's grace window is still open — even a "yes" here
       // can still fail to actually play for a couple more seconds while HLS segments
-      // populate (see the playback-error handling below, which will bounce back to VOD and
-      // rely on this fast retry to recover) — then settle into the normal, cheaper cadence.
-      timer = setTimeout(check, inGrace ? LIVE_ALARM_RETRY_MS : POLL_MS);
+      // populate (see the playback-error handling below) — then settle into the normal cadence.
+      timer = setTimeout(check, next);
     };
 
     check();
@@ -284,6 +307,7 @@ export default function VideoPanel({
         lastTime = player.currentTime;
         lastMovedAt = now;
         frozenReloads = 0;
+        liveErrorRetries.current = 0;
       }
       // Paused or in the background, it isn't supposed to move — don't count that as stuck.
       if (pausedRef.current || AppState.currentState !== "active") {
@@ -322,7 +346,17 @@ export default function VideoPanel({
       // (expected here, since "force live" with no actual broadcast means the live manifest
       // genuinely doesn't exist) shouldn't silently undo it.
       if (status === "error" && live && getDebugForceLive() === null) {
+        if (liveErrorRetries.current < MAX_LIVE_ERROR_RETRIES) {
+          liveErrorRetries.current += 1;
+          setTimeout(() => {
+            if (!liveRef.current) return;
+            player.replace(LIVE_SOURCE);
+            if (!pausedRef.current) player.play();
+          }, LIVE_ERROR_RETRY_MS);
+          return;
+        }
         console.warn("Live stream failed to play — falling back to the recorded replay.", error);
+        liveErrorRetries.current = 0;
         drainStartedAt.current = null;
         setLive(false);
       } else if (status === "error" && !live && replayUrl) {

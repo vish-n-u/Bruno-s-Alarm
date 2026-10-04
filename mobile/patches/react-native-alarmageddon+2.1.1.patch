@@ -1,5 +1,5 @@
 diff --git a/node_modules/react-native-alarmageddon/android/src/main/java/com/rnalarmmodule/AlarmModule.kt b/node_modules/react-native-alarmageddon/android/src/main/java/com/rnalarmmodule/AlarmModule.kt
-index 84502ce..88e3df8 100644
+index 84502ce..e043fe1 100644
 --- a/node_modules/react-native-alarmageddon/android/src/main/java/com/rnalarmmodule/AlarmModule.kt
 +++ b/node_modules/react-native-alarmageddon/android/src/main/java/com/rnalarmmodule/AlarmModule.kt
 @@ -67,6 +67,7 @@ class AlarmModule(reactContext: ReactApplicationContext) : ReactContextBaseJavaM
@@ -98,7 +98,7 @@ index 84502ce..88e3df8 100644
          prefs.edit().putString(id, obj.toString()).apply()
      }
 diff --git a/node_modules/react-native-alarmageddon/android/src/main/java/com/rnalarmmodule/AlarmReceiver.kt b/node_modules/react-native-alarmageddon/android/src/main/java/com/rnalarmmodule/AlarmReceiver.kt
-index 8eb109e..fc856ef 100644
+index 8eb109e..a4bf975 100644
 --- a/node_modules/react-native-alarmageddon/android/src/main/java/com/rnalarmmodule/AlarmReceiver.kt
 +++ b/node_modules/react-native-alarmageddon/android/src/main/java/com/rnalarmmodule/AlarmReceiver.kt
 @@ -6,11 +6,17 @@ import android.app.*
@@ -130,7 +130,7 @@ index 8eb109e..fc856ef 100644
  
          @Volatile
          private var player: MediaPlayer? = null
-@@ -36,6 +44,16 @@ class AlarmReceiver : BroadcastReceiver() {
+@@ -36,8 +44,28 @@ class AlarmReceiver : BroadcastReceiver() {
          @Volatile
          var activeAlarmId: String? = null
  
@@ -146,8 +146,20 @@ index 8eb109e..fc856ef 100644
 +
          @Volatile
          private var wakeLock: PowerManager.WakeLock? = null
++
++        // The exact focus request/listener the ringing alarm holds. Android only releases audio
++        // focus when given the SAME object that requested it — releasing a freshly built one does
++        // nothing, which left the app holding focus forever after Stop and silenced other audio
++        // (e.g. the Live tab) until the app was killed.
++        @Volatile
++        private var heldFocusRequest: AudioFocusRequest? = null
++
++        @Volatile
++        private var heldFocusListener: AudioManager.OnAudioFocusChangeListener? = null
      }
-@@ -64,13 +82,14 @@ class AlarmReceiver : BroadcastReceiver() {
+ 
+     override fun onReceive(context: Context, intent: Intent?) {
+@@ -64,13 +92,14 @@ class AlarmReceiver : BroadcastReceiver() {
          val body = intent.getStringExtra("body") ?: ""
          val snoozeEnabled = intent.getBooleanExtra("snoozeEnabled", true)
          val snoozeInterval = intent.getIntExtra("snoozeInterval", SNOOZE_MINUTES)
@@ -163,7 +175,7 @@ index 8eb109e..fc856ef 100644
          showNotificationWithActions(context, id, title, body, snoozeEnabled, snoozeInterval)
      }
  
-@@ -97,36 +116,99 @@ class AlarmReceiver : BroadcastReceiver() {
+@@ -97,36 +126,101 @@ class AlarmReceiver : BroadcastReceiver() {
              audioManager = context.getSystemService(Context.AUDIO_SERVICE) as AudioManager
          }
          audioManager?.let { am ->
@@ -206,13 +218,16 @@ index 8eb109e..fc856ef 100644
              } else {
 -                am.requestAudioFocus(null, AudioManager.STREAM_ALARM, AudioManager.AUDIOFOCUS_GAIN_TRANSIENT)
 +                am.requestAudioFocus(focusChangeListener, AudioManager.STREAM_ALARM, AudioManager.AUDIOFOCUS_GAIN_TRANSIENT)
-+            }
+             }
++            heldFocusRequest = focusRequest
++            heldFocusListener = focusChangeListener
 +            // Not fatal either way (playback doesn't depend on holding focus), but a FAILED
 +            // result here would be a real, previously-invisible clue for a silent-alarm report.
 +            Log.d(TAG, "Audio focus request result: $focusResult")
-+        }
-+    }
-+
+         }
+     }
+ 
+-    private fun playAlarm(context: Context, id: String) {
 +    private fun startVolumeGuard(context: Context, am: AudioManager, maxVolume: Int) {
 +        if (volumeReceiver != null) return
 +        val appContext = context.applicationContext
@@ -245,8 +260,8 @@ index 8eb109e..fc856ef 100644
 +        val observer = object : ContentObserver(Handler(Looper.getMainLooper())) {
 +            override fun onChange(selfChange: Boolean) {
 +                restore()
-             }
-         }
++            }
++        }
 +        appContext.contentResolver.registerContentObserver(Settings.System.CONTENT_URI, true, observer)
 +        volumeObserver = observer
 +        volumeGuardContext = appContext
@@ -261,14 +276,13 @@ index 8eb109e..fc856ef 100644
 +        volumeReceiver = null
 +        volumeObserver = null
 +        volumeGuardContext = null
-     }
- 
--    private fun playAlarm(context: Context, id: String) {
++    }
++
 +    private fun playAlarm(context: Context, id: String, soundPath: String? = null) {
          player?.let {
              try {
                  if (it.isPlaying) it.stop()
-@@ -136,7 +218,19 @@ class AlarmReceiver : BroadcastReceiver() {
+@@ -136,7 +230,19 @@ class AlarmReceiver : BroadcastReceiver() {
          }
  
          player = MediaPlayer().apply {
@@ -289,7 +303,7 @@ index 8eb109e..fc856ef 100644
                  // Try to use custom alarm sound from host app's res/raw folder
                  val resId = context.resources.getIdentifier(RAW_RES, "raw", context.packageName)
                  if (resId != 0) {
-@@ -150,22 +244,63 @@ class AlarmReceiver : BroadcastReceiver() {
+@@ -150,22 +256,63 @@ class AlarmReceiver : BroadcastReceiver() {
                          ?: android.media.RingtoneManager.getDefaultUri(android.media.RingtoneManager.TYPE_NOTIFICATION)
                      setDataSource(context, alarmUri)
                  }
@@ -368,7 +382,7 @@ index 8eb109e..fc856ef 100644
              }
          }
  
-@@ -265,6 +400,7 @@ class AlarmReceiver : BroadcastReceiver() {
+@@ -265,6 +412,7 @@ class AlarmReceiver : BroadcastReceiver() {
  
      private fun stopAlarm(context: Context, id: String?) {
          Log.d(TAG, "Stopping alarm id=$id")
@@ -376,7 +390,34 @@ index 8eb109e..fc856ef 100644
          
          player?.apply {
              try {
-@@ -310,11 +446,13 @@ class AlarmReceiver : BroadcastReceiver() {
+@@ -281,16 +429,18 @@ class AlarmReceiver : BroadcastReceiver() {
+             } catch (_: Exception) {
+             }
+             @Suppress("DEPRECATION")
+-            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+-                try {
+-                    am.abandonAudioFocusRequest(
+-                        AudioFocusRequest.Builder(AudioManager.AUDIOFOCUS_GAIN_TRANSIENT).build()
+-                    )
+-                } catch (_: Exception) {
++            try {
++                val request = heldFocusRequest
++                val listener = heldFocusListener
++                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O && request != null) {
++                    am.abandonAudioFocusRequest(request)
++                } else if (listener != null) {
++                    am.abandonAudioFocus(listener)
+                 }
+-            } else {
+-                am.abandonAudioFocus(null)
++            } catch (_: Exception) {
+             }
++            heldFocusRequest = null
++            heldFocusListener = null
+         }
+ 
+         releaseWakeLock()
+@@ -310,11 +460,13 @@ class AlarmReceiver : BroadcastReceiver() {
          val title = originalIntent.getStringExtra("title") ?: "Alarm"
          val body = originalIntent.getStringExtra("body") ?: ""
          val minutes = originalIntent.getIntExtra("snoozeMinutes", SNOOZE_MINUTES)

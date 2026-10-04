@@ -29,21 +29,31 @@ export type LiveStatus = {
    * every broadcast, identical on every phone. Used as the live chat room, so each stream gets
    * its own chat instead of sharing one with every other stream that half-day. Null when off. */
   streamId: string | null;
+  /** False when Cloudflare couldn't be asked (offline, timeout, server error). That's "unknown",
+   * not "off" — callers shouldn't end a stream they're showing because of one failed request. */
+  reachable: boolean;
 };
 
-const OFFLINE: LiveStatus = { live: false, streamId: null };
+const OFFLINE: LiveStatus = { live: false, streamId: null, reachable: true };
+const UNREACHABLE: LiveStatus = { live: false, streamId: null, reachable: false };
+const REQUEST_TIMEOUT_MS = 8_000;
 
 export async function getCloudflareLiveStatus(): Promise<LiveStatus> {
   if (!isCloudflareConfigured()) return OFFLINE;
+  const controller = new AbortController();
+  const timeout = setTimeout(() => controller.abort(), REQUEST_TIMEOUT_MS);
   try {
-    const res = await fetch(
-      `https://customer-${CUSTOMER_CODE}.cloudflarestream.com/${LIVE_INPUT_UID}/lifecycle`
-    );
-    if (!res.ok) return OFFLINE;
+    const res = await fetch(`https://customer-${CUSTOMER_CODE}.cloudflarestream.com/${LIVE_INPUT_UID}/lifecycle`, {
+      headers: { "Cache-Control": "no-cache" },
+      signal: controller.signal,
+    });
+    if (!res.ok) return UNREACHABLE;
     const data = await res.json();
     if (data?.live !== true) return OFFLINE;
-    return { live: true, streamId: typeof data.videoUID === "string" ? data.videoUID : null };
+    return { live: true, streamId: typeof data.videoUID === "string" ? data.videoUID : null, reachable: true };
   } catch {
-    return OFFLINE;
+    return UNREACHABLE;
+  } finally {
+    clearTimeout(timeout);
   }
 }

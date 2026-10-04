@@ -179,6 +179,10 @@ Contact email used in the app, site and policies: `vishnuna26@gmail.com`.
     *alarm* (that's why Alarmy never asks). Keep that declaration filled in, or Play revokes it
     and every user would get the "Show alarms over the lock screen" prompt.
   - `USE_EXACT_ALARM` is likewise auto-granted to declared alarm apps.
+- Audio focus: the patched AlarmReceiver keeps the exact `AudioFocusRequest` it requested and
+  abandons **that** object on stop (v29). Before, it abandoned a freshly built request, which
+  Android ignores — the app held focus forever after Stop and the Live tab went silent
+  (verified with `adb shell dumpsys audio` → "Audio Focus stack entries").
 - The patched library auto-stops a ringing alarm after **600 s** and has a volume guard; the
   ringing screen also swallows the hardware volume keys (`plugins/withVolumeKeyBlock.js`).
 
@@ -218,6 +222,13 @@ Contact email used in the app, site and policies: `vishnuna26@gmail.com`.
   closed, then shows the "NO SIGNAL" card with the next session time. If the replay can't play
   (Cloudflare not ready yet), it goes straight to NO SIGNAL. It never replays the phone's saved
   clip (that was the old behaviour and showed old/test clips).
+
+- **Live tab robustness (v29):** `getCloudflareLiveStatus()` returns `reachable: false` for a
+  failed/timed-out request ("unknown", not "off"); VideoPanel only ends a stream it's showing
+  after **2 "not live" answers in a row** (second one 5 s later), and a live-feed **playback
+  error is retried every 3 s up to 10 times** before falling back — a new stream isn't playable
+  for its first seconds and encoder reconnects cause gaps. Before this, either one caused the
+  LIVE ↔ REPLAY flip-flopping seen on 4 Oct.
 
 ### 4.4 "Ring when Bruno goes live" (optional, Android)
 
@@ -416,7 +427,7 @@ cd mobile/android && ./gradlew bundleRelease
 
 Releasing a new Play build:
 1. Bump **`versionCode` in BOTH `mobile/app.json` and `mobile/android/app/build.gradle`**
-   (the android folder isn't regenerated automatically). Current: **28**. Play rejects a
+   (the android folder isn't regenerated automatically). Current: **29**. Play rejects a
    versionCode it has already seen.
 2. Build the AAB, upload in Play Console. Commit the version bump.
 3. Store assets: `mobile/assets/play-store-icon.png` (512×512) and

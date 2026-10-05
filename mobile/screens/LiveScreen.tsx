@@ -3,10 +3,11 @@ import { Animated, Easing, StyleSheet, Text, View } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { useIsFocused } from "@react-navigation/native";
 import { Ionicons } from "@expo/vector-icons";
+import { useNetworkState } from "expo-network";
 import LiveChat from "../components/LiveChat";
 import VideoPanel from "../components/VideoPanel";
 import { getCloudflareRecordingManifestUrl } from "../lib/liveStatus";
-import { currentSessionId, nextSessionAt } from "../lib/schedule";
+import { currentSessionId, isNearLiveWindow, nextSessionAt } from "../lib/schedule";
 import { fonts, radius, spacing, useThemeColors } from "../lib/theme";
 import { track } from "../lib/analytics";
 
@@ -69,6 +70,25 @@ function NoSignalScreen({ nextTime }: { nextTime: string }) {
   );
 }
 
+// Shown instead of the video/NO SIGNAL when the phone is offline at a time it matters: Bruno is
+// (or was just) live, or it's around one of his sessions. Without it, an offline phone just showed
+// a frozen or black video with no hint why.
+function NoInternetScreen({ wasLive }: { wasLive: boolean }) {
+  const titleFlicker = useFlicker(0.5, 1);
+  return (
+    <View style={styles.noSignalRoot}>
+      <View style={styles.noSignalCenter}>
+        <Ionicons name="cloud-offline-outline" size={36} color="#8a8a8a" />
+        <Animated.Text style={[styles.noSignalTitle, { opacity: titleFlicker }]}>NO INTERNET</Animated.Text>
+        <Text style={styles.noSignalSubtitle}>
+          {wasLive ? "Bruno's live. Reconnect to keep watching." : "It's Bruno's time. Connect to watch him live."}
+        </Text>
+        <Text style={styles.noSignalNext}>Check your Wi-Fi or mobile data</Text>
+      </View>
+    </View>
+  );
+}
+
 // A dedicated tab for watching Bruno, separate from Home's schedule/alarm content. Reuses
 // VideoPanel exactly as the ringing screen does for the actual live feed — VideoPanel already
 // handles the live/VOD switch, its own Cloudflare polling, and (via allowUnmute) the
@@ -84,6 +104,9 @@ export default function LiveScreen() {
   const [live, setLive] = useState(false);
   const [streamId, setStreamId] = useState<string | null>(null);
   const [nextTime, setNextTime] = useState(() => formatTime(nextSessionAt()));
+  // Around one of Bruno's sessions (minutes before through the live window) — when an offline
+  // phone gets the "No internet" screen rather than the usual NO SIGNAL card.
+  const [nearSession, setNearSession] = useState(() => isNearLiveWindow());
   // The stream that just ended, replayed for a few minutes from its own Cloudflare recording —
   // never the phone's saved clip, which is often an older or test recording.
   const [replay, setReplay] = useState<{ url: string; until: number } | null>(null);
@@ -111,7 +134,11 @@ export default function LiveScreen() {
   // VideoPanel already lets the viewer finish the live footage before reporting "not live";
   // then the replay (if there is one) runs, then NO SIGNAL.
   const replaying = !live && replay !== null;
-  const showNoSignal = !live && !replaying;
+  const network = useNetworkState();
+  // `false` only — both are briefly undefined while the first check runs.
+  const offline = network.isConnected === false || network.isInternetReachable === false;
+  const showNoInternet = offline && (live || replaying || nearSession);
+  const showNoSignal = !live && !replaying && !showNoInternet;
   const playing = isFocused && (live || replaying);
 
   // One event each time Bruno's live stream (or its replay) starts showing on an open Live tab.
@@ -129,7 +156,10 @@ export default function LiveScreen() {
   // The next-live time only needs to be right, not live-ticking — recomputed once a minute
   // is plenty, and avoids a full per-second re-render just for this screen.
   useEffect(() => {
-    const id = setInterval(() => setNextTime(formatTime(nextSessionAt())), 60000);
+    const id = setInterval(() => {
+      setNextTime(formatTime(nextSessionAt()));
+      setNearSession(isNearLiveWindow());
+    }, 60000);
     return () => clearInterval(id);
   }, []);
 
@@ -151,10 +181,11 @@ export default function LiveScreen() {
         onReplayError={() => setReplay(null)}
       />
       {showNoSignal && <NoSignalScreen nextTime={nextTime} />}
+      {showNoInternet && <NoInternetScreen wasLive={live} />}
       {/* Chat only exists while live — closed during the replay, and skipped entirely once
           NoSignal is showing, so its own "not live" placeholder doesn't double up against it. */}
-      {live && <LiveChat sessionId={chatRoom} live={live} />}
-      {(live || replaying) && (
+      {live && !showNoInternet && <LiveChat sessionId={chatRoom} live={live} />}
+      {(live || replaying) && !showNoInternet && (
         <SafeAreaView style={styles.overlay} edges={["top"]} pointerEvents="none">
           <View style={styles.liveBadge}>
             <View style={[styles.liveDot, { backgroundColor: live ? colors.live : "#9a9a9a" }]} />

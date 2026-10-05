@@ -235,6 +235,12 @@ Contact email used in the app, site and policies: `vishnuna26@gmail.com`.
   for its first seconds and encoder reconnects cause gaps. Before this, either one caused the
   LIVE ↔ REPLAY flip-flopping seen on 4 Oct.
 
+- **No internet (v32):** `screens/LiveScreen.tsx` uses `expo-network`'s `useNetworkState()`. If
+  the phone is offline (`isConnected` or `isInternetReachable` is `false`) **and** Bruno is/was
+  live or it's around a session (`isNearLiveWindow()`), the tab shows a NO INTERNET screen (same
+  style as NO SIGNAL) instead of a frozen video; chat and the LIVE badge are hidden meanwhile.
+  Outside session time an offline phone still just sees NO SIGNAL.
+
 ### 4.4 "Ring when Bruno goes live" (optional, Android)
 
 - `lib/liveAlerts.ts` subscribes the device to the FCM topic `live`.
@@ -432,7 +438,7 @@ cd mobile/android && ./gradlew bundleRelease
 
 Releasing a new Play build:
 1. Bump **`versionCode` in BOTH `mobile/app.json` and `mobile/android/app/build.gradle`**
-   (the android folder isn't regenerated automatically). Current: **31**. Play rejects a
+   (the android folder isn't regenerated automatically). Current: **32**. Play rejects a
    versionCode it has already seen.
 2. Build the AAB, upload in Play Console. Commit the version bump.
 3. Store assets: `mobile/assets/play-store-icon.png` (512×512) and

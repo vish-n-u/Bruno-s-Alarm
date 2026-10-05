@@ -2,7 +2,50 @@
 
 The single document to read before touching this project. It explains what the product is,
 how every piece works, how to build and ship it, the traps that have already cost time, and
-what's still open. Written 28 Sep 2026; check `git log` for anything newer.
+what's still open. Written 28 Sep 2026, last updated **5 Oct 2026**; check `git log` for
+anything newer.
+
+---
+
+## 0. Where we are (snapshot, 5 Oct 2026)
+
+**App version:** `versionCode` **32** (Android). Built locally; the newest .aab is at
+`mobile/android/app/build/outputs/bundle/release/app-release.aab`.
+
+**Phones:** OPPO CPH2737 (owner's main test phone, on v31) and Samsung Galaxy A35 SM-A356E
+(on v32). Both run release builds signed with the upload key.
+
+**Google Play:** personal developer account → Google requires a **closed test with ≥ 12 testers
+for 14 days** before production. Done in Play Console: content rating, data safety, target
+audience, store listing assets, full-screen intent + exact alarm declarations (core function =
+alarm), **Advertising ID = No** (requires v25+ bundles), foreground-service issue removed (v27+).
+Next: run the closed test (feedback form: `mobile/docs/tester-feedback-form.gs`, a Google Apps
+Script that creates the form), then apply for production.
+
+**What changed 2–5 Oct (v20 → v32), all on `main`:**
+- Bruno's Pack chat tab live, shown/hidden from Firestore `config/app.packEnabled`; newest-200
+  message limit on the server; 🐾 DEV badge from `config/app.developerIds` (§4.5).
+- Onboarding uses a transparent cut-out photo (`assets/bruno-cutout.png`).
+- Firebase Analytics product events (§4.6); advertising ID removed (v25); expo-audio background
+  service removed (v27).
+- Settings → About: "About Bruno's Alarm" card and "Contact us" (contact@brunos-alarm.com).
+- **v29:** alarm no longer keeps the phone's audio after Stop (Live tab was silent); Live tab no
+  longer flips LIVE ↔ REPLAY at stream start or on one failed check (§4.3).
+- **v30:** always-visible sound button on the Live tab ("Tap for sound" / "Sound on").
+- **v31:** stopped alarms are removed from the saved list (Settings showed them as "pending").
+- **v32:** NO INTERNET screen on the Live tab when offline around a session (`expo-network`).
+- Camera: the streaming phone now sends true portrait 1080×1920 (§10 item 2) — the old blur was
+  the encoder pillarboxing portrait into a landscape frame, not Cloudflare.
+- Removed the failing legacy GitHub Actions cron (`.github/workflows/cron.yml`).
+
+**Waiting on the owner:**
+- Run the on-device checklist (alarms locked/swiped, snooze, sound after an alarm, Live tab with
+  a real stream incl. start/stop and NO INTERNET, Pack, Contact us) — see §10 item 10.
+- Measure the new alarm-download size after a real session (§10 item 2).
+- Decide whether the privacy policy / terms / website contact switches from
+  `vishnuna26@gmail.com` to `contact@brunos-alarm.com` (the app already uses the new one).
+- iPhone: needs an Apple Developer account + Firebase `GoogleService-Info.plist`; work so far is
+  on the `ios` branch (§11).
 
 ---
 
@@ -25,8 +68,11 @@ What a user sees in the app:
 - **Home tab** — their alarms, a card for "Bruno's daily alarm" (while it's off: a one-tap
   "Turn on" offer with "Not now", which hides it for good; once on: the alarm's times), a `+`
   button to add their own alarm, a gear to Settings. Animated sky that follows the real time of day.
-- **Live tab** — the live camera when Bruno is on, a "NO SIGNAL" test card when he isn't, and a
-  live chat overlay during a stream.
+- **Live tab** — the live camera when Bruno is on (LIVE badge top-left, sound button top-right,
+  starts muted), a 5-minute REPLAY after a stream ends, a "NO SIGNAL" test card when he isn't
+  live, "NO INTERNET" when the phone is offline around a session, and a live chat overlay.
+- **Bruno's Pack tab** — one always-open chat room; shown only while Firestore
+  `config/app.packEnabled` is true.
 - **Onboarding** (first launch) — three short slides telling one story, main thing first:
   "An alarm clock with a real dog." → "Pick any time." (plays his newest howl, rings on
   silent) → "Catch him live, too." (his times in the user's timezone, live + chat). Last button
@@ -34,9 +80,11 @@ What a user sees in the app:
   no permissions. (An earlier version led with the live stream and never said it was an alarm —
   the owner found it confusing, 30 Sep.)
 - **Settings** — Bruno's daily alarm toggle, "Ring when Bruno goes live" toggle (Android),
-  list of scheduled alarms, Privacy/Terms links, version. **Tap "Version" 7× to unlock a hidden
-  Debug section** (test alarm in 90s, force-live, preview onboarding, saved-recording status,
-  weather preview, clear all alarms).
+  About (About Bruno's Alarm card, Contact us → contact@brunos-alarm.com), Privacy/Terms
+  links, version, list of scheduled alarms. **Tap "Version" 7× to unlock a hidden Debug
+  section** (test alarm in 90s, force-live, preview onboarding, my chat id, saved-recording
+  status, weather preview, run background refresh, clear all alarms). Force-live resets when
+  the app restarts.
 
 Status: **Android beta**, being submitted to Google Play (package `com.brunosalarm.app`).
 iOS code paths exist but iOS has never been built or shipped (no `ios/` folder) — see §11 for
@@ -65,12 +113,13 @@ firebase.json             Firebase config (predeploy runs the function tests)
 mobile/                   The Expo app
   App.tsx                 Root: fonts, onboarding gate, alarm-ringing takeover, tab navigator
   components/             HomeScreen, Onboarding, AlarmRingingScreen, VideoPanel, LiveChat, …
-  screens/                LiveScreen, SettingsScreen, CustomAlarmScreen, BrunosPackScreen (hidden), …
+  screens/                LiveScreen, SettingsScreen, CustomAlarmScreen, BrunosPackScreen, …
   lib/                    All logic (see §4)
   plugins/                Expo config plugins that customise the native Android project (see §5)
   patches/                patch-package patch for react-native-alarmageddon (see §5)
   docs/                   Topic notes: play-store-checklist, hidden-features, ios-*, live-chat-setup, …
-  assets/                 icon.png (app icon master), bruno-photo.jpg (onboarding),
+  assets/                 icon.png (app icon master), bruno-cutout.png (onboarding, transparent),
+                          bruno-photo.jpg (permission-dialog lock-screen illustration),
                           play-store-icon.png + play-feature-graphic.png (store listing),
                           videos/ (bundled fallback howl), audio/, animations/
   privacy-policy.txt/.html, terms-of-service.txt/.html   Source copies of the legal text
@@ -94,7 +143,9 @@ JOURNEY.md, bruno-app-build-plan.md   Historical notes from earlier phases
 | Expo / EAS | Project ID only (builds are done locally, not on EAS) | owner `vishnuna123` |
 | Camera streaming app | The phone app that streams Bruno to Cloudflare (RTMP/SRT) | Since 2 Oct: a new app sending true portrait, no watermark — see §10 item 2 |
 
-Contact email used in the app, site and policies: `vishnuna26@gmail.com`.
+Contact email: the app's Settings uses **`contact@brunos-alarm.com`** (since v26). The privacy
+policy, terms and website (`app/site.ts` `CONTACT_EMAIL`) still say `vishnuna26@gmail.com` —
+the owner hasn't decided yet whether to switch them (Play shows the policy's address).
 
 ### Environment variables (names only — values live in the files/dashboards, never in chat or git)
 
@@ -350,18 +401,25 @@ Contact email used in the app, site and policies: `vishnuna26@gmail.com`.
   (this machine's network breaks on IPv6 Maven mirrors).
 - `mobile/patches/react-native-alarmageddon+2.1.1.patch` (applied by `postinstall:
   patch-package`) adds: `soundPath` support, auto-stop 60 → 600 s, a volume guard,
-  `canScheduleExactAlarms`/`canUseFullScreenIntent`, and diagnostic logging (audio-focus
-  changes, MediaPlayer error/completion) for an unexplained report of an alarm stopping ~22 s in.
-- **Regenerating the patch safely:** after native builds, `node_modules/react-native-alarmageddon`
-  contains build output. Reset it first, then re-apply, then edit, then regenerate:
+  `canScheduleExactAlarms`/`canUseFullScreenIntent`/`isIgnoringBatteryOptimizations`, releasing
+  the **same** audio-focus request on stop (v29), removing stopped alarms from the saved list
+  (v31), and diagnostic logging (audio-focus changes, MediaPlayer error/completion) for an
+  unexplained report of an alarm stopping ~22 s in.
+- **Regenerating the patch:** `npx patch-package react-native-alarmageddon` does **not** work
+  here — the published package itself ships an `android/build/` folder, so the diff fills with
+  build files (and Windows "Filename too long" errors). What works (used 1–4 Oct): edit the files
+  in `node_modules/react-native-alarmageddon`, then diff the 4 patched files against a clean copy
+  from npm and write the patch by hand:
   ```bash
-  cd mobile
-  rm -rf node_modules/react-native-alarmageddon
-  npm install --no-save react-native-alarmageddon@2.1.1
-  npx patch-package                 # re-apply the existing patch (install did NOT do it automatically)
-  # …make your edits in node_modules/react-native-alarmageddon/android/…
-  npx patch-package react-native-alarmageddon
-  grep -c "android/build/" patches/react-native-alarmageddon+2.1.1.patch   # must print 0
+  mkdir tmp && cd tmp && npm pack react-native-alarmageddon@2.1.1 && tar -xzf *.tgz
+  P=node_modules/react-native-alarmageddon
+  for f in android/src/main/java/com/rnalarmmodule/AlarmModule.kt \
+           android/src/main/java/com/rnalarmmodule/AlarmReceiver.kt lib/index.d.ts src/index.ts; do
+    mkdir -p "orig/$P/$(dirname $f)" "new/$P/$(dirname $f)"
+    cp "package/$f" "orig/$P/$f"; cp "../mobile/$P/$f" "new/$P/$f"; done
+  git diff --no-index --src-prefix=a/ --dst-prefix=b/ orig new \
+    | sed -e 's#a/orig/#a/#g' -e 's#b/new/#b/#g' > ../mobile/patches/react-native-alarmageddon+2.1.1.patch
+  cd ../mobile && npx patch-package --reverse && npx patch-package   # must both print ✔
   ```
 
 ---
@@ -446,14 +504,22 @@ Releasing a new Play build:
    The feature graphic is rendered by a small Python/Pillow script using the app's fonts from
    `mobile/node_modules/@expo-google-fonts/*` (not committed — easy to recreate).
 
-**Install conflict:** a Play-installed copy is signed by Google's key; a local build is
-signed with the upload key. They can't update each other — uninstall first (this wipes the
-app's alarms/settings on that phone).
+**Install conflict:** a Play-installed copy is signed by Google's key; a local release build is
+signed with the upload key; a debug build (`npx expo run:android`) is signed with the debug key.
+None can update another — `adb install` fails with `INSTALL_FAILED_UPDATE_INCOMPATIBLE`;
+uninstall first (this wipes the app's alarms/settings and gives the phone a new chat id). Check
+a phone's copy with `adb shell dumpsys package com.brunosalarm.app | grep -E "versionCode|pkgFlags"`
+(`DEBUGGABLE` = a debug build).
 
-Play Console status (as of 28 Sep): content rating done (3+/Everyone, "Users Interact");
+**If a release build fails with `ENOTEMPTY … metro-cache`:** delete
+`%TEMP%\metro-cache` (PowerShell `Remove-Item -Recurse -Force`) and build again.
+
+Play Console status (as of 5 Oct): content rating done (3+/Everyone, "Users Interact");
 Data safety done (Name, Approximate location, Other in-app messages, App interactions, Crash
 logs, Diagnostics, Device IDs; nothing shared; encrypted in transit; deletion via
-`/privacy#delete-your-data`); target audience should exclude under-13s. See
+`/privacy#delete-your-data`); target audience 13+; store icon/feature graphic/screenshots
+uploaded; full-screen intent + exact alarm declared as "alarm"; Advertising ID declared **No**.
+Personal account → closed test (≥ 12 testers, 14 days) before production. See
 `mobile/docs/play-store-checklist.md`.
 
 ---
@@ -481,9 +547,16 @@ logs, Diagnostics, Device IDs; nothing shared; encrypted in transit; deletion vi
   bounds instead of estimating from screenshots. The test phone is 1080×2373.
 - The phone's log buffer only keeps a few minutes — capture `adb logcat -d` right after a
   problem happens.
-- Cloudflare Stream thumbnail URLs return 403 for this account; to see what a recording
-  contains, pull a frame from its R2 copy:
+- To see what a recording contains: Cloudflare's thumbnail URL works
+  (`https://customer-<code>.cloudflarestream.com/<uid>/thumbnails/thumbnail.jpg?time=8s&height=1920`),
+  or pull a frame from the R2 copy:
   `ffmpeg -ss 30 -i https://media.brunos-alarm.com/alarm-recordings/<uid>.mp4 -frames:v 1 out.jpg`.
+  The size the camera actually *sent* is `input.width/height` on the live input's videos
+  (Cloudflare API, `CLOUDFLARE_API_TOKEN` in root `.env.local`).
+- **Who holds the phone's audio:** `adb shell dumpsys audio`, section "Audio Focus stack
+  entries". After an alarm is stopped, Bruno's Alarm must not be listed (that was the v29 bug).
+- `uiautomator dump` fails ("could not get idle state") while the app is animating; use
+  screenshots (`adb exec-out screencap -p > s.png`) instead.
 
 ---
 
@@ -519,7 +592,14 @@ logs, Diagnostics, Device IDs; nothing shared; encrypted in transit; deletion vi
    the player reloads when a new recording downloads (§4.3). Needs an on-device test with a
    real stream stop.
    A 5-minute replay of the stream that just ended was added back the right way (its own
-   recording, labelled REPLAY). Needs a real test: how soon Cloudflare makes it playable.
+   recording, labelled REPLAY). Cloudflare needs a few minutes after a stream ends to finish
+   the recording (32 s stream on 4 Oct: ready ~9 min later), so the replay may be partial or skip
+   straight to NO SIGNAL at first — expected.
+   **4 Oct real-session bugs, FIXED in v29:** (a) no sound on the Live tab after stopping an
+   alarm — the alarm never released audio focus (see §4.1); (b) LIVE ↔ REPLAY flip-flopping —
+   a new stream errors for its first seconds and any single failed status check counted as
+   "offline" (see §4.3). Also seen: the 6 AM stream on 4 Oct arrived as 3 separate recordings
+   (encoder reconnecting) — check the streaming phone's connection / auto-reconnect.
    Alarm sound and ringing video matching — **built 29 Sep (Option A, §4.1), app v16**; needs an
    on-device test (normal ring, snooze, ring during a live stream, first ring after updating).
 5. ~~Bruno's Pack 200-message cap~~ — **built and deployed 2 Oct**; the tab is on (§4.5).
@@ -531,6 +611,21 @@ logs, Diagnostics, Device IDs; nothing shared; encrypted in transit; deletion vi
    the legacy web player code and routes.
 9. Untested on device: tapping Undo was removed (delete is immediate again); the live-alert
    dedupe with a real reconnecting stream; volume-key blocking end to end.
+10. **Owner's on-device checklist for v29–v32 (not done yet):** (A) preview onboarding photo,
+    About / Contact us, Pack send + DEV badge + Report/Block, `packEnabled` off/on; (B) test
+    alarm with phone locked + app swiped away, Stop → no leftover in Settings, Snooze rings again,
+    other audio works right after Stop; (C) real stream: open Live tab in the first seconds (no
+    LIVE/REPLAY flipping), sound button, 6 PM alarm → Stop → Live with sound, stream stop →
+    REPLAY → NO SIGNAL, chat; force-live + airplane mode → NO INTERNET; (D) optional DebugView.
+11. **Closed testing on Play** (personal account): ≥ 12 testers for 14 days, then apply for
+    production. Feedback form script: `mobile/docs/tester-feedback-form.gs`.
+12. **Contact email in legal pages/site** still `vishnuna26@gmail.com` (app uses
+    `contact@brunos-alarm.com`) — owner to decide; make sure the new inbox receives mail.
+13. Later / optional: turn on R8 code shrinking (Play flags "DEX optimization: Low"; needs a
+    full re-test, R8 has broken release builds here before); remove the ~20 harmless launcher
+    "badge" permissions; delete the legacy website routes (`app/api/{cron,subscribe,status}`) and
+    the now-unused GitHub secrets `CRON_SECRET` / `APP_URL`; remove the old iPhone keep-awake
+    engine from `main` (`lib/iosAlarmEngine.ts`) once the `ios` branch is merged.
 
 ---
 

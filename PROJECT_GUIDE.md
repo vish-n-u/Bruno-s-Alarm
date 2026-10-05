@@ -9,7 +9,7 @@ anything newer.
 
 ## 0. Where we are (snapshot, 5 Oct 2026)
 
-**App version:** `versionCode` **32** (Android). Built locally; the newest .aab is at
+**App version:** `versionCode` **33** (Android). Built locally; the newest .aab is at
 `mobile/android/app/build/outputs/bundle/release/app-release.aab`.
 
 **Phones:** OPPO CPH2737 (owner's main test phone, on v31) and Samsung Galaxy A35 SM-A356E
@@ -33,6 +33,7 @@ Script that creates the form), then apply for production.
   longer flips LIVE ↔ REPLAY at stream start or on one failed check (§4.3).
 - **v30:** always-visible sound button on the Live tab ("Tap for sound" / "Sound on").
 - **v31:** stopped alarms are removed from the saved list (Settings showed them as "pending").
+- **v33:** Live tab no longer flashes the saved howl clip before a stream loads ("Connecting to Bruno…").
 - **v32:** NO INTERNET screen on the Live tab when offline around a session (`expo-network`).
 - Camera: the streaming phone now sends true portrait 1080×1920 (§10 item 2) — the old blur was
   the encoder pillarboxing portrait into a landscape frame, not Cloudflare.
@@ -286,6 +287,11 @@ the owner hasn't decided yet whether to switch them (Play shows the policy's add
   for its first seconds and encoder reconnects cause gaps. Before this, either one caused the
   LIVE ↔ REPLAY flip-flopping seen on 4 Oct.
 
+- **No hidden clip (v33):** the Live tab's player plays **nothing** when Bruno isn't live and
+  there's no replay (it used to play the saved howl clip under NO SIGNAL, which flashed on
+  screen when a stream started). A black "Connecting to Bruno…" / "Loading the replay…" screen
+  covers the player until the new source's first frame (`onFirstFrameRender`, with a
+  playback-position backup).
 - **No internet (v32):** `screens/LiveScreen.tsx` uses `expo-network`'s `useNetworkState()`. If
   the phone is offline (`isConnected` or `isInternetReachable` is `false`) **and** Bruno is/was
   live or it's around a session (`isNearLiveWindow()`), the tab shows a NO INTERNET screen (same
@@ -496,7 +502,7 @@ cd mobile/android && ./gradlew bundleRelease
 
 Releasing a new Play build:
 1. Bump **`versionCode` in BOTH `mobile/app.json` and `mobile/android/app/build.gradle`**
-   (the android folder isn't regenerated automatically). Current: **32**. Play rejects a
+   (the android folder isn't regenerated automatically). Current: **33**. Play rejects a
    versionCode it has already seen.
 2. Build the AAB, upload in Play Console. Commit the version bump.
 3. Store assets: `mobile/assets/play-store-icon.png` (512×512) and

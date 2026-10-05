@@ -1,9 +1,8 @@
 import { useEffect, useMemo, useRef, useState } from "react";
-import { Animated, AppState, Pressable, StyleSheet, Text, View } from "react-native";
+import { ActivityIndicator, Animated, AppState, Pressable, StyleSheet, Text, View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useVideoPlayer, VideoView, type VideoSource } from "expo-video";
 import { Ionicons } from "@expo/vector-icons";
-import { getCachedAlarmVideoUri, onAlarmRecordingChanged, refreshAlarmSound } from "../lib/alarmSound";
 import { tapLight } from "../lib/haptics";
 import { fonts, radius, spacing } from "../lib/theme";
 import { getDebugForceLive, isLiveWindow, isNearLiveWindow } from "../lib/schedule";
@@ -20,10 +19,6 @@ const SAMPLE_VIDEO = require("../assets/videos/Bruno Howl Alarm.mp4");
 // bundled sample.
 const LIVE_SOURCE: VideoSource =
   getCloudflareLiveManifestUrl() || process.env.EXPO_PUBLIC_LIVE_VIDEO_URL || SAMPLE_VIDEO;
-// Static fallback for the recorded replay, used only until the real cached recording (see
-// lib/alarmSound.ts — the same file periodically refreshed from Cloudflare for the native
-// alarm sound) has been downloaded at least once.
-const FALLBACK_VOD_SOURCE: VideoSource = process.env.EXPO_PUBLIC_VOD_VIDEO_URL || SAMPLE_VIDEO;
 
 // A go-live alarm fires the instant Cloudflare's webhook sees the encoder connect — but
 // Cloudflare's own "is this input live" status, and the HLS segments actually being
@@ -103,18 +98,6 @@ export default function VideoPanel({
   const [muted, setMuted] = useState(true);
   const insets = useSafeAreaInsets();
 
-  // Bruno's latest saved recording, if one's ever been downloaded — takes priority over the
-  // fixed placeholder clip. `version` changes whenever a new recording replaces the file: the
-  // path stays the same (scheduled alarms point at it), so without it the player would keep
-  // showing a file that was deleted and swapped underneath it and freeze.
-  const [recording, setRecording] = useState<{ uri: string; version: number } | null>(null);
-  function applyRecording(uri: string | undefined, replaced: boolean) {
-    if (!uri) return;
-    setRecording((prev) =>
-      prev && prev.uri === uri && !replaced ? prev : { uri, version: (prev?.version ?? 0) + 1 }
-    );
-  }
-
   // Computed once at mount: only a go-live alarm gets a grace window at all.
   const graceDeadline = useRef(alwaysCheckLive ? Date.now() + LIVE_ALARM_GRACE_MS : 0);
   // Set when Cloudflare says the broadcast stopped but the viewer still has footage to watch.
@@ -145,31 +128,6 @@ export default function VideoPanel({
       Animated.timing(iconOpacity, { toValue: 0, duration: 350, useNativeDriver: true }).start();
     }, 550);
   }
-
-  // Re-checks (and actively tries to refresh) the cached recording every time we're about to
-  // show the VOD fallback rather than only once on mount — refreshAlarmSound() is safe to call
-  // opportunistically (no-ops if there's nothing newer), so the fallback has its best shot at
-  // being the latest one, not a stale/previous recording or the bundled placeholder.
-  useEffect(() => {
-    if (live) return;
-    let cancelled = false;
-    getCachedAlarmVideoUri().then((uri) => {
-      if (!cancelled) applyRecording(uri, false);
-    });
-    refreshAlarmSound().catch(() => {});
-    return () => {
-      cancelled = true;
-    };
-  }, [live]);
-
-  // A newly downloaded recording has replaced the saved file — reload it.
-  useEffect(
-    () =>
-      onAlarmRecordingChanged(() => {
-        getCachedAlarmVideoUri().then((uri) => applyRecording(uri, true));
-      }),
-    []
-  );
 
   useEffect(() => {
     let cancelled = false;
@@ -238,17 +196,34 @@ export default function VideoPanel({
     };
   }, []);
 
-  const vodSource: VideoSource = useMemo(
-    () => (recording ? { uri: recording.uri } : FALLBACK_VOD_SOURCE),
-    [recording]
-  );
   const replaySource: VideoSource | null = useMemo(() => (replayUrl ? { uri: replayUrl } : null), [replayUrl]);
-  const source = live ? LIVE_SOURCE : replaySource ?? vodSource;
+  // Nothing plays when Bruno isn't live and there's no replay — the screen shows NO SIGNAL then.
+  // (It used to quietly play the saved howl clip underneath, which flashed on screen for a moment
+  // whenever a stream started, before the live feed loaded.)
+  const source: VideoSource = live ? LIVE_SOURCE : replaySource;
 
   // The first load is handled entirely by useVideoPlayer's own source argument — play()
-  // right in its setup callback. This ref exists only to detect a *later* change (live/VOD
-  // toggling, or a new recording), so we don't call replace() redundantly on mount.
+  // right in its setup callback. This ref exists only to detect a *later* change (live/replay
+  // toggling), so we don't call replace() redundantly on mount.
   const loadedSource = useRef(source);
+
+  // Until the new source shows its first frame, a black "Connecting…" screen covers the player,
+  // so whatever it showed before (a previous stream's last frame) never flashes up.
+  const [frameShown, setFrameShown] = useState(false);
+  useEffect(() => {
+    setFrameShown(false);
+    if (!source) return;
+    // Backup for onFirstFrameRender: playback position moving means frames are showing.
+    const startTime = player.currentTime;
+    const id = setInterval(() => {
+      if (player.currentTime > startTime + 0.2) {
+        setFrameShown(true);
+        clearInterval(id);
+      }
+    }, 500);
+    return () => clearInterval(id);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [source]);
 
   const player = useVideoPlayer(source, (p) => {
     p.loop = true;
@@ -377,7 +352,19 @@ export default function VideoPanel({
           (below) plus, on the Live tab, a chat overlay anchored to the bottom; the native
           play/pause/scrub bar not only duplicates that but paints a dimming scrim behind
           itself whenever shown, which made the whole video read as broken/black. */}
-      <VideoView style={styles.video} player={player} contentFit="cover" nativeControls={false} />
+      <VideoView
+        style={styles.video}
+        player={player}
+        contentFit="cover"
+        nativeControls={false}
+        onFirstFrameRender={() => setFrameShown(true)}
+      />
+      {source !== null && !frameShown && (
+        <View style={styles.connecting} pointerEvents="none">
+          <ActivityIndicator color="#fff" />
+          <Text style={styles.connectingText}>{live ? "Connecting to Bruno…" : "Loading the replay…"}</Text>
+        </View>
+      )}
       {allowUnmute && (
         <Pressable style={StyleSheet.absoluteFill} onPress={handleTap}>
           <Animated.View style={[styles.centerIconWrap, { opacity: iconOpacity }]} pointerEvents="none">
@@ -429,6 +416,22 @@ const styles = StyleSheet.create({
     bottom: 0,
     alignItems: "center",
     justifyContent: "center",
+  },
+  connecting: {
+    position: "absolute",
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    backgroundColor: "#000",
+    alignItems: "center",
+    justifyContent: "center",
+    gap: spacing.sm,
+  },
+  connectingText: {
+    color: "#bdbdbd",
+    fontFamily: fonts.body,
+    fontSize: 14,
   },
   soundPill: {
     position: "absolute",

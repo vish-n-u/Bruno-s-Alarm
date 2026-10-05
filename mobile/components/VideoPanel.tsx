@@ -51,6 +51,13 @@ const OFFLINE_CONFIRM_MS = 5_000;
 // half a minute before falling back.
 const LIVE_ERROR_RETRY_MS = 3_000;
 const MAX_LIVE_ERROR_RETRIES = 10;
+// When the camera stops, Cloudflare drops the live feed at once (the live address answers 204), so
+// a viewer who was ~30 s behind loses the rest — but it's all in the recording. The replay then
+// starts that far before the recording's end, continuing roughly where they were instead of from
+// the beginning. The player's measured delay is used when it has one (Cloudflare's feed usually
+// lacks the timing data, so it's often null); otherwise the ~30 s the owner observed.
+const DEFAULT_LIVE_DELAY_S = 30;
+const ENCODER_LAG_S = 8; // added to the player's measured offset: camera → Cloudflare → playlist
 
 // The Live tab's player: live stream, the replay of a stream that just ended, or (unused there,
 // hidden behind NO SIGNAL) the saved recording. Starts muted; tap to unmute. The alarm-ringing
@@ -106,6 +113,10 @@ export default function VideoPanel({
   const offlineStreak = useRef(0);
   // Live-feed playback errors retried so far (see MAX_LIVE_ERROR_RETRIES). Reset once it plays.
   const liveErrorRetries = useRef(0);
+  // How far behind live the viewer was (seconds), when the player can tell — see DEFAULT_LIVE_DELAY_S.
+  const lastLiveOffset = useRef<number | null>(null);
+  // Set when a replay is loaded, so it's positioned once (not on every rebuffer).
+  const replaySeekPending = useRef(false);
 
   // Reels-style tap-to-mute: tapping anywhere on the video toggles mute and briefly flashes a
   // centered speaker icon that fades back out, instead of a small always-on corner button.
@@ -212,6 +223,7 @@ export default function VideoPanel({
   const [frameShown, setFrameShown] = useState(false);
   useEffect(() => {
     setFrameShown(false);
+    replaySeekPending.current = !live && source !== null;
     if (!source) return;
     // Backup for onFirstFrameRender: playback position moving means frames are showing.
     const startTime = player.currentTime;
@@ -286,6 +298,8 @@ export default function VideoPanel({
         lastMovedAt = now;
         frozenReloads = 0;
         liveErrorRetries.current = 0;
+        const offset = player.currentOffsetFromLive;
+        if (offset !== null && offset >= 0) lastLiveOffset.current = offset;
       }
       // Paused or in the background, it isn't supposed to move — don't count that as stuck.
       if (pausedRef.current || AppState.currentState !== "active") {
@@ -320,6 +334,15 @@ export default function VideoPanel({
   // live again on its own if it's actually still up.
   useEffect(() => {
     const subscription = player.addListener("statusChange", ({ status, error }) => {
+      if (status === "readyToPlay" && !live && replaySeekPending.current && player.duration > 0) {
+        replaySeekPending.current = false;
+        const behind =
+          lastLiveOffset.current !== null ? lastLiveOffset.current + ENCODER_LAG_S : DEFAULT_LIVE_DELAY_S;
+        const target = player.duration - behind;
+        // Recording still being processed (shorter than expected) → just start from the beginning.
+        if (target > 2) player.currentTime = target;
+        lastLiveOffset.current = null;
+      }
       // A debug-forced state is a deliberate override for testing — a real playback error
       // (expected here, since "force live" with no actual broadcast means the live manifest
       // genuinely doesn't exist) shouldn't silently undo it.

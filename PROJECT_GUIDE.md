@@ -9,7 +9,7 @@ anything newer.
 
 ## 0. Where we are (snapshot, 5 Oct 2026)
 
-**App version:** `versionCode` **33** (Android). Built locally; the newest .aab is at
+**App version:** `versionCode` **34** (Android). Built locally; the newest .aab is at
 `mobile/android/app/build/outputs/bundle/release/app-release.aab`.
 
 **Phones:** OPPO CPH2737 (owner's main test phone, on v31) and Samsung Galaxy A35 SM-A356E
@@ -33,6 +33,7 @@ Script that creates the form), then apply for production.
   longer flips LIVE ↔ REPLAY at stream start or on one failed check (§4.3).
 - **v30:** always-visible sound button on the Live tab ("Tap for sound" / "Sound on").
 - **v31:** stopped alarms are removed from the saved list (Settings showed them as "pending").
+- **v34:** when a stream ends, the replay continues near where the viewer was instead of restarting.
 - **v33:** Live tab no longer flashes the saved howl clip before a stream loads ("Connecting to Bruno…").
 - **v32:** NO INTERNET screen on the Live tab when offline around a session (`expo-network`).
 - Camera: the streaming phone now sends true portrait 1080×1920 (§10 item 2) — the old blur was
@@ -287,6 +288,12 @@ the owner hasn't decided yet whether to switch them (Play shows the policy's add
   for its first seconds and encoder reconnects cause gaps. Before this, either one caused the
   LIVE ↔ REPLAY flip-flopping seen on 4 Oct.
 
+- **Stream end → replay continues (v34):** when the camera stops, Cloudflare drops the live feed
+  immediately (the live-input manifest returns **204**), so a viewer ~30 s behind only has a few
+  buffered seconds left. The replay (the stream's recording) is then started that far before its
+  end instead of from 0: `player.currentOffsetFromLive + 8 s` when the player reports it (usually
+  null — Cloudflare's playlists have no PROGRAM-DATE-TIME), otherwise 30 s
+  (`DEFAULT_LIVE_DELAY_S`). If the recording is still processing (too short), it starts from 0.
 - **No hidden clip (v33):** the Live tab's player plays **nothing** when Bruno isn't live and
   there's no replay (it used to play the saved howl clip under NO SIGNAL, which flashed on
   screen when a stream started). A black "Connecting to Bruno…" / "Loading the replay…" screen
@@ -502,7 +509,7 @@ cd mobile/android && ./gradlew bundleRelease
 
 Releasing a new Play build:
 1. Bump **`versionCode` in BOTH `mobile/app.json` and `mobile/android/app/build.gradle`**
-   (the android folder isn't regenerated automatically). Current: **33**. Play rejects a
+   (the android folder isn't regenerated automatically). Current: **34**. Play rejects a
    versionCode it has already seen.
 2. Build the AAB, upload in Play Console. Commit the version bump.
 3. Store assets: `mobile/assets/play-store-icon.png` (512×512) and

@@ -624,6 +624,12 @@ Personal account → closed test (≥ 12 testers, 14 days) before production. Se
    the legacy web player code and routes.
 9. Untested on device: tapping Undo was removed (delete is immediate again); the live-alert
    dedupe with a real reconnecting stream; volume-key blocking end to end.
+14. **PARKED (6 Oct): exact replay position per viewer.** v34 starts the replay a fixed ~30 s
+    before the recording's end (the player rarely knows its real delay). Owner wants it exact
+    for every viewer, whatever their delay. Idea: the live feed and the recording are both made
+    of numbered ~2 s pieces (`seg_N`); if the live playlist uses the same numbers, the app can
+    note which piece the viewer was on when the feed cut and start the replay exactly there.
+    Next step: inspect the live playlist **during a live stream** to confirm the numbering.
 10. **Owner's on-device checklist for v29–v32 (not done yet):** (A) preview onboarding photo,
     About / Contact us, Pack send + DEV badge + Report/Block, `packEnabled` off/on; (B) test
     alarm with phone locked + app swiped away, Stop → no leftover in Settings, Snooze rings again,

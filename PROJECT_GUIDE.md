@@ -9,7 +9,7 @@ anything newer.
 
 ## 0. Where we are (snapshot, 5 Oct 2026)
 
-**App version:** `versionCode` **36** (Android). Built locally; the newest .aab is at
+**App version:** `versionCode` **37** (Android). Built locally; the newest .aab is at
 `mobile/android/app/build/outputs/bundle/release/app-release.aab`.
 
 **Phones:** OPPO CPH2737 (owner's main test phone, on v31) and Samsung Galaxy A35 SM-A356E
@@ -509,7 +509,7 @@ cd mobile/android && ./gradlew bundleRelease
 
 Releasing a new Play build:
 1. Bump **`versionCode` in BOTH `mobile/app.json` and `mobile/android/app/build.gradle`**
-   (the android folder isn't regenerated automatically). Current: **36**. Play rejects a
+   (the android folder isn't regenerated automatically). Current: **37**. Play rejects a
    versionCode it has already seen.
 2. Build the AAB, upload in Play Console. Commit the version bump.
 3. Store assets: `mobile/assets/play-store-icon.png` (512×512) and

@@ -211,7 +211,7 @@ export default function HomeScreen({ navigation }: Props) {
           {!brunoSubscribed && !dailyCardDismissed && (
             <View style={styles.dailyCard}>
               <Text style={styles.dailyCardTitle}>Bruno's daily alarm</Text>
-              <Text style={styles.dailyCardBody}>Rings when he howls, around {sessionTimesLabel()}.</Text>
+              <Text style={styles.dailyCardBody}>Rings at his morning and evening howl (India), around {sessionTimesLabel()}.</Text>
               <View style={styles.dailyCardActions}>
                 <Touchable style={styles.dailyCardButton} onPress={turnOnDailyAlarm} disabled={turningOnDaily}>
                   <Text style={styles.dailyCardButtonText}>{turningOnDaily ? "Turning on…" : "Turn on"}</Text>

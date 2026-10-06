@@ -60,8 +60,8 @@ export default function NotifyToggle() {
         : status === "denied"
           ? "Blocked, enable in device settings"
           : status === "subscribed"
-            ? `On. Rings around ${sessionTimesLabel()} every day`
-            : `Rings when Bruno howls, around ${sessionTimesLabel()}`;
+            ? `On. Rings at his morning and evening howl (India), around ${sessionTimesLabel()}`
+            : `His morning and evening howl (India), around ${sessionTimesLabel()}`;
 
   return (
     <View style={styles.row}>

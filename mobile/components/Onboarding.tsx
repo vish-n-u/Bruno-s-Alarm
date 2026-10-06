@@ -61,7 +61,7 @@ export default function Onboarding({ onDone }: { onDone: (openNewAlarm: boolean)
         kind: "icon",
         icon: "videocam-outline",
         title: "Catch him live, too.",
-        body: `Twice a day, morning and evening where Bruno lives (India), he howls at a church bell. For you that's around ${sessionTimesLabel()}. Watch live and chat with everyone else watching.`,
+        body: `Twice a day, in his morning and evening, he howls at a church bell. For you that's around ${sessionTimesLabel()}. Watch live and chat with everyone else watching.`,
       },
     ],
     []

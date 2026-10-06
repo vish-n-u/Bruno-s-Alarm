@@ -83,7 +83,7 @@ export default function Home() {
         <section className="hero">
           <div className="wrap hero-grid">
             <div className="hero-copy">
-              <p className="eyebrow">Every morning &amp; evening in India · 06:00 &amp; 18:00 IST</p>
+              <p className="eyebrow">Every morning &amp; evening · 06:00 &amp; 18:00 IST</p>
               <h1 className="display">
                 A real dog.
                 <br />

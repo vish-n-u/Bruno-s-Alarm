@@ -5,9 +5,12 @@ import { useEffect } from "react";
 // Same boundaries as getTimeOfDay() in mobile/lib/theme.ts.
 function phaseAt(date: Date): string {
   const h = date.getHours() + date.getMinutes() / 60;
-  if (h >= 5 && h < 11) return "morning";
-  if (h >= 11 && h < 17) return "afternoon";
+  if (h >= 5 && h < 6.5) return "dawn";
+  if (h >= 6.5 && h < 11) return "morning";
+  if (h >= 11 && h < 16) return "afternoon";
+  if (h >= 16 && h < 17) return "golden";
   if (h >= 17 && h < 18.5) return "evening";
+  if (h >= 18.5 && h < 19.5) return "dusk";
   return "night";
 }
 

@@ -9,7 +9,7 @@ anything newer.
 
 ## 0. Where we are (snapshot, 5 Oct 2026)
 
-**App version:** `versionCode` **37** (Android). Built locally; the newest .aab is at
+**App version:** `versionCode` **44** (Android, 14 Oct). Built locally; the newest .aab is at
 `mobile/android/app/build/outputs/bundle/release/app-release.aab`.
 
 **Phones:** OPPO CPH2737 (owner's main test phone, on v31) and Samsung Galaxy A35 SM-A356E
@@ -76,9 +76,9 @@ What a user sees in the app:
 - **Bruno's Pack tab** — one always-open chat room; shown only while Firestore
   `config/app.packEnabled` is true.
 - **Onboarding** (first launch) — three short slides telling one story, main thing first:
-  "An alarm clock with a real dog." → "Pick any time." (plays his newest howl, rings on
-  silent) → "Catch him live, too." (his times in the user's timezone, live + chat). Last button
-  "Set my first alarm" opens the new-alarm sheet on Home; Skip just goes to Home. No questions,
+  "An alarm clock with a real dog." → "Pick any time." (newest howl, rings on silent; a
+  "Hear Bruno" button plays the bundled howl on media volume) → "Catch him live, too." (his times in the user's timezone, live + chat). Last button
+  The last button ("Let's go", since 12 Oct) and Skip both just go to Home; the new-alarm sheet is no longer opened automatically. No questions,
   no permissions. (An earlier version led with the live stream and never said it was an alarm —
   the owner found it confusing, 30 Sep.)
 - **Settings** — Bruno's daily alarm toggle, "Ring when Bruno goes live" toggle (Android),
@@ -167,10 +167,14 @@ the owner hasn't decided yet whether to switch them (Play shows the policy's add
   clip is served from R2 rather than straight from Stream.
 - **Cloudflare Stream** is the real cost: roughly $1 per 1,000 minutes *watched* (live + the
   5-minute replay — the replay can double or triple watch minutes) and roughly $5 per 1,000
-  minutes *stored* per month (every stream is recorded and kept, tests included). Check
-  Cloudflare's current pricing.
+  minutes *stored* (every stream is recorded, tests included). Check Cloudflare's current pricing.
+- **Recordings auto-delete after 30 days** (Live Input `deleteRecordingAfterDays: 30`, verified
+  11 Oct: all recordings carry a `scheduledDeletion`). Stored minutes stay ~one month's worth
+  (~45–60 min), well inside the prepaid 1,000. Download any clip you want to keep before then.
+- First invoice (9 Sep–8 Oct): **$7.08** = $5 storage block + $1 viewing block (80 min watched)
+  + 18% GST; R2 $0. Expect about that monthly until viewing passes 1,000 min/month.
 - Levers if it grows: shorten or drop the replay (`REPLAY_MS` in `screens/LiveScreen.tsx`),
-  auto-delete old recordings (a Live Input setting), use a separate test input.
+  use a separate test input.
 
 ---
 
@@ -186,14 +190,14 @@ the owner hasn't decided yet whether to switch them (Play shows the policy's add
 - The ringing UI is the app's own `MainActivity` shown over the lock screen
   (`plugins/withLockScreenAlarmActivity.js`), rendered as `components/AlarmRingingScreen.tsx`:
   full-screen Bruno video (muted) + **Stop** and **Snooze 10 min**, plus a
-  **"Bruno's live — watch"** button when he's live (stops the alarm, opens the Live tab).
+  **"Watch Bruno live"** button when he's live (stops the alarm, opens the Live tab).
 - **Sound and video always come from the same clip** (decided 29 Sep, "Option A"):
   - Every Android alarm is scheduled with the same fixed sound path
     (`getAlarmSoundFilePath()`); the native player plays that file if it exists and plays,
     else the built-in howl.
   - The ringing video (`components/AlarmClipVideo.tsx`, not VideoPanel) applies the same rule
     (`getAlarmClipVideoUri()`): the saved file if present, else the bundled
-    `Bruno Howl Alarm.mp4` — the same 26 s clip the built-in howl was cut from. If the saved file
+    `Bruno Howl Alarm.mp4` — the same 35 s clip the built-in howl is taken from (new clip 8 Oct; drop the clip in unchanged (owner prefers the original file) and copy its audio to `assets/audio/alarm_default.mp3` AND `android/app/src/main/res/raw/`). If the saved file
     won't play, it switches to the built-in clip too (the native player would have).
   - It never shows the live stream, never downloads, and the saved file is never replaced while
     an alarm rings (`setAlarmRinging()` in `lib/alarmSound.ts`).
@@ -345,6 +349,10 @@ the owner hasn't decided yet whether to switch them (Play shows the policy's add
   seconds; last value cached for offline launches; missing doc/field = hidden). `sendChatMessage`
   also refuses Pack messages while it's off (30 s cache), so older builds can't post either.
   `config/*` is public-read, no client writes (`firestore.rules`).
+  **Each user can also hide the tab on their own phone** (since v44 code, 13 Oct): Settings →
+  Chat → "Show Bruno's Pack tab", offered only while `packEnabled` is on. Stored locally
+  (`lib/packPreference.ts`, AsyncStorage `bruno-pack-tab-hidden`); the tab shows only when the
+  owner's switch is on AND the user hasn't hidden it. Analytics: `pack_tab_shown|hidden`.
 - **DEV badge:** `config/app.developerIds` (array of strings) lists chat ids (anonymous Firebase
   uids) that get a paw "DEV" pill next to their name in both chats (`components/DevBadge.tsx`).
   Trusted because a message's `deviceId` is stamped by `sendChatMessage`, never the app. Applies
@@ -358,8 +366,11 @@ the owner hasn't decided yet whether to switch them (Play shows the policy's add
 
 ### 4.6 Other pieces
 
-- **Theme** (`lib/theme.ts`): four palettes chosen by the *real clock*, not system dark mode
-  — morning, afternoon, evening (17:00–18:30), night. Fonts: Anton (headlines), Bricolage
+- **Theme** (`lib/theme.ts`): seven palettes chosen by the *real clock*, not system dark mode
+  — dawn (05:00–06:30, dark sky + warm glow around the sun in `Sky.tsx`), morning, afternoon
+  (11:00–16:00), golden hour (16:00–17:00), evening/sunset (17:00–18:30), dusk (18:30–19:30),
+  night. Dawn, dusk and night are dark (light status bar). No em dashes in user-facing copy
+  (owner's rule, 7 Oct). Fonts: Anton (headlines), Bricolage
   Grotesque (body), Courier Prime (numbers), Caveat (handwritten accents). The website uses
   the same palettes and fonts.
 - `components/Touchable.tsx`: the one press component (scale + haptic). Built on
@@ -441,7 +452,7 @@ the owner hasn't decided yet whether to switch them (Play shows the policy's add
 
 - Next.js 15 App Router at the repo root. Pages: `/` (landing), `/privacy`, `/terms`, and a
   secret-protected `/status` (legacy). Deployed automatically by Vercel on push to `main`.
-- The site follows the visitor's clock with the app's four palettes (`app/layout.tsx` inline
+- The site follows the visitor's clock with the app's seven palettes (`app/layout.tsx` inline
   script + `app/_components/PhaseSync.tsx`) and shows a schedule board in the visitor's
   timezone (`app/_components/DepartureBoard.tsx`).
 - `/privacy` is the **official privacy policy URL** (Play Console + app Settings);
@@ -451,7 +462,7 @@ the owner hasn't decided yet whether to switch them (Play shows the policy's add
 - **`GET /api/latest-recording`** (public, no auth):
   1. Lists the Live Input's recordings from the Cloudflare Stream API (token stays server-side).
   2. Picks the newest recording **of a real session**: `status.state === "ready"`, at least
-     30 s long, and overlapping a scheduled 06:00/18:00 IST session (from 10 min before to
+     20 s long (was 30 until 18 Oct, which froze alarms on the 7 Oct clip), and overlapping a scheduled 06:00/18:00 IST session (from 10 min before to
      30 min after). Test streams, broken recordings and off-schedule streams are ignored, so
      they never become anyone's alarm. The rule lives in `overlapsSession()` in `lib/schedule.ts`.
   3. Mirrors that MP4 into R2 once as `alarm-recordings/<videoUID>.mp4` (unique name per
@@ -509,10 +520,16 @@ cd mobile/android && ./gradlew bundleRelease
 
 Releasing a new Play build:
 1. Bump **`versionCode` in BOTH `mobile/app.json` and `mobile/android/app/build.gradle`**
-   (the android folder isn't regenerated automatically). Current: **37**. Play rejects a
+   (the android folder isn't regenerated automatically). Current: **44**. Play rejects a
    versionCode it has already seen.
-2. Build the AAB, upload in Play Console. Commit the version bump.
-3. Store assets: `mobile/assets/play-store-icon.png` (512×512) and
+2. **Build clean**, or Gradle may reuse a cached JS bundle (Play v39 shipped app.json from v38 —
+   its Settings said "(38)"): delete `app/build/generated/res/react`, `app/build/generated/assets/react`,
+   `app/build/intermediates/merged_res/release`, `.../packaged_res/release` and `.../intermediates/assets`
+   under `mobile/android`, then `./gradlew bundleRelease`. **Verify**: unzip the AAB and
+   `strings base/assets/index.android.bundle | grep "<some text you just changed>"`. Settings → Version
+   now reads the installed package's own version/build (`expo-application`), so it's always true.
+3. Upload in Play Console. Commit the version bump.
+4. Store assets: `mobile/assets/play-store-icon.png` (512×512) and
    `mobile/assets/play-feature-graphic.png` (1024×500).
    The feature graphic is rendered by a small Python/Pillow script using the app's fonts from
    `mobile/node_modules/@expo-google-fonts/*` (not committed — easy to recreate).
@@ -523,6 +540,12 @@ None can update another — `adb install` fails with `INSTALL_FAILED_UPDATE_INCO
 uninstall first (this wipes the app's alarms/settings and gives the phone a new chat id). Check
 a phone's copy with `adb shell dumpsys package com.brunosalarm.app | grep -E "versionCode|pkgFlags"`
 (`DEBUGGABLE` = a debug build).
+
+**Replacing a bundled asset under the same file name** (e.g. the default howl video) is NOT
+picked up by an incremental Gradle build: the APK keeps the old copy. Delete
+`mobile/android/app/build/generated/res/react`, `.../generated/assets/react`,
+`.../intermediates/merged_res/release` and `.../intermediates/packaged_res/release`, rebuild, and
+check with `unzip -l app-release.apk | grep mp4` (8 Oct).
 
 **If a release build fails with `ENOTEMPTY … metro-cache`:** delete
 `%TEMP%\metro-cache` (PowerShell `Remove-Item -Recurse -Force`) and build again.

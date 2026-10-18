@@ -79,7 +79,7 @@ export default function NotifyToggle() {
           value={status === "subscribed"}
           onValueChange={handleToggle}
           disabled={status === "unsupported"}
-          trackColor={{ false: colors.surfaceAlt, true: colors.accent }}
+          trackColor={{ false: colors.textSecondary, true: colors.accent }}
           thumbColor={colors.surface}
         />
       )}

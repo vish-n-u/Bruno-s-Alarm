@@ -3,7 +3,7 @@ import { AppState, StyleSheet, View } from "react-native";
 import { useVideoPlayer, VideoView, type VideoSource } from "expo-video";
 import { getAlarmClipVideoUri } from "../lib/alarmSound";
 
-// The built-in howl (assets/audio/alarm_default.mp3) was cut from this exact clip — same 26 s —
+// The built-in howl (assets/audio/alarm_default.mp3) is this exact clip's audio (35 s, replaced 8 Oct 2026) —
 // so when the alarm falls back to the built-in sound, this is its matching video.
 const BUILT_IN_CLIP: VideoSource = require("../assets/videos/Bruno Howl Alarm.mp4");
 

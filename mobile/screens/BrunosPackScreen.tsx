@@ -58,13 +58,13 @@ function errorMessageFor(reason: Exclude<SendMessageResult, { ok: true }>["reaso
     case "profanity":
       return "That message isn't allowed here.";
     case "rate-limited":
-      return "Slow down a little — you're sending messages too fast.";
+      return "Slow down a little. You're sending messages too fast.";
     case "session-full":
-      return "Chat is full right now — try again later.";
+      return "Chat is full right now. Try again later.";
     case "not-signed-in":
-      return "Couldn't connect to chat — check your connection and try again.";
+      return "Couldn't connect to chat. Check your connection and try again.";
     case "unknown":
-      return "Message didn't send — try again.";
+      return "Message didn't send. Try again.";
   }
 }
 
@@ -185,7 +185,7 @@ export default function BrunosPackScreen() {
     <SafeAreaView style={styles.root} edges={["top"]}>
       <View style={styles.header}>
         <Text style={styles.title}>Bruno's Pack</Text>
-        <Text style={styles.subtitle}>One room, always open — say hi.</Text>
+        <Text style={styles.subtitle}>One room, always open. Say hi.</Text>
       </View>
 
       <KeyboardAvoidingView
@@ -216,7 +216,7 @@ export default function BrunosPackScreen() {
                 loop
                 style={styles.emptyLottie}
               />
-              <Text style={styles.emptyStateText}>No messages yet — be the first to say something.</Text>
+              <Text style={styles.emptyStateText}>No messages yet. Be the first to say something.</Text>
             </View>
           }
           onContentSizeChange={() => listRef.current?.scrollToEnd({ animated: false })}

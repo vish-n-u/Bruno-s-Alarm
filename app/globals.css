@@ -1,4 +1,4 @@
-/* The app's own palette (mobile/lib/theme.ts): four sky phases that follow the visitor's real
+/* The app's own palette (mobile/lib/theme.ts): seven sky phases that follow the visitor's real
    clock, set on <html data-phase> by the script in layout.tsx. No attribute (JS off) falls
    back to afternoon. */
 :root {
@@ -21,6 +21,25 @@
   color-scheme: light;
 }
 
+:root[data-phase="dawn"] {
+  --bg: #1f2440;
+  --surface: #2a3052;
+  --surface-alt: #353c63;
+  --border: #5f6797;
+  --rule: rgba(195, 181, 198, 0.22);
+  --text: #f3e9e4;
+  --muted: #c3b5c6;
+  --accent: #f28a4b;
+  --accent-border: #c96c32;
+  --accent-text: #1f2440;
+  --accent-bg: rgba(242, 138, 75, 0.18);
+  --live: #f2703a;
+  --live-bg: rgba(242, 112, 58, 0.18);
+  --sun: #f7a35c;
+  --shadow: 0 3px 10px rgba(0, 0, 0, 0.4);
+  color-scheme: dark;
+}
+
 :root[data-phase="morning"] {
   --bg: #dcebf4;
   --surface: #f5fafd;
@@ -36,6 +55,21 @@
   --sun: #f6c768;
 }
 
+:root[data-phase="golden"] {
+  --bg: #f5dc9f;
+  --surface: #fef9ea;
+  --surface-alt: #fbedc6;
+  --border: #5a4316;
+  --rule: rgba(90, 67, 22, 0.2);
+  --text: #3a2b0c;
+  --muted: #735d2b;
+  --accent: #b8601c;
+  --accent-border: #924a12;
+  --accent-text: #fffaf0;
+  --accent-bg: rgba(184, 96, 28, 0.15);
+  --sun: #f3a43c;
+}
+
 :root[data-phase="evening"] {
   --bg: #f2c194;
   --surface: #fdf1e3;
@@ -49,6 +83,25 @@
   --accent-text: #fff6ee;
   --accent-bg: rgba(209, 72, 58, 0.14);
   --sun: #f08a4b;
+}
+
+:root[data-phase="dusk"] {
+  --bg: #2a2948;
+  --surface: #35335a;
+  --surface-alt: #403e68;
+  --border: #6a6596;
+  --rule: rgba(178, 170, 208, 0.22);
+  --text: #ece7f7;
+  --muted: #b2aad0;
+  --accent: #f2a65a;
+  --accent-border: #c8823b;
+  --accent-text: #2a2948;
+  --accent-bg: rgba(242, 166, 90, 0.18);
+  --live: #f2703a;
+  --live-bg: rgba(242, 112, 58, 0.18);
+  --sun: #e8eef6;
+  --shadow: 0 3px 10px rgba(0, 0, 0, 0.4);
+  color-scheme: dark;
 }
 
 :root[data-phase="night"] {

@@ -47,13 +47,13 @@ function errorMessageFor(reason: Exclude<SendMessageResult, { ok: true }>["reaso
     case "profanity":
       return "That message isn't allowed here.";
     case "rate-limited":
-      return "Slow down a little — you're sending messages too fast.";
+      return "Slow down a little. You're sending messages too fast.";
     case "session-full":
       return "Chat is full for this session.";
     case "not-signed-in":
-      return "Couldn't connect to chat — check your connection and try again.";
+      return "Couldn't connect to chat. Check your connection and try again.";
     case "unknown":
-      return "Message didn't send — try again.";
+      return "Message didn't send. Try again.";
   }
 }
 

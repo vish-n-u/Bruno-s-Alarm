@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 import { Animated, Dimensions, Easing, StyleSheet, View } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
+import { getTimeOfDay } from "../lib/theme";
 import type { WeatherCondition } from "../lib/weather";
 
 // Extracted out of HomeScreen so the exact same decorative rendering can be driven by a real
@@ -12,9 +13,9 @@ import type { WeatherCondition } from "../lib/weather";
 const SCREEN_HEIGHT = Dimensions.get("window").height;
 const SCREEN_WIDTH = Dimensions.get("window").width;
 
-// Same dawn/midday/sunset/night window used for the color theme (lib/theme.ts) — kept as
-// plain hour numbers here rather than imported, since this is about the sun/moon's position
-// in an arc, not which palette is active.
+// Sunrise = the start of the dawn palette, sunset = the start of dusk (lib/theme.ts) — kept
+// as plain hour numbers here rather than imported, since this is about the sun/moon's
+// position in an arc, not which palette is active.
 const SUNRISE_HOUR = 5;
 const SUNSET_HOUR = 18.5;
 
@@ -278,10 +279,15 @@ type Props = {
   now: Date;
   /** `null` is treated exactly like "clear" — see lib/weather.ts. */
   weatherCondition: WeatherCondition | null;
+  /** false hides the sun/moon — for a screen with its own scene up top (About). */
+  showCelestial?: boolean;
 };
 
-export default function Sky({ now, weatherCondition }: Props) {
+export default function Sky({ now, weatherCondition, showCelestial = true }: Props) {
   const celestial = getCelestialPosition(now);
+  // Dawn keeps a dark sky, so the just-risen sun gets warm sunrise rings instead of the
+  // bright daytime halo.
+  const isDawn = getTimeOfDay(now) === "dawn";
   // The sun/moon's position: low near the horizon at rise/set, arcing up towards the top of
   // the screen at solar noon/midnight — sin() turns the 0→1 progress into that curve. Capped
   // at 16% so even its lowest point stays clear of the (opaque) schedule card below — other-
@@ -366,11 +372,20 @@ export default function Sky({ now, weatherCondition }: Props) {
           the same hue family. During the day it's a bright, mostly-white disc for contrast;
           at night it's a much dimmer, cool-toned glow — a bright white spotlight behind the
           moon reads as a stage light, not moonlight. */}
+      {showCelestial && (
       <Animated.View
         style={[styles.celestial, { top: celestialTopAnim, left: celestialLeftAnim }]}
         pointerEvents="none"
       >
-        {celestial.isDaytime ? (
+        {celestial.isDaytime && isDawn ? (
+          <View style={styles.dawnGlowOuter}>
+            <View style={styles.dawnGlowInner}>
+              <Animated.View style={{ transform: [{ rotate: sunSpin }] }}>
+                <Ionicons name="sunny" size={100} color="#ffb300" />
+              </Animated.View>
+            </View>
+          </View>
+        ) : celestial.isDaytime ? (
           <View style={styles.celestialHaloDay}>
             <Animated.View style={{ transform: [{ rotate: sunSpin }] }}>
               <Ionicons name="sunny" size={100} color="#ffb300" />
@@ -382,6 +397,7 @@ export default function Sky({ now, weatherCondition }: Props) {
           </View>
         )}
       </Animated.View>
+      )}
       {!celestial.isDaytime &&
         STARS.map((star, i) =>
           nightDarkness < star.minDarkness ? null : (
@@ -528,6 +544,25 @@ const styles = StyleSheet.create({
     alignItems: "center",
     justifyContent: "center",
   },
+  // Two warm rings around the dawn sun. The negative margin keeps the sun itself where the
+  // 132px day halo would put it, so the position doesn't jump when dawn turns into morning.
+  dawnGlowOuter: {
+    width: 220,
+    height: 220,
+    borderRadius: 110,
+    margin: -44,
+    backgroundColor: "rgba(255,140,60,0.22)",
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  dawnGlowInner: {
+    width: 150,
+    height: 150,
+    borderRadius: 75,
+    backgroundColor: "rgba(255,170,80,0.3)",
+    alignItems: "center",
+    justifyContent: "center",
+  },
   celestialHaloNight: {
     width: 108,
     height: 108,
@@ -548,20 +583,21 @@ const styles = StyleSheet.create({
     backgroundColor: "#eaf2fb",
   },
   // left: 0 anchors each cloud at the screen's left edge; useDriftAcross's translateX then
-  // carries it the full width, off one side and back in from the other.
+  // carries it the full width, off one side and back in from the other. They drift through
+  // the open sky between the title and Home's dog scene, below the sun's lowest point.
   cloud1: {
     position: "absolute",
-    top: "60%",
+    top: "21%",
     left: 0,
   },
   cloud2: {
     position: "absolute",
-    top: "69%",
+    top: "28%",
     left: 0,
   },
   cloud3: {
     position: "absolute",
-    top: "77%",
+    top: "24%",
     left: 0,
   },
   // The wrap only sets position — its glow/core children are absolutely positioned within

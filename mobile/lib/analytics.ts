@@ -1,4 +1,4 @@
-import { getAnalytics, logEvent as fbLogEvent, logScreenView as fbLogScreenView } from "@react-native-firebase/analytics";
+import { getAnalytics, getAppInstanceId, logEvent as fbLogEvent, logScreenView as fbLogScreenView } from "@react-native-firebase/analytics";
 import { getCrashlytics, log as fbLog, recordError as fbRecordError } from "@react-native-firebase/crashlytics";
 
 // Thin wrappers around the two Firebase modules' v22+ "modular" API (getX(app) + free
@@ -28,6 +28,17 @@ export function logScreenView(screenName: string): void {
     fbLogScreenView(getAnalytics(), { screen_name: screenName, screen_class: screenName }).catch(() => {});
   } catch {
     // Analytics only.
+  }
+}
+
+/** This install's Firebase Analytics ID (random, per install, not a person). Settings → Debug
+ * shows it so a tester can send it, and their events can then be found in Firebase
+ * (Explore → User explorer, or DebugView). */
+export async function getAnalyticsId(): Promise<string | null> {
+  try {
+    return await getAppInstanceId(getAnalytics());
+  } catch {
+    return null;
   }
 }
 
@@ -69,8 +80,25 @@ export const track = {
   customAlarmDeleted(): void {
     logEvent("custom_alarm_deleted");
   },
-  liveAlarm(on: boolean): void {
-    logEvent(on ? "live_alarm_on" : "live_alarm_off");
+  /** "Ring when Bruno goes live" switched on/off — from Settings, or the Live tab's "Ring me". */
+  liveAlarm(on: boolean, source: "settings" | "live_tab" = "settings"): void {
+    logEvent(on ? "live_alarm_on" : "live_alarm_off", { source });
+  },
+  /** The user showed/hid the Bruno's Pack tab on their phone (Settings → Chat). */
+  packTab(shown: boolean): void {
+    logEvent(shown ? "pack_tab_shown" : "pack_tab_hidden");
+  },
+  /** Played a sample of his howl: onboarding's phone, the new-alarm sheet, or About. */
+  howlPreview(where: "onboarding" | "alarm_sheet" | "about"): void {
+    logEvent("howl_preview", { where });
+  },
+  /** Onboarding slide reached (1-based), for the drop-off funnel. */
+  onboardingSlide(slide: number): void {
+    logEvent("onboarding_slide", { slide });
+  },
+  /** Live tab's "Watch his last howl" — the saved recording, or the built-in clip. */
+  lastHowlWatched(clip: "saved" | "built_in"): void {
+    logEvent("last_howl_watched", { clip });
   },
   /** The ringing screen appeared (the app was opened by, or during, a ringing alarm). */
   alarmRang(alarmId: string): void {

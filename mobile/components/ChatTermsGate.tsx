@@ -6,7 +6,7 @@ import { getDisplayName, setDisplayName } from "../lib/profile";
 import { fonts, radius, spacing, useThemeColors, type ThemeColors } from "../lib/theme";
 
 const RULES = [
-  "Be kind — no harassment, hate, or threats toward Bruno's Pack or anyone else.",
+  "Be kind. No harassment, hate, or threats toward Bruno's Pack or anyone else.",
   "No spam or flooding the chat.",
   "Messages are public to everyone watching, and moderated automatically.",
 ];

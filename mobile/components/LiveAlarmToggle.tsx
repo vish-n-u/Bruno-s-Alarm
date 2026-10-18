@@ -52,7 +52,7 @@ export default function LiveAlarmToggle() {
         <Switch
           value={enabled}
           onValueChange={handleToggle}
-          trackColor={{ false: colors.surfaceAlt, true: colors.accent }}
+          trackColor={{ false: colors.textSecondary, true: colors.accent }}
           thumbColor={colors.surface}
         />
       </View>

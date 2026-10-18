@@ -20,7 +20,7 @@ export const metadata: Metadata = {
     template: "%s · Bruno's Alarm",
   },
   description:
-    "A real dog howls at a church bell at 6AM and 6PM IST. This Android app wakes you up with it — live when he's on, recorded when he isn't.",
+    "A real dog howls at a church bell at 6AM and 6PM IST. This Android app wakes you up with it: live when he's on, recorded when he isn't.",
   openGraph: {
     title: "Bruno's Alarm",
     description: "A real dog, live twice a day. Wake up to Bruno's howl.",
@@ -35,7 +35,7 @@ export const viewport: Viewport = {
 
 // Mirrors getTimeOfDay() in mobile/lib/theme.ts. Runs in <head> before first paint so the
 // page never flashes the wrong palette; PhaseSync keeps it current after that.
-const phaseScript = `(function(){try{var d=new Date(),h=d.getHours()+d.getMinutes()/60,p=h>=5&&h<11?"morning":h>=11&&h<17?"afternoon":h>=17&&h<18.5?"evening":"night";document.documentElement.setAttribute("data-phase",p);}catch(e){}})();`;
+const phaseScript = `(function(){try{var d=new Date(),h=d.getHours()+d.getMinutes()/60,p=h>=5&&h<6.5?"dawn":h>=6.5&&h<11?"morning":h>=11&&h<16?"afternoon":h>=16&&h<17?"golden":h>=17&&h<18.5?"evening":h>=18.5&&h<19.5?"dusk":"night";document.documentElement.setAttribute("data-phase",p);}catch(e){}})();`;
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (

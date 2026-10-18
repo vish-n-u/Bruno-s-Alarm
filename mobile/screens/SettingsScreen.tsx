@@ -1,10 +1,11 @@
 import { useCallback, useState } from "react";
-import { Alert, Linking, Platform, ScrollView, Share, StyleSheet, Text, View } from "react-native";
+import { Alert, Linking, Platform, ScrollView, Share, StyleSheet, Switch, Text, View } from "react-native";
 import { showDialog } from "../lib/dialog";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { Ionicons } from "@expo/vector-icons";
 import { useFocusEffect } from "@react-navigation/native";
 import type { NativeStackScreenProps } from "@react-navigation/native-stack";
+import * as Application from "expo-application";
 import * as Device from "expo-device";
 import appConfig from "../app.json";
 import LiveAlarmToggle from "../components/LiveAlarmToggle";
@@ -20,7 +21,10 @@ import {
   type ScheduledAlarmSummary,
 } from "../lib/notifications";
 import { describeSavedRecording, getCachedAlarmSoundPath, refreshAlarmSound } from "../lib/alarmSound";
+import { getAnalyticsId, track } from "../lib/analytics";
+import { useAppConfig } from "../lib/appConfig";
 import { ensureAnonymousAuth } from "../lib/firebase";
+import { setPackTabHidden, usePackTabHidden } from "../lib/packPreference";
 import { success, tapLight, warning } from "../lib/haptics";
 import { animateNextLayout } from "../lib/layoutAnim";
 import { setDebugForceLive } from "../lib/schedule";
@@ -29,8 +33,15 @@ import { fonts, radius, shadow, spacing, useThemeColors, type ThemeColors } from
 // Served by the Next.js site at the repo root (app/privacy, app/terms).
 const PRIVACY_POLICY_URL = "https://bruno-s-alarm.vercel.app/privacy";
 const TERMS_URL = "https://bruno-s-alarm.vercel.app/terms";
-const WEBSITE_URL = "https://bruno-s-alarm.vercel.app";
 const CONTACT_EMAIL = "contact@brunos-alarm.com";
+
+// The INSTALLED app's own version and build number (read from the package at runtime), not
+// app.json's — a release build once shipped a cached JS bundle whose app.json still said the
+// previous build (Play v39 showed "(38)"). Build number too, so a tester's report says exactly
+// which upload they're on. Falls back to app.json if the native values aren't available.
+const VERSION_LABEL = `${Application.nativeApplicationVersion ?? appConfig.expo.version} · build ${
+  Application.nativeBuildVersion ?? (Platform.OS === "android" ? appConfig.expo.android.versionCode : "?")
+}`;
 
 const KIND_LABEL: Record<ScheduledAlarmKind, string> = {
   session: "Bruno's real sessions",
@@ -124,6 +135,8 @@ export default function SettingsScreen({ navigation }: Props) {
   const colors = useThemeColors();
   const styles = createStyles(colors);
   const insets = useSafeAreaInsets();
+  const { packEnabled } = useAppConfig();
+  const packTabHidden = usePackTabHidden();
   const [forcingLive, setForcingLive] = useState(false);
   const [alarms, setAlarms] = useState<ScheduledAlarmSummary[]>([]);
   // The Debug section's own copy claims these tools aren't visible to real users — that was
@@ -164,18 +177,10 @@ export default function SettingsScreen({ navigation }: Props) {
   // debug test) without needing a manual pull-to-refresh.
   useFocusEffect(refreshAlarms);
 
+  // Its own animated screen (screens/AboutScreen.tsx), not a dialog.
   function handleAbout() {
     tapLight();
-    showDialog({
-      icon: "paw",
-      title: "About Bruno's Alarm",
-      body:
-        "Bruno is a real dog who howls at a church bell twice a day. We film it live and turn his latest howl into your alarm, so every morning you wake up to the real thing.",
-      buttons: [
-        { label: "Visit website", style: "primary", onPress: () => Linking.openURL(WEBSITE_URL).catch(() => {}) },
-        { label: "Close", style: "cancel" },
-      ],
-    });
+    navigation.navigate("About");
   }
 
   // Opens the phone's email app with the address filled in, plus the app version and phone model
@@ -184,7 +189,7 @@ export default function SettingsScreen({ navigation }: Props) {
     tapLight();
     const subject = encodeURIComponent("Bruno's Alarm");
     const details = [
-      `App version: ${appConfig.expo.version} (${Platform.OS === "android" ? appConfig.expo.android.versionCode : Platform.OS})`,
+      `App version: ${VERSION_LABEL}`,
       `Phone: ${[Device.manufacturer, Device.modelName].filter(Boolean).join(" ") || "unknown"}`,
       `${Platform.OS === "ios" ? "iOS" : "Android"} ${Device.osVersion ?? Platform.Version}`,
     ].join("\n");
@@ -232,14 +237,41 @@ export default function SettingsScreen({ navigation }: Props) {
       style={styles.root}
       contentContainerStyle={[styles.content, { paddingBottom: spacing.xxl + insets.bottom }]}
     >
+      <Text style={[styles.sectionLabelSecondary, styles.firstSectionLabel]}>Alarms</Text>
       <View style={styles.card}>
         <NotifyToggle />
+        {Platform.OS === "android" && (
+          <>
+            <View style={styles.rowDivider} />
+            <LiveAlarmToggle />
+          </>
+        )}
       </View>
 
-      {Platform.OS === "android" && (
-        <View style={[styles.card, { marginTop: spacing.md }]}>
-          <LiveAlarmToggle />
-        </View>
+      {/* Only offered while the owner has the Pack switched on for everyone (config/app). */}
+      {packEnabled && (
+        <>
+          <SectionLabel variant="secondary">Chat</SectionLabel>
+          <View style={styles.card}>
+            <View style={styles.row}>
+              <Ionicons name="chatbubbles-outline" size={18} color={colors.textSecondary} style={styles.rowIcon} />
+              <View style={styles.rowTextWrap}>
+                <Text style={styles.rowText}>Show Bruno's Pack tab</Text>
+                <Text style={styles.rowSubtitle}>The always-open chat with everyone</Text>
+              </View>
+              <Switch
+                value={!packTabHidden}
+                onValueChange={(show) => {
+                  tapLight();
+                  setPackTabHidden(!show);
+                  track.packTab(show);
+                }}
+                trackColor={{ false: colors.textSecondary, true: colors.accent }}
+                thumbColor={colors.surface}
+              />
+            </View>
+          </View>
+        </>
       )}
 
       <SectionLabel variant="secondary">About</SectionLabel>
@@ -286,7 +318,7 @@ export default function SettingsScreen({ navigation }: Props) {
         <SettingsRow
           icon="information-circle-outline"
           title="Version"
-          value={appConfig.expo.version}
+          value={VERSION_LABEL}
           onPress={handleVersionTap}
           colors={colors}
           styles={styles}
@@ -367,6 +399,25 @@ export default function SettingsScreen({ navigation }: Props) {
               }}
             >
               <Text style={styles.consoleText}>&gt; my chat id</Text>
+            </Touchable>
+            <View style={styles.rowDivider} />
+            <Touchable
+              style={styles.consoleRow}
+              onPress={async () => {
+                // A tester sends this so their events can be found in Firebase (User explorer).
+                tapLight();
+                const id = await getAnalyticsId();
+                if (!id) {
+                  Alert.alert("No analytics ID yet", "Firebase hasn't created one. Try again in a minute.");
+                  return;
+                }
+                Alert.alert("This phone's analytics ID", id, [
+                  { text: "Share / copy", onPress: () => Share.share({ message: id }).catch(() => {}) },
+                  { text: "OK", style: "cancel" },
+                ]);
+              }}
+            >
+              <Text style={styles.consoleText}>&gt; my analytics id</Text>
             </Touchable>
             {Platform.OS === "android" && (
               <>
@@ -469,6 +520,9 @@ function createStyles(colors: ThemeColors) {
       marginBottom: spacing.xs,
       marginTop: spacing.xl,
     },
+    firstSectionLabel: {
+      marginTop: 0,
+    },
     card: {
       backgroundColor: colors.surface,
       borderColor: colors.border,
@@ -497,9 +551,11 @@ function createStyles(colors: ThemeColors) {
       flex: 1,
       gap: 1,
     },
+    // A faint hairline: at full border strength the rows read like a table.
     rowDivider: {
       height: 1,
       backgroundColor: colors.border,
+      opacity: 0.15,
     },
     rowText: {
       color: colors.textPrimary,

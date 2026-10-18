@@ -27,6 +27,8 @@ import HomeScreen from "./components/HomeScreen";
 import AlarmRingingScreen from "./components/AlarmRingingScreen";
 import AppDialogHost from "./components/AppDialogHost";
 import { useAppConfig } from "./lib/appConfig";
+import { usePackTabHidden } from "./lib/packPreference";
+import AboutScreen from "./screens/AboutScreen";
 import SettingsScreen from "./screens/SettingsScreen";
 import CustomAlarmScreen from "./screens/CustomAlarmScreen";
 import LiveScreen from "./screens/LiveScreen";
@@ -40,7 +42,7 @@ import { syncLiveAlarmOnLaunch } from "./lib/liveAlerts";
 import { listenForLiveAlertsInForeground } from "./lib/liveAlertRinger";
 import { registerBackgroundAlarmSoundRefresh } from "./lib/backgroundRefresh";
 import { resumeIOSAlarmEngineIfNeeded } from "./lib/iosAlarmEngine";
-import { useThemeColors, useTimeOfDay } from "./lib/theme";
+import { fonts, isDarkTimeOfDay, useThemeColors, useTimeOfDay } from "./lib/theme";
 import { logScreenView, track } from "./lib/analytics";
 
 type Screen = "checking" | "onboarding" | "home";
@@ -58,6 +60,7 @@ export type HomeStackParamList = {
   Settings: undefined;
   CustomAlarm: undefined;
   OnboardingPreview: undefined;
+  About: undefined;
   WeatherPreview: undefined;
 };
 
@@ -95,10 +98,13 @@ function HomeStack() {
         headerStyle: { backgroundColor: colors.background },
         headerTintColor: colors.textPrimary,
         headerShadowVisible: false,
+        // Same Anton headline as the rest of the app, not the system font.
+        headerTitleStyle: { fontFamily: fonts.display, fontSize: 24 },
       }}
     >
       <HomeStackNav.Screen name="Home" component={HomeScreen} options={{ headerShown: false }} />
       <HomeStackNav.Screen name="Settings" component={SettingsScreen} />
+      <HomeStackNav.Screen name="About" component={AboutScreen} options={{ title: "About" }} />
       <HomeStackNav.Screen name="CustomAlarm" component={CustomAlarmScreen} options={{ title: "Your alarms" }} />
       <HomeStackNav.Screen
         name="OnboardingPreview"
@@ -118,6 +124,8 @@ export default function App() {
   const [initialTab, setInitialTab] = useState<"HomeTab" | "LiveTab">("HomeTab");
   const colors = useThemeColors();
   const { packEnabled } = useAppConfig();
+  // The owner's switch for everyone, and this user's own choice to hide it (Settings → Chat).
+  const packTabHidden = usePackTabHidden();
 
   // Screen views for Firebase Analytics: every navigator screen, plus the two full-screen
   // takeovers that live outside the navigator (onboarding, the ringing alarm).
@@ -133,9 +141,9 @@ export default function App() {
     else if (screen === "onboarding") reportScreen("Onboarding");
   }, [ringingAlarmId, screen]);
   const timeOfDay = useTimeOfDay();
-  // Night is the only phase with a dark background — everything else (dawn/midday/sunset)
-  // wants the light system chrome, matching whichever palette useThemeColors() picked.
-  const isNight = timeOfDay === "night";
+  // Dawn, dusk and night have dark backgrounds — everything else wants the light system chrome,
+  // matching whichever palette useThemeColors() picked.
+  const isNight = isDarkTimeOfDay(timeOfDay);
   const [fontsLoaded] = useFonts({
     Anton_400Regular,
     CourierPrime_400Regular,
@@ -283,7 +291,7 @@ export default function App() {
                 ),
               }}
             />
-            {packEnabled && (
+            {packEnabled && !packTabHidden && (
               <Tab.Screen
                 name="MessagesTab"
                 component={BrunosPackScreen}

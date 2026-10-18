@@ -1,11 +1,18 @@
-import { useEffect, useRef, useState } from "react";
-import { Animated, Easing, StyleSheet, Text, View } from "react-native";
+import { useCallback, useEffect, useRef, useState } from "react";
+import { Animated, Easing, Platform, StyleSheet, Text, View } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { useIsFocused } from "@react-navigation/native";
 import { Ionicons } from "@expo/vector-icons";
 import { useNetworkState } from "expo-network";
+import type { VideoSource } from "expo-video";
+import LastHowlPlayer from "../components/LastHowlPlayer";
+import LiveAlarmSetupSheet from "../components/LiveAlarmSetupSheet";
 import LiveChat from "../components/LiveChat";
+import Touchable from "../components/Touchable";
 import VideoPanel from "../components/VideoPanel";
+import { getSavedRecording } from "../lib/alarmSound";
+import { tapLight } from "../lib/haptics";
+import { enableLiveAlarm, isLiveAlarmEnabled } from "../lib/liveAlerts";
 import { getCloudflareRecordingManifestUrl } from "../lib/liveStatus";
 import { currentSessionId, isNearLiveWindow, nextSessionAt } from "../lib/schedule";
 import { fonts, radius, spacing, useThemeColors } from "../lib/theme";
@@ -14,6 +21,10 @@ import { track } from "../lib/analytics";
 function formatTime(timestamp: number): string {
   return new Date(timestamp).toLocaleString(undefined, { hour: "numeric", minute: "2-digit" });
 }
+
+// The clip the built-in alarm howl was cut from, for "Watch his last howl" before any real
+// recording has downloaded.
+const BUILT_IN_HOWL: VideoSource = require("../assets/videos/Bruno Howl Alarm.mp4");
 
 // How long the stream that just ended stays watchable (as a labelled replay) before NO SIGNAL.
 const REPLAY_MS = 5 * 60 * 1000;
@@ -48,7 +59,33 @@ function useFlicker(min: number, max: number): Animated.Value {
 /** Shown in place of the video entirely when Bruno isn't actually live — an old-TV
  * "no signal" test card instead of quietly playing the recorded replay, so it's unmistakable
  * that this isn't the live feed. */
-function NoSignalScreen({ nextTime }: { nextTime: string }) {
+/** "5 h 05 min", "12 min", "under a minute" — how long until the next session. */
+function formatCountdown(ms: number): string {
+  const totalMinutes = Math.floor(ms / 60000);
+  if (totalMinutes < 1) return "under a minute";
+  const hours = Math.floor(totalMinutes / 60);
+  const minutes = totalMinutes % 60;
+  return hours > 0 ? `${hours} h ${String(minutes).padStart(2, "0")} min` : `${minutes} min`;
+}
+
+/** Not a dead end: says when he's next on, offers to ring the phone the moment he is (the
+ * "Ring when Bruno goes live" setting, which otherwise lives only in Settings), and plays his
+ * last howl meanwhile. */
+function NoSignalScreen({
+  nextAt,
+  now,
+  liveAlarmOn,
+  onRingMe,
+  onWatchLastHowl,
+}: {
+  nextAt: number;
+  now: number;
+  /** null = not offered (not Android, or still loading). */
+  liveAlarmOn: boolean | null;
+  onRingMe: () => void;
+  onWatchLastHowl: () => void;
+}) {
+  const colors = useThemeColors();
   const scanlineFlicker = useFlicker(0.06, 0.16);
   const titleFlicker = useFlicker(0.5, 1);
 
@@ -59,7 +96,28 @@ function NoSignalScreen({ nextTime }: { nextTime: string }) {
         <Ionicons name="tv-outline" size={36} color="#8a8a8a" />
         <Animated.Text style={[styles.noSignalTitle, { opacity: titleFlicker }]}>NO SIGNAL</Animated.Text>
         <Text style={styles.noSignalSubtitle}>Bruno's not live right now</Text>
-        <Text style={styles.noSignalNext}>Next live at {nextTime}</Text>
+        <Text style={styles.noSignalNext}>
+          Next live in {formatCountdown(nextAt - now)} · {formatTime(nextAt)}
+        </Text>
+
+        <View style={styles.noSignalActions}>
+          {liveAlarmOn === false && (
+            <Touchable style={[styles.noSignalButton, { backgroundColor: colors.accent }]} onPress={onRingMe}>
+              <Ionicons name="flash" size={16} color={colors.accentText} />
+              <Text style={[styles.noSignalButtonText, { color: colors.accentText }]}>Ring me when he's live</Text>
+            </Touchable>
+          )}
+          {liveAlarmOn === true && (
+            <View style={styles.noSignalOn}>
+              <Ionicons name="checkmark-circle" size={16} color="#8a8a8a" />
+              <Text style={styles.noSignalNext}>We'll ring you when he's live</Text>
+            </View>
+          )}
+          <Touchable style={[styles.noSignalButton, styles.noSignalButtonOutline]} onPress={onWatchLastHowl}>
+            <Ionicons name="play" size={16} color="#d8d8d8" />
+            <Text style={styles.noSignalButtonText}>Watch his last howl</Text>
+          </Touchable>
+        </View>
       </View>
       <View style={styles.colorBars}>
         {COLOR_BARS.map((color, i) => (
@@ -103,7 +161,13 @@ export default function LiveScreen() {
   const isFocused = useIsFocused();
   const [live, setLive] = useState(false);
   const [streamId, setStreamId] = useState<string | null>(null);
-  const [nextTime, setNextTime] = useState(() => formatTime(nextSessionAt()));
+  const [nextAt, setNextAt] = useState(() => nextSessionAt());
+  const [now, setNow] = useState(() => Date.now());
+  // "Ring when Bruno goes live", offered on NO SIGNAL. Android only, like its Settings toggle.
+  const [liveAlarmOn, setLiveAlarmOn] = useState<boolean | null>(null);
+  const [liveAlarmSheet, setLiveAlarmSheet] = useState(false);
+  // "Watch his last howl": the saved real-session clip, or the built-in one if none yet.
+  const [lastHowl, setLastHowl] = useState<{ source: VideoSource; label: string | null } | null>(null);
   // Around one of Bruno's sessions (minutes before through the live window) — when an offline
   // phone gets the "No internet" screen rather than the usual NO SIGNAL card.
   const [nearSession, setNearSession] = useState(() => isNearLiveWindow());
@@ -155,13 +219,55 @@ export default function LiveScreen() {
 
   // The next-live time only needs to be right, not live-ticking — recomputed once a minute
   // is plenty, and avoids a full per-second re-render just for this screen.
+  // Also drives the countdown, which only shows minutes.
   useEffect(() => {
     const id = setInterval(() => {
-      setNextTime(formatTime(nextSessionAt()));
+      setNextAt(nextSessionAt());
+      setNow(Date.now());
       setNearSession(isNearLiveWindow());
-    }, 60000);
+    }, 15000);
     return () => clearInterval(id);
   }, []);
+
+  // Re-read on focus: it may have been switched in Settings meanwhile.
+  useEffect(() => {
+    if (Platform.OS !== "android" || !isFocused) return;
+    isLiveAlarmEnabled().then(setLiveAlarmOn).catch(() => setLiveAlarmOn(null));
+  }, [isFocused]);
+
+  // Leaving the tab closes the last-howl player.
+  useEffect(() => {
+    if (!isFocused) setLastHowl(null);
+  }, [isFocused]);
+
+  function handleRingMe() {
+    tapLight();
+    setLiveAlarmSheet(true);
+  }
+
+  async function handleLiveAlarmConfirm() {
+    tapLight();
+    await enableLiveAlarm();
+    track.liveAlarm(true, "live_tab");
+    setLiveAlarmOn(true);
+    setLiveAlarmSheet(false);
+  }
+
+  async function handleWatchLastHowl() {
+    tapLight();
+    const saved = await getSavedRecording().catch(() => undefined);
+    track.lastHowlWatched(saved ? "saved" : "built_in");
+    setLastHowl(
+      saved
+        ? {
+            source: { uri: saved.uri },
+            label: new Date(saved.recordedAt).toLocaleString(undefined, { weekday: "short", hour: "numeric", minute: "2-digit" }),
+          }
+        : { source: BUILT_IN_HOWL, label: null }
+    );
+  }
+
+  const closeLastHowl = useCallback(() => setLastHowl(null), []);
 
   return (
     <View style={styles.root}>
@@ -180,7 +286,23 @@ export default function LiveScreen() {
         replayUrl={replaying ? replay.url : null}
         onReplayError={() => setReplay(null)}
       />
-      {showNoSignal && <NoSignalScreen nextTime={nextTime} />}
+      {showNoSignal && (
+        <NoSignalScreen
+          nextAt={nextAt}
+          now={now}
+          liveAlarmOn={liveAlarmOn}
+          onRingMe={handleRingMe}
+          onWatchLastHowl={handleWatchLastHowl}
+        />
+      )}
+      {showNoSignal && lastHowl && (
+        <LastHowlPlayer source={lastHowl.source} label={lastHowl.label} paused={!isFocused} onClose={closeLastHowl} />
+      )}
+      <LiveAlarmSetupSheet
+        visible={liveAlarmSheet}
+        onConfirm={handleLiveAlarmConfirm}
+        onCancel={() => setLiveAlarmSheet(false)}
+      />
       {showNoInternet && <NoInternetScreen wasLive={live} />}
       {/* Chat only exists while live — closed during the replay, and skipped entirely once
           NoSignal is showing, so its own "not live" placeholder doesn't double up against it. */}
@@ -267,13 +389,44 @@ const styles = StyleSheet.create({
     fontFamily: fonts.body,
     fontSize: 13,
   },
+  noSignalActions: {
+    marginTop: spacing.xxl,
+    gap: spacing.md,
+    alignItems: "center",
+  },
+  noSignalButton: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: spacing.sm,
+    paddingVertical: spacing.md,
+    paddingHorizontal: spacing.xl,
+    borderRadius: radius.pill,
+  },
+  noSignalButtonOutline: {
+    borderWidth: 1,
+    borderColor: "#4a4a4a",
+  },
+  noSignalButtonText: {
+    color: "#d8d8d8",
+    fontFamily: fonts.bodyBold,
+    fontSize: 14,
+  },
+  noSignalOn: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: spacing.xs,
+  },
+  // Inset from the edges like a test card on a screen, so the bars don't run into the tab bar
+  // and read as a rendering glitch.
   colorBars: {
     position: "absolute",
-    bottom: 0,
-    left: 0,
-    right: 0,
+    bottom: spacing.xl,
+    left: spacing.xl,
+    right: spacing.xl,
     flexDirection: "row",
-    height: 28,
+    height: 20,
+    borderRadius: radius.sm,
+    overflow: "hidden",
   },
   colorBar: {
     flex: 1,

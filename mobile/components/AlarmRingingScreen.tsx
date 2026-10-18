@@ -134,7 +134,7 @@ export default function AlarmRingingScreen({
           {brunoLive && (
             <Touchable style={[styles.liveButton, busy && styles.buttonBusy]} onPress={handleWatchLive} disabled={busy}>
               <View style={[styles.liveDot, { backgroundColor: colors.live }]} />
-              <Text style={styles.liveButtonText}>Bruno's live — watch</Text>
+              <Text style={styles.liveButtonText}>Watch Bruno live</Text>
             </Touchable>
           )}
 

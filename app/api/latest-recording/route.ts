@@ -73,7 +73,9 @@ type CloudflareVideoSummary = {
 // enough to contain a howl, and overlapping a scheduled 06:00/18:00 IST session. Before this,
 // a failed recording started just after the 18:00 session blocked it for hours ("not ready"),
 // and a later test stream became everyone's alarm.
-const MIN_DURATION_SECONDS = 30;
+// 20, not 30: by mid-October his sessions ran ~25 s and every one was rejected, so phones kept
+// the 7 Oct clip for 10 days. 20 still drops the 9–14 s fragments (camera blips, reconnects).
+const MIN_DURATION_SECONDS = 20;
 // He isn't punctual: accept a stream that starts up to 10 min early or is still going 30 min late.
 const SESSION_LEAD_MINUTES = 10;
 const SESSION_LAG_MINUTES = 30;

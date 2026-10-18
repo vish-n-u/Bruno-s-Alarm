@@ -15,19 +15,39 @@ import {
 } from "react-native";
 import { showDialog } from "../lib/dialog";
 import { SafeAreaView } from "react-native-safe-area-context";
+import { Ionicons } from "@expo/vector-icons";
+import { createAudioPlayer, type AudioPlayer } from "expo-audio";
 import Touchable from "./Touchable";
 import { ensureAlarmPermissions } from "../lib/alarmPermissions";
+import { getAlarmClipVideoUri } from "../lib/alarmSound";
+import { raisePreviewVolume, restorePreviewVolume } from "../lib/previewVolume";
 import { success, tapLight, tick, warning } from "../lib/haptics";
 import { playDeleteSound } from "../lib/uiSound";
 import {
   deleteCustomAlarm,
   getCustomAlarm,
+  nextCustomAlarmOccurrence,
   saveCustomAlarm,
   type CustomAlarm,
   type RepeatMode,
 } from "../lib/customAlarm";
-import { fonts, radius, spacing, useThemeColors, type ThemeColors } from "../lib/theme";
+import { fonts, radius, spacing, useNow, useThemeColors, type ThemeColors } from "../lib/theme";
 import { track } from "../lib/analytics";
+
+/** "Rings in 18 h 05 min" under a day away, then "Rings Tue at 07:00" — the line a Clock app
+ * shows under its picker, which also catches an AM/PM slip. */
+function ringsInLabel(at: number | null, now: number): string {
+  if (at === null) return "Pick at least one day";
+  const minutes = Math.max(1, Math.ceil((at - now) / 60000));
+  if (minutes < 60) return `Rings in ${minutes} min`;
+  if (minutes < 24 * 60) {
+    return `Rings in ${Math.floor(minutes / 60)} h ${String(minutes % 60).padStart(2, "0")} min`;
+  }
+  const when = new Date(at);
+  const day = when.toLocaleDateString(undefined, { weekday: "short" });
+  const time = when.toLocaleTimeString(undefined, { hour: "numeric", minute: "2-digit" });
+  return `Rings ${day} at ${time}`;
+}
 
 const ROW_HEIGHT = 44;
 const VISIBLE_ROWS = 5;
@@ -169,7 +189,10 @@ function Wheel<T extends string | number>({
 
   // Drives both the per-row depth effect (native-driven, so it stays smooth regardless of what
   // the JS thread is doing) and, via the listener below, the row-crossing haptic tick.
-  const scrollY = useRef(new Animated.Value(0)).current;
+  // Starts at the initial row's offset, not 0: positioning the list (initialScrollIndex, or
+  // scrollToIndex without animation) fires no scroll event, so a 0 here left the default time
+  // un-highlighted until the wheel was touched — and a reopened sheet kept the last row lit.
+  const scrollY = useRef(new Animated.Value((middleOffset + selectedIndex) * ROW_HEIGHT)).current;
 
   // Fires a light "tick" once per row crossed while spinning, the way a real clicking dial
   // would — not just once when it finally settles. Tracked in a ref (not state) since it only
@@ -218,6 +241,7 @@ function Wheel<T extends string | number>({
 
     if (!internal || lastVirtualRow.current === null) {
       listRef.current?.scrollToIndex({ index: target, animated: false });
+      scrollY.setValue(target * ROW_HEIGHT); // no scroll event fires for this jump
       lastVirtualRow.current = target;
       return;
     }
@@ -228,6 +252,7 @@ function Wheel<T extends string | number>({
     const driftedNearEdge = current < margin || current > data.length * LOOP_COPIES - margin;
     if (driftedNearEdge) {
       listRef.current?.scrollToIndex({ index: target, animated: false });
+      scrollY.setValue(target * ROW_HEIGHT);
       lastVirtualRow.current = target;
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -299,6 +324,52 @@ export default function EditCustomAlarmModal({ visible, alarmId, onClose, onSave
   const [editingEnabled, setEditingEnabled] = useState(true);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
+  const now = useNow(15000);
+  const nextRing = nextCustomAlarmOccurrence([
+    { id: "", name: "", hour: HOURS[hourIndex], minute: MINUTES[minuteIndex], enabled: true, repeatMode, customDays },
+  ]);
+
+  // Sound row: a preview of what this alarm plays — the saved recording if there is one (the
+  // same file every alarm rings with), else the built-in howl. On the media stream, with a low
+  // media volume raised while it plays (lib/previewVolume.ts).
+  const previewRef = useRef<AudioPlayer | null>(null);
+  const [previewing, setPreviewing] = useState(false);
+
+  function stopPreview() {
+    const player = previewRef.current;
+    previewRef.current = null;
+    if (player) {
+      player.pause();
+      player.remove();
+    }
+    setPreviewing(false);
+    restorePreviewVolume();
+  }
+
+  async function togglePreview() {
+    tapLight();
+    if (previewRef.current) {
+      stopPreview();
+      return;
+    }
+    const saved = await getAlarmClipVideoUri().catch(() => undefined);
+    const player = createAudioPlayer(saved ? { uri: saved } : require("../assets/audio/alarm_default.mp3"));
+    previewRef.current = player;
+    player.addListener("playbackStatusUpdate", (status) => {
+      if (status.didJustFinish && previewRef.current === player) stopPreview();
+    });
+    setPreviewing(true);
+    track.howlPreview("alarm_sheet");
+    await raisePreviewVolume();
+    player.play();
+  }
+
+  // Closing the sheet (or unmounting) stops it.
+  useEffect(() => {
+    if (!visible) stopPreview();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [visible]);
+  useEffect(() => () => stopPreview(), []);
 
   // Reloads (or resets to defaults for a new alarm) every time the popup opens — mirrors
   // the previous screen's mount-time load, just keyed off `visible` instead.
@@ -451,6 +522,7 @@ export default function EditCustomAlarmModal({ visible, alarmId, onClose, onSave
                   />
                 </View>
               </View>
+              <Text style={styles.ringsIn}>{ringsInLabel(nextRing, now.getTime())}</Text>
 
               <ScrollView
                 horizontal
@@ -489,6 +561,17 @@ export default function EditCustomAlarmModal({ visible, alarmId, onClose, onSave
                   ))}
                 </View>
               )}
+
+              <Touchable style={styles.soundRow} onPress={togglePreview}>
+                <Ionicons name="volume-high-outline" size={20} color={colors.accent} />
+                <View style={styles.soundText}>
+                  <Text style={styles.soundTitle}>Bruno's newest howl</Text>
+                  <Text style={styles.soundSubtitle}>Rings even on silent</Text>
+                </View>
+                <View style={styles.soundPlay}>
+                  <Ionicons name={previewing ? "stop" : "play"} size={14} color={colors.accentText} />
+                </View>
+              </Touchable>
 
               <TextInput
                 style={styles.nameInput}
@@ -680,9 +763,50 @@ function createStyles(colors: ThemeColors) {
     dayCircleTextActive: {
       color: colors.accentText,
     },
+    ringsIn: {
+      marginTop: spacing.sm,
+      color: colors.textSecondary,
+      fontFamily: fonts.bodyMedium,
+      fontSize: 13,
+      textAlign: "center",
+    },
+    soundRow: {
+      width: "100%",
+      marginTop: spacing.xl,
+      flexDirection: "row",
+      alignItems: "center",
+      gap: spacing.md,
+      borderWidth: 1,
+      borderColor: colors.border,
+      backgroundColor: colors.surface,
+      borderRadius: radius.md,
+      paddingVertical: spacing.md,
+      paddingHorizontal: spacing.lg,
+    },
+    soundText: {
+      flex: 1,
+    },
+    soundTitle: {
+      color: colors.textPrimary,
+      fontFamily: fonts.bodyMedium,
+      fontSize: 15,
+    },
+    soundSubtitle: {
+      color: colors.textSecondary,
+      fontFamily: fonts.body,
+      fontSize: 12,
+    },
+    soundPlay: {
+      width: 30,
+      height: 30,
+      borderRadius: 15,
+      backgroundColor: colors.accent,
+      alignItems: "center",
+      justifyContent: "center",
+    },
     nameInput: {
       width: "100%",
-      marginTop: spacing.xxl,
+      marginTop: spacing.md,
       borderWidth: 1,
       borderColor: colors.border,
       backgroundColor: colors.surface,

@@ -11,3 +11,7 @@ npm-debug.log*
 functions/lib
 firebase-debug.log
 .firebase/
+
+# Generated marketing media (rebuild with marketing/*.py)
+marketing/*.mp4
+marketing/*.png

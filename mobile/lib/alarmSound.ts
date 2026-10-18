@@ -123,6 +123,18 @@ export async function getCachedAlarmVideoUri(): Promise<string | undefined> {
   return record.path;
 }
 
+/** The saved recording for showing to the viewer (the Live tab's "Watch his last howl"): its
+ * file:// URI and when it was recorded, or undefined if none is on the phone. Only real-session
+ * clips are ever kept (removeInvalidSavedRecording), so this is always one of his howls. */
+export async function getSavedRecording(): Promise<{ uri: string; recordedAt: number } | undefined> {
+  const record = await getCacheRecord();
+  if (!record) return undefined;
+  const info = await FileSystem.getInfoAsync(record.path);
+  const recordedAt = Date.parse(record.recordedAt);
+  if (!info.exists || !Number.isFinite(recordedAt)) return undefined;
+  return { uri: record.path, recordedAt };
+}
+
 // A "not ready yet" answer (Cloudflare still preparing the file) or a failed download is worth
 // another try shortly; anything else (offline, unconfigured, nothing recorded) is not, and the
 // next trigger — the app coming to the foreground, a schedule change, the background task —

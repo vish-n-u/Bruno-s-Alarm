@@ -11,6 +11,7 @@ import LiveChat from "../components/LiveChat";
 import Touchable from "../components/Touchable";
 import VideoPanel from "../components/VideoPanel";
 import { getSavedRecording } from "../lib/alarmSound";
+import { fetchLastHowl } from "../lib/latestRecording";
 import { tapLight } from "../lib/haptics";
 import { enableLiveAlarm, isLiveAlarmEnabled } from "../lib/liveAlerts";
 import { getCloudflareRecordingManifestUrl } from "../lib/liveStatus";
@@ -253,18 +254,23 @@ export default function LiveScreen() {
     setLiveAlarmSheet(false);
   }
 
+  // Newest real session first, streamed from Cloudflare (no download to wait for, and not
+  // limited by the alarm clip's 30 s rule; DECISIONS.md D1a). Offline or unavailable: the clip
+  // saved for alarms, then the built-in one.
   async function handleWatchLastHowl() {
     tapLight();
+    const when = (iso: string | number) =>
+      new Date(iso).toLocaleString(undefined, { weekday: "short", hour: "numeric", minute: "2-digit" });
+    const newest = await fetchLastHowl();
+    const streamUrl = newest ? getCloudflareRecordingManifestUrl(newest.uid) : null;
+    if (newest && streamUrl) {
+      track.lastHowlWatched("stream");
+      setLastHowl({ source: { uri: streamUrl }, label: when(newest.recordedAt) });
+      return;
+    }
     const saved = await getSavedRecording().catch(() => undefined);
     track.lastHowlWatched(saved ? "saved" : "built_in");
-    setLastHowl(
-      saved
-        ? {
-            source: { uri: saved.uri },
-            label: new Date(saved.recordedAt).toLocaleString(undefined, { weekday: "short", hour: "numeric", minute: "2-digit" }),
-          }
-        : { source: BUILT_IN_HOWL, label: null }
-    );
+    setLastHowl(saved ? { source: { uri: saved.uri }, label: when(saved.recordedAt) } : { source: BUILT_IN_HOWL, label: null });
   }
 
   const closeLastHowl = useCallback(() => setLastHowl(null), []);

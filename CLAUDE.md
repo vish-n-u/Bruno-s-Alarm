@@ -1,6 +1,6 @@
 # Bruno's Alarm
 
-Read `PROJECT_GUIDE.md` before doing anything — it covers how the app, website and backend
+Read `PROJECT_GUIDE.md` and `DECISIONS.md` before doing anything — it covers how the app, website and backend
 work, how to build/deploy, known traps, and the prioritised list of open issues (§10).
 
 Quick orientation:
@@ -11,3 +11,7 @@ Quick orientation:
 - Release builds are local Gradle builds; bump `versionCode` in both `mobile/app.json` and
   `mobile/android/app/build.gradle`.
 - Never write files containing regex/unicode backslash escapes via Bash heredocs (§9).
+
+- **Before changing any rule, number or behaviour, check `DECISIONS.md` for why it exists.** If the
+  change would bend a recorded decision, ask the owner first, then update the entry (append, with
+  the date). Record the *why* of every new decision there.

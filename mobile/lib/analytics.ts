@@ -96,8 +96,8 @@ export const track = {
   onboardingSlide(slide: number): void {
     logEvent("onboarding_slide", { slide });
   },
-  /** Live tab's "Watch his last howl" — the saved recording, or the built-in clip. */
-  lastHowlWatched(clip: "saved" | "built_in"): void {
+  /** Live tab's "Watch his last howl": streamed newest session, the saved alarm clip, or built-in. */
+  lastHowlWatched(clip: "stream" | "saved" | "built_in"): void {
     logEvent("last_howl_watched", { clip });
   },
   /** The ringing screen appeared (the app was opened by, or during, a ringing alarm). */

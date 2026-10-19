@@ -36,3 +36,19 @@ export async function fetchLatestRecording(): Promise<LatestRecordingResult> {
     return { status: "unavailable" };
   }
 }
+
+/** The Live tab's "Watch his last howl": the newest real session, even a short one, from
+ * /api/last-howl (separate from the alarm clip's stricter length rule; DECISIONS.md D1a).
+ * Returns its Cloudflare video uid to stream, or null if unavailable (offline, none yet). */
+export async function fetchLastHowl(): Promise<{ uid: string; recordedAt: string } | null> {
+  if (!BACKEND_URL) return null;
+  try {
+    const res = await fetch(`${BACKEND_URL}/api/last-howl`);
+    if (!res.ok) return null;
+    const data = await res.json();
+    if (typeof data?.uid !== "string" || typeof data?.recordedAt !== "string") return null;
+    return { uid: data.uid, recordedAt: data.recordedAt };
+  } catch {
+    return null;
+  }
+}

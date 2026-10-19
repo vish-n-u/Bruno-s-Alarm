@@ -462,7 +462,7 @@ the owner hasn't decided yet whether to switch them (Play shows the policy's add
 - **`GET /api/latest-recording`** (public, no auth):
   1. Lists the Live Input's recordings from the Cloudflare Stream API (token stays server-side).
   2. Picks the newest recording **of a real session**: `status.state === "ready"`, at least
-     20 s long (was 30 until 18 Oct, which froze alarms on the 7 Oct clip), and overlapping a scheduled 06:00/18:00 IST session (from 10 min before to
+     30 s long (the owner's rule for the looping alarm; DECISIONS.md D1), and overlapping a scheduled 06:00/18:00 IST session (from 10 min before to
      30 min after). Test streams, broken recordings and off-schedule streams are ignored, so
      they never become anyone's alarm. The rule lives in `overlapsSession()` in `lib/schedule.ts`.
   3. Mirrors that MP4 into R2 once as `alarm-recordings/<videoUID>.mp4` (unique name per
@@ -472,6 +472,10 @@ the owner hasn't decided yet whether to switch them (Play shows the policy's add
      Cloudflare's MP4 generation **failed** (status `error`, which otherwise stays forever), it
      deletes and re-requests it automatically (`requestDownload()`).
   Mirroring exists to avoid Stream's per-minute delivery fees when many phones download.
+- **`GET /api/last-howl`** (public): the newest real session **of 20 s or more** as
+  `{ uid, recordedAt, duration }`, for the Live tab's "Watch his last howl", which streams it by
+  uid (HLS). Separate from the alarm clip on purpose (DECISIONS.md D1a). Session rules for both
+  routes live in `lib/sessionRecordings.ts`.
 
 ---
 

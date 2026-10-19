@@ -9,7 +9,7 @@ anything newer.
 
 ## 0. Where we are (snapshot, 5 Oct 2026)
 
-**App version:** `versionCode` **44** (Android, 14 Oct). Built locally; the newest .aab is at
+**App version:** `versionCode` **46** (Android, 19 Oct). Built locally; the newest .aab is at
 `mobile/android/app/build/outputs/bundle/release/app-release.aab`.
 
 **Phones:** OPPO CPH2737 (owner's main test phone, on v31) and Samsung Galaxy A35 SM-A356E
@@ -524,7 +524,7 @@ cd mobile/android && ./gradlew bundleRelease
 
 Releasing a new Play build:
 1. Bump **`versionCode` in BOTH `mobile/app.json` and `mobile/android/app/build.gradle`**
-   (the android folder isn't regenerated automatically). Current: **44**. Play rejects a
+   (the android folder isn't regenerated automatically). Current: **46**. Play rejects a
    versionCode it has already seen.
 2. **Build clean**, or Gradle may reuse a cached JS bundle (Play v39 shipped app.json from v38 —
    its Settings said "(38)"): delete `app/build/generated/res/react`, `app/build/generated/assets/react`,

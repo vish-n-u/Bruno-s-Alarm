@@ -232,6 +232,42 @@ async function archiveReportedMessages(sessionRef: FirebaseFirestore.DocumentRef
   return archived;
 }
 
+type RateHowlRequest = { videoUid?: unknown; paws?: unknown };
+
+// A Cloudflare Stream video uid: 32 lowercase hex characters.
+const VIDEO_UID_PATTERN = /^[0-9a-f]{32}$/;
+
+/**
+ * "Rate this howl" on the Live tab's "Watch his last howl" (1–5 paws). One rating per phone
+ * (anonymous auth uid) per howl; rating again replaces the earlier one. Keeps a running total on
+ * howlRatings/{videoUid} ({ count, sum }) so every viewer can show the average without reading
+ * individual votes. Like chat, clients can't write here directly (firestore.rules); this is the
+ * only writer.
+ */
+export const rateHowl = onCall<RateHowlRequest>(async (request) => {
+  const uid = request.auth?.uid;
+  if (!uid) throw new HttpsError("unauthenticated", "Sign-in required.");
+  const { videoUid, paws } = request.data ?? {};
+  if (typeof videoUid !== "string" || !VIDEO_UID_PATTERN.test(videoUid)) {
+    throw new HttpsError("invalid-argument", "Bad howl id.");
+  }
+  if (typeof paws !== "number" || !Number.isInteger(paws) || paws < 1 || paws > 5) {
+    throw new HttpsError("invalid-argument", "Rating must be 1 to 5.");
+  }
+
+  const summaryRef = db.collection("howlRatings").doc(videoUid);
+  const voteRef = summaryRef.collection("votes").doc(uid);
+  await db.runTransaction(async (tx: Transaction) => {
+    const [voteSnap, summarySnap] = await Promise.all([tx.get(voteRef), tx.get(summaryRef)]);
+    const previous = voteSnap.exists ? Number(voteSnap.get("paws")) || 0 : 0;
+    const count = (Number(summarySnap.get("count")) || 0) + (previous ? 0 : 1);
+    const sum = (Number(summarySnap.get("sum")) || 0) - previous + paws;
+    tx.set(voteRef, { paws, at: FieldValue.serverTimestamp() });
+    tx.set(summaryRef, { count, sum, updatedAt: FieldValue.serverTimestamp() }, { merge: true });
+  });
+  return { ok: true };
+});
+
 export const cleanupOldChat = onSchedule("every 60 minutes", async () => {
   const cutoff = Date.now() - CHAT_RETENTION_MS;
   const sessionRefs = await db.collection("sessions").listDocuments();

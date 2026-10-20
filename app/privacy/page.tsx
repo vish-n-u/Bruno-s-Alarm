@@ -74,6 +74,11 @@ export default function PrivacyPage() {
           <strong>If you report a chat message:</strong> the message you reported, your reason,
           and your anonymous device ID, so we can review it.
         </li>
+        <li>
+          <strong>If you rate one of Bruno&rsquo;s howls:</strong> your rating (1 to 5 paws) and
+          your anonymous device ID, so rating again changes your rating instead of adding a
+          second one. Everyone else sees only the average and how many people rated it.
+        </li>
       </ul>
       <p>
         We do not collect your real name, email address, phone number, or precise location, and

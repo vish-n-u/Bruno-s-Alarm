@@ -9,7 +9,7 @@ anything newer.
 
 ## 0. Where we are (snapshot, 5 Oct 2026)
 
-**App version:** `versionCode` **46** (Android, 19 Oct). Built locally; the newest .aab is at
+**App version:** `versionCode` **47** (Android, 20 Oct). Built locally; the newest .aab is at
 `mobile/android/app/build/outputs/bundle/release/app-release.aab`.
 
 **Phones:** OPPO CPH2737 (owner's main test phone, on v31) and Samsung Galaxy A35 SM-A356E
@@ -342,6 +342,11 @@ the owner hasn't decided yet whether to switch them (Play shows the policy's add
   there's no ID (debug force-live). App versions before 15 still use the clock-based room.
   If the camera drops and Cloudflare starts a new recording, the chat starts a new room.
 - Messages are deleted by `cleanupOldChat` ~2 hours after a room goes quiet.
+- **Howl ratings** (v47): "Watch his last howl" shows "Rate this howl" (1–5 paws) and the average.
+  Callable `rateHowl` (functions/src/index.ts) keeps `howlRatings/{videoUid}` = { count, sum }
+  plus `votes/{deviceUid}`; rules: summary public-read, a vote readable only by its own phone,
+  no client writes. App: `lib/howlRatings.ts`, `components/LastHowlPlayer.tsx`. Analytics
+  `howl_rated`. (A test doc `howlRatings/000…0` with 2 votes exists from the 20 Oct test.)
 - **Bruno's Pack** — a persistent always-open chat tab (`screens/BrunosPackScreen.tsx`, room id
   `brunos-pack`) — added to the app in v20/v21. **Shown or hidden for everyone from the server:**
   Firestore doc `config/app`, boolean field `packEnabled` (edit in the Firebase console →
@@ -524,7 +529,7 @@ cd mobile/android && ./gradlew bundleRelease
 
 Releasing a new Play build:
 1. Bump **`versionCode` in BOTH `mobile/app.json` and `mobile/android/app/build.gradle`**
-   (the android folder isn't regenerated automatically). Current: **46**. Play rejects a
+   (the android folder isn't regenerated automatically). Current: **47**. Play rejects a
    versionCode it has already seen.
 2. **Build clean**, or Gradle may reuse a cached JS bundle (Play v39 shipped app.json from v38 —
    its Settings said "(38)"): delete `app/build/generated/res/react`, `app/build/generated/assets/react`,

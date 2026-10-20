@@ -67,6 +67,13 @@ inside the $5 block. Anything to keep (marketing) must be downloaded first. · v
 **D10. A stream only "ends" after 2 not-live answers in a row; playback errors retry 10× / 3 s.**
 *Why:* single failed checks caused LIVE↔REPLAY flip-flopping (4 Oct). · v29.
 
+**D9a. "Watch his last howl" opens instantly with a loader, stays open at the end, and can be
+rated 1–5 paws; everyone sees the average** (owner, 20 Oct). Ratings are keyed by the session's
+Cloudflare uid, one per phone (re-rating replaces it), written only by the `rateHowl` Cloud
+Function; `howlRatings/{uid}` = { count, sum } is public, votes are private to their phone.
+Privacy policy updated (effective 20 Oct). Only streamed sessions can be rated (the offline
+fallbacks have no uid).
+
 ## Copy and design
 
 **D11. Tagline everywhere: "A real dog. Live twice a day."** Never "Two alarms a day" (reads as if

@@ -96,6 +96,10 @@ export const track = {
   onboardingSlide(slide: number): void {
     logEvent("onboarding_slide", { slide });
   },
+  /** Rated the last howl 1–5 paws (Live tab). */
+  howlRated(paws: number): void {
+    logEvent("howl_rated", { paws });
+  },
   /** Live tab's "Watch his last howl": streamed newest session, the saved alarm clip, or built-in. */
   lastHowlWatched(clip: "stream" | "saved" | "built_in"): void {
     logEvent("last_howl_watched", { clip });

@@ -43,6 +43,19 @@ service cloud.firestore {
       allow read, update, delete: if false;
     }
 
+    // "Rate this howl" (1–5 paws). Written only by the `rateHowl` callable function. The summary
+    // ({ count, sum }) is public so every viewer can show the average; each phone may read only
+    // its own vote, to show which paws it picked.
+    match /howlRatings/{videoUid} {
+      allow read: if true;
+      allow write: if false;
+
+      match /votes/{voterUid} {
+        allow read: if request.auth != null && request.auth.uid == voterUid;
+        allow write: if false;
+      }
+    }
+
     // Owner-controlled switches (e.g. packEnabled for the Bruno's Pack tab — see
     // mobile/lib/appConfig.ts). Edited only in the Firebase console, which bypasses these rules.
     match /config/{docId} {

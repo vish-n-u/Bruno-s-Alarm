@@ -1,5 +1,5 @@
 BRUNO'S ALARM — PRIVACY POLICY
-Effective October 2, 2026
+Effective October 20, 2026
 Package: com.brunosalarm.app
 
 Bruno's Alarm wakes you up with a real dog's twice-daily howl, and lets you chat with
@@ -31,6 +31,9 @@ deliver the video. No ads, nothing sold to third parties.
   public chat.
 - If you report a chat message: the message you reported, your reason, and your
   anonymous device ID, so we can review it.
+- If you rate one of Bruno's howls: your rating (1 to 5 paws) and your anonymous
+  device ID, so rating again changes your rating instead of adding a second one.
+  Everyone else sees only the average and how many people rated it.
 - If you turn on the optional "Ring when Bruno goes live" alarm: Firebase Cloud
   Messaging gives your device a push identifier, and the app subscribes it to a
   "live" topic so it can be told when Bruno starts streaming. No name, email, or

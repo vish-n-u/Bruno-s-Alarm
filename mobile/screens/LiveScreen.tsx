@@ -168,7 +168,10 @@ export default function LiveScreen() {
   const [liveAlarmOn, setLiveAlarmOn] = useState<boolean | null>(null);
   const [liveAlarmSheet, setLiveAlarmSheet] = useState(false);
   // "Watch his last howl": the saved real-session clip, or the built-in one if none yet.
-  const [lastHowl, setLastHowl] = useState<{ source: VideoSource; label: string | null } | null>(null);
+  // source null = still finding it (the player shows a loader straight away).
+  const [lastHowl, setLastHowl] = useState<{ source: VideoSource | null; videoUid: string | null; label: string | null } | null>(null);
+  // Bumped on every open/close, so a lookup that finishes after the viewer closed is ignored.
+  const lastHowlRequest = useRef(0);
   // Around one of Bruno's sessions (minutes before through the live window) — when an offline
   // phone gets the "No internet" screen rather than the usual NO SIGNAL card.
   const [nearSession, setNearSession] = useState(() => isNearLiveWindow());
@@ -259,21 +262,32 @@ export default function LiveScreen() {
   // saved for alarms, then the built-in one.
   async function handleWatchLastHowl() {
     tapLight();
+    const request = ++lastHowlRequest.current;
+    setLastHowl({ source: null, videoUid: null, label: null });
     const when = (iso: string | number) =>
       new Date(iso).toLocaleString(undefined, { weekday: "short", hour: "numeric", minute: "2-digit" });
     const newest = await fetchLastHowl();
     const streamUrl = newest ? getCloudflareRecordingManifestUrl(newest.uid) : null;
+    if (request !== lastHowlRequest.current) return;
     if (newest && streamUrl) {
       track.lastHowlWatched("stream");
-      setLastHowl({ source: { uri: streamUrl }, label: when(newest.recordedAt) });
+      setLastHowl({ source: { uri: streamUrl }, videoUid: newest.uid, label: when(newest.recordedAt) });
       return;
     }
     const saved = await getSavedRecording().catch(() => undefined);
+    if (request !== lastHowlRequest.current) return;
     track.lastHowlWatched(saved ? "saved" : "built_in");
-    setLastHowl(saved ? { source: { uri: saved.uri }, label: when(saved.recordedAt) } : { source: BUILT_IN_HOWL, label: null });
+    setLastHowl(
+      saved
+        ? { source: { uri: saved.uri }, videoUid: null, label: when(saved.recordedAt) }
+        : { source: BUILT_IN_HOWL, videoUid: null, label: null }
+    );
   }
 
-  const closeLastHowl = useCallback(() => setLastHowl(null), []);
+  const closeLastHowl = useCallback(() => {
+    lastHowlRequest.current++;
+    setLastHowl(null);
+  }, []);
 
   return (
     <View style={styles.root}>
@@ -302,7 +316,13 @@ export default function LiveScreen() {
         />
       )}
       {showNoSignal && lastHowl && (
-        <LastHowlPlayer source={lastHowl.source} label={lastHowl.label} paused={!isFocused} onClose={closeLastHowl} />
+        <LastHowlPlayer
+          source={lastHowl.source}
+          videoUid={lastHowl.videoUid}
+          label={lastHowl.label}
+          paused={!isFocused}
+          onClose={closeLastHowl}
+        />
       )}
       <LiveAlarmSetupSheet
         visible={liveAlarmSheet}

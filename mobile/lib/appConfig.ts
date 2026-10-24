@@ -11,22 +11,26 @@ import { useEffect, useState } from "react";
 //   packEnabled (boolean)   — shows the "Bruno's Pack" chat tab. Missing/false = hidden. The chat
 //                             server also refuses Pack messages while it's false
 //                             (functions/src/index.ts), so older app versions can't post either.
+//   liveChatEnabled (boolean) — shows the chat on the Live tab during a stream. Missing/false =
+//                             hidden; the chat server also refuses live messages while it's
+//                             false, so older app versions can't post either (DECISIONS.md D17a).
 //   developerIds (string[]) — chat ids (anonymous Firebase uids) that get the "DEV" badge in chat.
 //                             Each phone's id is shown in Settings' hidden debug section. Safe to
 //                             trust: a message's deviceId is stamped by the server, never the app.
 
 const CACHE_KEY = "bruno-app-config";
 
-export type AppConfig = { packEnabled: boolean; developerIds: string[] };
+export type AppConfig = { packEnabled: boolean; liveChatEnabled: boolean; developerIds: string[] };
 
 // Hidden until the server says otherwise — a phone that has never reached it (first launch,
 // offline) shouldn't show a chat that might be switched off.
-const DEFAULTS: AppConfig = { packEnabled: false, developerIds: [] };
+const DEFAULTS: AppConfig = { packEnabled: false, liveChatEnabled: false, developerIds: [] };
 
 function parse(data: Record<string, unknown> | undefined): AppConfig {
   const ids = data?.developerIds;
   return {
     packEnabled: data?.packEnabled === true,
+    liveChatEnabled: data?.liveChatEnabled === true,
     developerIds: Array.isArray(ids) ? ids.filter((id): id is string => typeof id === "string") : [],
   };
 }

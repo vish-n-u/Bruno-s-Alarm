@@ -11,6 +11,7 @@ import LiveChat from "../components/LiveChat";
 import Touchable from "../components/Touchable";
 import VideoPanel from "../components/VideoPanel";
 import { getSavedRecording } from "../lib/alarmSound";
+import { useAppConfig } from "../lib/appConfig";
 import { fetchLastHowl } from "../lib/latestRecording";
 import { tapLight } from "../lib/haptics";
 import { enableLiveAlarm, isLiveAlarmEnabled } from "../lib/liveAlerts";
@@ -160,6 +161,8 @@ export default function LiveScreen() {
   // preserve their state), so without this an unmuted video would keep playing audio in
   // the background after leaving the Live tab.
   const isFocused = useIsFocused();
+  // Owner's switch for the live chat overlay (config/app.liveChatEnabled; DECISIONS.md D17a).
+  const { liveChatEnabled } = useAppConfig();
   const [live, setLive] = useState(false);
   const [streamId, setStreamId] = useState<string | null>(null);
   const [nextAt, setNextAt] = useState(() => nextSessionAt());
@@ -332,7 +335,7 @@ export default function LiveScreen() {
       {showNoInternet && <NoInternetScreen wasLive={live} />}
       {/* Chat only exists while live — closed during the replay, and skipped entirely once
           NoSignal is showing, so its own "not live" placeholder doesn't double up against it. */}
-      {live && !showNoInternet && <LiveChat sessionId={chatRoom} live={live} />}
+      {live && !showNoInternet && liveChatEnabled && <LiveChat sessionId={chatRoom} live={live} />}
       {(live || replaying) && !showNoInternet && (
         <SafeAreaView style={styles.overlay} edges={["top"]} pointerEvents="none">
           <View style={styles.liveBadge}>

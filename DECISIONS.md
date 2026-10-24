@@ -98,6 +98,12 @@ sunrise glow (owner's pick, 7 Oct). The About screen is always morning orange li
 **D17. Chat writes only via the `sendChatMessage` Cloud Function** (rate limit, profanity filter,
 200 chars); live chat is deleted ~2 h after a room goes quiet (privacy policy promises this).
 
+**D17a. Live chat (on the Live tab during a stream) has an owner switch, and it's OFF for the
+production launch** (owner, 24 Oct). `config/app.liveChatEnabled` (missing/false = off): the app
+(v48+) hides the chat overlay, and `sendChatMessage` refuses live-room messages ("Live chat is
+closed.") so older app versions can't post either. Bruno's Pack keeps its own switch. To turn live
+chat on: set the field to true in the Firebase console; takes effect within ~30 s.
+
 **D18. Bruno's Pack is shown only when the owner's `config/app.packEnabled` is on AND the user
 hasn't hidden it** (Settings → Chat, 13 Oct). Owner switched it on 11 Oct.
 

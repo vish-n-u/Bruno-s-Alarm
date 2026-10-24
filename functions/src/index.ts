@@ -40,18 +40,23 @@ const SESSION_MESSAGE_CAP = 500;
 const UNCAPPED_SESSION_IDS = new Set(["brunos-pack"]);
 const PERSISTENT_ROOM_KEEP = 200;
 
-// The Bruno's Pack switch, Firestore config/app.packEnabled (the app hides the tab while it's
-// off — mobile/lib/appConfig.ts). Read here too so a closed Pack also refuses messages from any
-// app version. Cached briefly to avoid a read per message.
+// The owner's chat switches in Firestore config/app (the app hides each chat while it's off —
+// mobile/lib/appConfig.ts). Read here too so a closed chat also refuses messages from any app
+// version. Missing = off. Cached briefly to avoid a read per message.
+//   packEnabled     — the always-open Bruno's Pack room
+//   liveChatEnabled — the chat on the Live tab during a stream (DECISIONS.md D17a)
 const CONFIG_CACHE_MS = 30 * 1000;
-let packEnabledCache: { value: boolean; at: number } | null = null;
+let chatConfigCache: { packEnabled: boolean; liveChatEnabled: boolean; at: number } | null = null;
 
-async function isPackEnabled(): Promise<boolean> {
-  if (packEnabledCache && Date.now() - packEnabledCache.at < CONFIG_CACHE_MS) return packEnabledCache.value;
-  const snap = await db.collection("config").doc("app").get();
-  const value = snap.data()?.packEnabled === true;
-  packEnabledCache = { value, at: Date.now() };
-  return value;
+async function chatSwitches(): Promise<{ packEnabled: boolean; liveChatEnabled: boolean }> {
+  if (chatConfigCache && Date.now() - chatConfigCache.at < CONFIG_CACHE_MS) return chatConfigCache;
+  const data = (await db.collection("config").doc("app").get()).data();
+  chatConfigCache = {
+    packEnabled: data?.packEnabled === true,
+    liveChatEnabled: data?.liveChatEnabled === true,
+    at: Date.now(),
+  };
+  return chatConfigCache;
 }
 
 // Counts Unicode code points, not UTF-16 code units — matches the client's own check in
@@ -97,8 +102,11 @@ export const sendChatMessage = onCall<SendChatMessageRequest>(async (request) =>
     throw new HttpsError("invalid-argument", "Message not allowed.");
   }
 
-  if (UNCAPPED_SESSION_IDS.has(sessionId) && !(await isPackEnabled())) {
-    throw new HttpsError("failed-precondition", "Bruno's Pack is closed.");
+  const switches = await chatSwitches();
+  if (UNCAPPED_SESSION_IDS.has(sessionId)) {
+    if (!switches.packEnabled) throw new HttpsError("failed-precondition", "Bruno's Pack is closed.");
+  } else if (!switches.liveChatEnabled) {
+    throw new HttpsError("failed-precondition", "Live chat is closed.");
   }
 
   const sessionRef = db.collection("sessions").doc(sessionId);

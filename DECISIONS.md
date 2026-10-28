@@ -140,3 +140,9 @@ ID = No; no foreground-service declaration needed). Keep until ads are actually 
 
 **D21. Analytics never send personal data** (no names, chat text, emails); per-tester lookup uses
 the per-install analytics ID only.
+
+**D22. The website lives at `brunos-alarm.com`; `bruno-s-alarm.vercel.app` stays up and is never
+redirected.** *Why:* installed apps (v49 and earlier) call `/api/latest-recording` and open
+privacy/terms on the vercel.app host, so redirecting or removing it would break them. The root is
+a Cloudflare CNAME to Vercel with the proxy off (Vercel issues the certificate). It used to be an
+unused, access-disabled R2 custom domain, which was removed; R2 stays on `media.`. · 28 Oct.

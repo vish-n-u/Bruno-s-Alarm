@@ -1,6 +1,6 @@
 // One place for the details the landing, privacy, and terms pages all share.
 
-export const SITE_URL = "https://bruno-s-alarm.vercel.app";
+export const SITE_URL = "https://brunos-alarm.com";
 export const CONTACT_EMAIL = "vishnuna26@gmail.com";
 export const PACKAGE_NAME = "com.brunosalarm.app";
 

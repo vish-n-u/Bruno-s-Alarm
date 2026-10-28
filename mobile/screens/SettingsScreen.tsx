@@ -31,8 +31,8 @@ import { setDebugForceLive } from "../lib/schedule";
 import { fonts, radius, shadow, spacing, useThemeColors, type ThemeColors } from "../lib/theme";
 
 // Served by the Next.js site at the repo root (app/privacy, app/terms).
-const PRIVACY_POLICY_URL = "https://bruno-s-alarm.vercel.app/privacy";
-const TERMS_URL = "https://bruno-s-alarm.vercel.app/terms";
+const PRIVACY_POLICY_URL = "https://brunos-alarm.com/privacy";
+const TERMS_URL = "https://brunos-alarm.com/terms";
 const CONTACT_EMAIL = "contact@brunos-alarm.com";
 
 // The INSTALLED app's own version and build number (read from the package at runtime), not

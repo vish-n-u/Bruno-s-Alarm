@@ -20,7 +20,7 @@ Final permissions the app declares: `POST_NOTIFICATIONS`, `SCHEDULE_EXACT_ALARM`
 
 ## To do in the Play Console
 
-1. **Privacy policy.** Use `https://bruno-s-alarm.vercel.app/privacy` (served by the Next.js site at
+1. **Privacy policy.** Use `https://brunos-alarm.com/privacy` (served by the Next.js site at
    the repo root, `app/privacy/page.tsx`). The app's Settings links there too, and to `/terms`. The
    old Notion page is no longer linked from anywhere.
 2. **Permissions declarations** (App content):

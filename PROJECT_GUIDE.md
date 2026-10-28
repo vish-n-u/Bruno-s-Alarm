@@ -137,7 +137,7 @@ JOURNEY.md, bruno-app-build-plan.md   Historical notes from earlier phases
 | Service | Used for | Identifier |
 |---|---|---|
 | GitHub | Code | `vish-n-u/Bruno-s-Alarm`, branch `main` |
-| Vercel | Website + `/api/latest-recording` | `https://bruno-s-alarm.vercel.app` — **auto-deploys on every push to `main`** (~1–2 min) |
+| Vercel | Website + `/api/latest-recording` | `https://brunos-alarm.com` (www 308-redirects to it; `https://bruno-s-alarm.vercel.app` must keep working, see D22). DNS: Cloudflare CNAMEs, DNS only — **auto-deploys on every push to `main`** (~1–2 min) |
 | Firebase | Chat, push, analytics, crash reports | project `bruno-s-howl` |
 | Cloudflare Stream | Live video + automatic recordings | one Live Input (UID in env vars) |
 | Cloudflare R2 | Public copies of recordings for phones to download | bucket served at `https://media.brunos-alarm.com` |

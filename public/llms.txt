@@ -15,17 +15,17 @@ Key facts:
 
 ## Pages
 
-- [Home](https://bruno-s-alarm.vercel.app/): what the app does, Bruno's last howl, FAQ
+- [Home](https://brunos-alarm.com/): what the app does, Bruno's last howl, FAQ
 - [Get it on Google Play](https://play.google.com/store/apps/details?id=com.brunosalarm.app)
-- [Meet Bruno](https://bruno-s-alarm.vercel.app/blog/meet-bruno): the dog and how the app started
-- [How Bruno's howl becomes your alarm](https://bruno-s-alarm.vercel.app/blog/how-his-howl-becomes-your-alarm)
-- [Rate Bruno's howls](https://bruno-s-alarm.vercel.app/blog/rate-his-howls)
-- [What time does Bruno howl where you live?](https://bruno-s-alarm.vercel.app/blog/what-time-does-bruno-howl): his sessions in other time zones
-- [Why do dogs howl at church bells?](https://bruno-s-alarm.vercel.app/blog/why-do-dogs-howl-at-bells)
-- [An alarm that rings even on silent](https://bruno-s-alarm.vercel.app/blog/alarm-that-rings-on-silent)
-- [Android alarm not going off? Check these settings](https://bruno-s-alarm.vercel.app/blog/android-alarm-not-going-off)
-- [Does it work without internet?](https://bruno-s-alarm.vercel.app/blog/does-bruno-alarm-work-offline)
-- [Why is it Android only?](https://bruno-s-alarm.vercel.app/blog/why-android-only)
-- [All blog posts](https://bruno-s-alarm.vercel.app/blog)
-- [Privacy Policy](https://bruno-s-alarm.vercel.app/privacy)
-- [Terms of Service](https://bruno-s-alarm.vercel.app/terms)
+- [Meet Bruno](https://brunos-alarm.com/blog/meet-bruno): the dog and how the app started
+- [How Bruno's howl becomes your alarm](https://brunos-alarm.com/blog/how-his-howl-becomes-your-alarm)
+- [Rate Bruno's howls](https://brunos-alarm.com/blog/rate-his-howls)
+- [What time does Bruno howl where you live?](https://brunos-alarm.com/blog/what-time-does-bruno-howl): his sessions in other time zones
+- [Why do dogs howl at church bells?](https://brunos-alarm.com/blog/why-do-dogs-howl-at-bells)
+- [An alarm that rings even on silent](https://brunos-alarm.com/blog/alarm-that-rings-on-silent)
+- [Android alarm not going off? Check these settings](https://brunos-alarm.com/blog/android-alarm-not-going-off)
+- [Does it work without internet?](https://brunos-alarm.com/blog/does-bruno-alarm-work-offline)
+- [Why is it Android only?](https://brunos-alarm.com/blog/why-android-only)
+- [All blog posts](https://brunos-alarm.com/blog)
+- [Privacy Policy](https://brunos-alarm.com/privacy)
+- [Terms of Service](https://brunos-alarm.com/terms)

@@ -1,7 +1,11 @@
 import Image from "next/image";
 import Link from "next/link";
 import DepartureBoard from "./_components/DepartureBoard";
+import HeroSky from "./_components/HeroSky";
+import LastHowl from "./_components/LastHowl";
+import StoryScene from "./_components/StoryScene";
 import { SiteFooter, SiteHeader } from "./_components/SiteChrome";
+import { POSTS, formatDate } from "./blog/posts";
 import { PLAY_STORE_LIVE, PLAY_STORE_URL } from "./site";
 
 function PlayButton({ large = false }: { large?: boolean }) {
@@ -28,34 +32,57 @@ function PlayButton({ large = false }: { large?: boolean }) {
   );
 }
 
+// "awoooo", one letter at a time (CSS), like the app's About scene.
+function Awoo({ className = "" }: { className?: string }) {
+  return (
+    <span className={`awoo ${className}`} aria-hidden="true">
+      {"awoooo".split("").map((ch, i) => (
+        <span key={i} style={{ animationDelay: `${0.4 + i * 0.18}s` }}>
+          {ch}
+        </span>
+      ))}
+    </span>
+  );
+}
+
+// Everything here is true of the shipped app (live chat is switched off for now: DECISIONS.md D17a).
 const FEATURES = [
   {
+    icon: "🔔",
     title: "A real alarm, not a notification",
-    body: "It rings on your phone's alarm channel, so it gets through silent mode and Do Not Disturb and takes over the lock screen like a proper alarm clock. Snooze is there if you must.",
+    body: "It rings on your phone's alarm channel, so it gets through silent mode and Do Not Disturb and takes over the lock screen like a proper alarm clock.",
   },
   {
+    icon: "⏰",
+    title: "Your times, your days",
+    body: "Set as many alarms as you like: once, every day, weekdays, or any days you pick. Snooze is there if you must.",
+  },
+  {
+    icon: "🐕",
+    title: "His howl, kept fresh",
+    body: "Every alarm plays a real recording of Bruno, refreshed as new howls come in, and saved on your phone so it never needs a connection.",
+  },
+  {
+    icon: "📺",
     title: "Live when he's live",
-    body: "At session time the Live tab shows the camera. If your alarm rings while he's off, it plays his latest recording, so there's always a howl in it. Flip one switch and it'll ring you the moment he goes live, even off schedule.",
+    body: "Watch him around his morning and evening, or flip on \"Ring when Bruno goes live\" and your phone rings the moment he's on camera.",
   },
   {
-    title: "Your own times too",
-    body: "Set alarms for whenever you actually get up. Every alarm plays Bruno's latest howl.",
+    icon: "🐾",
+    title: "Rate his howls",
+    body: "Missed it? Watch his last howl and rate it out of 5 paws. Everyone sees the average.",
   },
   {
-    title: "A chat for the pack",
-    body: "A live chat opens while he's on, and Bruno's Pack is always open. Both are moderated and rate-limited; live chat is wiped after each session and the Pack keeps only its newest 200 messages.",
+    icon: "🌅",
+    title: "A sky that keeps time",
+    body: "The app changes with your day, from a sunrise glow at dawn to stars at night. This website does too.",
   },
 ];
 
 const FAQ = [
-  {
-    q: "What does it cost?",
-    a: "Nothing. No ads, no sign-up, no account.",
-  },
-  {
-    q: "iPhone?",
-    a: "Android only for now.",
-  },
+  { q: "Is Bruno real?", a: "Very. Everything you see and hear in the app is him, recorded at his actual sessions." },
+  { q: "What does it cost?", a: "Nothing. No ads, no sign-up, no account." },
+  { q: "iPhone?", a: "Android only for now." },
   {
     q: "What if he doesn't howl?",
     a: "The alarm never depends on him turning up. The sound is saved on your phone ahead of time, so it rings with or without a connection, and with or without Bruno.",
@@ -64,23 +91,27 @@ const FAQ = [
     q: "What do you collect?",
     a: (
       <>
-        Very little. Alarms stay on your phone, and chat uses an anonymous ID instead of an
-        account. The <Link href="/privacy">privacy policy</Link> lists every piece of it.
+        Very little. Alarms stay on your phone, and chat and ratings use an anonymous ID instead of
+        an account. The <Link href="/privacy">privacy policy</Link> lists every piece of it.
       </>
     ),
   },
-  {
-    q: "It says beta?",
-    a: "It is. Things will occasionally break, and he still won't be punctual.",
-  },
+];
+
+const SCREENS = [
+  { src: "/media/ringing.jpg", alt: "The ringing screen: Bruno howling with Stop and Snooze buttons", note: "6:00 am, sorted" },
+  { src: "/media/last-howl.jpg", alt: "Watch his last howl in the app", note: "missed it? replay it" },
+  { src: "/media/live-frame.jpg", alt: "Bruno mid-howl on a live stream", note: "live, twice a day" },
 ];
 
 export default function Home() {
+  const latestPosts = [...POSTS].sort((a, b) => (a.date < b.date ? 1 : -1)).slice(0, 3);
   return (
     <>
       <SiteHeader />
       <main>
         <section className="hero">
+          <HeroSky />
           <div className="wrap hero-grid">
             <div className="hero-copy">
               <p className="eyebrow">Every morning &amp; evening · 06:00 &amp; 18:00 IST</p>
@@ -99,22 +130,45 @@ export default function Home() {
               </p>
               <div className="hero-actions">
                 <PlayButton />
-                <a href="#schedule" className="text-link">
-                  When is he on? ↓
+                <a href="#last-howl" className="text-link">
+                  Hear his last howl ↓
                 </a>
               </div>
             </div>
-            <figure className="hero-photo">
-              <Image
-                src="/bruno.jpg"
-                alt="Bruno, a tan short-haired dog, head tipped back mid-howl"
-                width={800}
-                height={800}
-                priority
-                sizes="(max-width: 800px) 80vw, 420px"
-              />
-              <figcaption className="hand">Bruno, doing the one thing.</figcaption>
-            </figure>
+            <div className="hero-art">
+              <figure className="polaroid">
+                <video src="/media/howl-loop.mp4" poster="/media/howl-poster.jpg" autoPlay muted loop playsInline />
+                <figcaption className="hand">Bruno, doing the one thing.</figcaption>
+              </figure>
+              <Awoo className="hero-awoo" />
+              <div className="phone hero-phone">
+                <Image src="/media/ringing.jpg" alt="The app's ringing screen" width={540} height={1056} sizes="200px" priority />
+              </div>
+            </div>
+          </div>
+        </section>
+
+        <section id="last-howl" className="section">
+          <div className="wrap last-howl-wrap">
+            <div>
+              <h2 className="section-title">His last howl</h2>
+              <p className="section-lede">
+                The newest session, straight from the camera. Rated by everyone who watched it in
+                the app.
+              </p>
+              <p className="hand side-note">Turn the sound up. Trust me.</p>
+            </div>
+            <LastHowl />
+          </div>
+        </section>
+
+        <section className="section story">
+          <div className="wrap">
+            <h2 className="section-title">How it goes, every day</h2>
+            <p className="section-lede">The bell rings far off. He hears it first.</p>
+            <div className="scene-frame">
+              <StoryScene />
+            </div>
           </div>
         </section>
 
@@ -132,8 +186,50 @@ export default function Home() {
             <ul className="features">
               {FEATURES.map((f) => (
                 <li key={f.title}>
+                  <span className="feature-icon" aria-hidden="true">
+                    {f.icon}
+                  </span>
                   <h3>{f.title}</h3>
                   <p>{f.body}</p>
+                </li>
+              ))}
+            </ul>
+          </div>
+        </section>
+
+        <section className="section screens">
+          <div className="wrap">
+            <h2 className="section-title">Inside the app</h2>
+            <ul className="screen-strip">
+              {SCREENS.map((s, i) => (
+                <li key={s.src} className={`screen-card tilt-${i % 3}`}>
+                  {/* eslint-disable-next-line @next/next/no-img-element */}
+                  <img src={s.src} alt={s.alt} loading="lazy" />
+                  <span className="hand">{s.note}</span>
+                </li>
+              ))}
+            </ul>
+          </div>
+        </section>
+
+        <section className="section">
+          <div className="wrap">
+            <div className="section-head">
+              <h2 className="section-title">From the blog</h2>
+              <Link href="/blog" className="text-link">
+                All posts →
+              </Link>
+            </div>
+            <ul className="post-grid">
+              {latestPosts.map((p, i) => (
+                <li key={p.slug} className={`post-card tilt-${i % 3}`}>
+                  <Link href={`/blog/${p.slug}`}>
+                    {/* eslint-disable-next-line @next/next/no-img-element */}
+                    <img src={p.cover.src} alt={p.cover.alt} loading="lazy" />
+                    <span className="post-date">{formatDate(p.date)}</span>
+                    <h3>{p.title}</h3>
+                    <p>{p.summary}</p>
+                  </Link>
                 </li>
               ))}
             </ul>
@@ -156,8 +252,9 @@ export default function Home() {
 
         <section id="get-it" className="section get-it">
           <div className="wrap get-it-inner">
+            <Image src="/media/bruno-cutout.webp" alt="" width={180} height={180} className="get-it-bruno" />
             <h2 className="display get-it-title">Wake up with Bruno.</h2>
-            <p className="get-it-meta">Android · Free · Beta</p>
+            <p className="get-it-meta">Android · Free · No ads</p>
             <PlayButton large />
           </div>
         </section>

@@ -10,7 +10,7 @@ const { CLOUDFLARE_API_TOKEN, CLOUDFLARE_ACCOUNT_ID, CLOUDFLARE_LIVE_INPUT_UID }
  * with no download to wait for. Deliberately separate from /api/latest-recording, which picks
  * the ALARM clip under a stricter length rule.
  *
- *   200 { uid, recordedAt, duration }
+ *   200 { uid, recordedAt, duration, thumbnail?, embedUrl? }  (the last two are for the website)
  *   404 { error: "no_recordings" }
  *   503 { error: "not_configured" } · 502 { error: "cloudflare_error" }
  */
@@ -29,7 +29,13 @@ export async function GET() {
     const newest = newestSessionRecording(videos, LAST_HOWL_MIN_SECONDS);
     if (!newest) return NextResponse.json({ error: "no_recordings" }, { status: 404 });
     return NextResponse.json(
-      { uid: newest.uid, recordedAt: newest.created, duration: newest.duration },
+      {
+        uid: newest.uid,
+        recordedAt: newest.created,
+        duration: newest.duration,
+        thumbnail: newest.thumbnail,
+        embedUrl: newest.preview ? newest.preview.replace(/\/watch$/, "/iframe") : undefined,
+      },
       // A new session appears at most twice a day; a short shared cache spares Cloudflare's API.
       { headers: { "Cache-Control": "public, s-maxage=60, stale-while-revalidate=300" } },
     );

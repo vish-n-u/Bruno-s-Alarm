@@ -1,0 +1,862 @@
+/* Fun pass (28 Oct): same energy as the app. Living sky, polaroid howl, "awoooo", last howl and
+   ratings, the line-art story scene, scrapbook cards, the blog. Colours come from globals.css's
+   time-of-day variables, so everything follows the visitor's clock like the app. */
+
+/* ---------- Hero sky (HeroSky.tsx) ---------- */
+
+.hero {
+  position: relative;
+  overflow: hidden;
+}
+
+.hero > .wrap {
+  position: relative;
+  z-index: 1;
+}
+
+.hero-sky {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  z-index: 0;
+}
+
+.sky-body {
+  position: absolute;
+  width: 90px;
+  height: 90px;
+  margin: -45px 0 0 -45px;
+  border-radius: 50%;
+  background: rgba(255, 255, 255, 0.35);
+  display: grid;
+  place-items: center;
+  transition: left 60s linear, top 60s linear;
+}
+
+.sky-moon {
+  background: rgba(200, 215, 240, 0.12);
+}
+
+.sky-body svg {
+  width: 78%;
+  height: 78%;
+}
+
+.sun-spin {
+  animation: spin 120s linear infinite;
+}
+
+@keyframes spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+.cloud {
+  position: absolute;
+  left: 0;
+  width: 120px;
+  fill: #fff;
+  opacity: 0.85;
+  animation: drift 60s linear infinite;
+}
+
+:root[data-phase="night"] .cloud,
+:root[data-phase="dusk"] .cloud,
+:root[data-phase="dawn"] .cloud {
+  opacity: 0.07;
+}
+
+/* Clouds drift along the top and bottom edges, never through the text. */
+.cloud-1 {
+  top: 2%;
+  animation-duration: 70s;
+}
+
+.cloud-2 {
+  top: 88%;
+  width: 90px;
+  animation-duration: 95s;
+  animation-delay: -40s;
+}
+
+.cloud-3 {
+  top: 10%;
+  width: 70px;
+  animation-duration: 55s;
+  animation-delay: -20s;
+}
+
+@keyframes drift {
+  from {
+    transform: translateX(-160px);
+  }
+  to {
+    transform: translateX(calc(100vw + 40px));
+  }
+}
+
+.leaf {
+  position: absolute;
+  top: -30px;
+  left: 62%;
+  width: 26px;
+  opacity: 0;
+  animation: leaf-fall 14s ease-in-out 3s infinite;
+}
+
+@keyframes leaf-fall {
+  0% {
+    transform: translate(0, 0) rotate(0);
+    opacity: 0;
+  }
+  8% {
+    opacity: 1;
+  }
+  50% {
+    transform: translate(30px, 260px) rotate(60deg);
+  }
+  85% {
+    opacity: 1;
+  }
+  100% {
+    transform: translate(-10px, 560px) rotate(140deg);
+    opacity: 0;
+  }
+}
+
+/* ---------- Hero art: polaroid video, phone, awoooo ---------- */
+
+.hero-art {
+  position: relative;
+  justify-self: center;
+  width: 100%;
+  max-width: 440px;
+  min-height: 460px;
+}
+
+.polaroid {
+  margin: 0;
+  position: absolute;
+  left: 0;
+  top: 10px;
+  width: 64%;
+  background: #fff;
+  padding: 10px 10px 4px;
+  border-radius: 6px;
+  box-shadow: 0 14px 30px rgba(0, 0, 0, 0.18);
+  transform: rotate(-4deg);
+  animation: bob 6s ease-in-out infinite;
+}
+
+.polaroid video {
+  display: block;
+  width: 100%;
+  aspect-ratio: 4 / 5;
+  object-fit: cover;
+  border-radius: 3px;
+  background: #222;
+}
+
+.polaroid figcaption {
+  color: #5a3a24;
+  font-size: 1.3rem;
+  text-align: center;
+  padding: 4px 0 2px;
+}
+
+.phone {
+  border: 7px solid #1e1612;
+  border-radius: 30px;
+  overflow: hidden;
+  background: #000;
+  box-shadow: 0 18px 36px rgba(0, 0, 0, 0.25);
+}
+
+.phone img {
+  display: block;
+  width: 100%;
+  height: auto;
+}
+
+.hero-phone {
+  position: absolute;
+  right: 0;
+  bottom: 0;
+  width: 46%;
+  transform: rotate(5deg);
+  animation: bob 7s ease-in-out infinite reverse;
+}
+
+@keyframes bob {
+  0%,
+  100% {
+    translate: 0 0;
+  }
+  50% {
+    translate: 0 -8px;
+  }
+}
+
+.awoo {
+  font-family: var(--font-hand), cursive;
+  color: var(--accent);
+  font-size: 2.6rem;
+  font-weight: 700;
+  display: inline-flex;
+  align-items: flex-end;
+  pointer-events: none;
+}
+
+.awoo span {
+  opacity: 0;
+  animation: awoo 5s ease-out infinite;
+}
+
+.awoo span:nth-child(2) {
+  translate: 0 -4px;
+}
+.awoo span:nth-child(3) {
+  translate: 0 -8px;
+}
+.awoo span:nth-child(4) {
+  translate: 0 -12px;
+}
+.awoo span:nth-child(5) {
+  translate: 0 -16px;
+}
+.awoo span:nth-child(6) {
+  translate: 0 -20px;
+}
+
+@keyframes awoo {
+  0% {
+    opacity: 0;
+    transform: translateY(8px);
+  }
+  12%,
+  70% {
+    opacity: 1;
+    transform: translateY(0);
+  }
+  85%,
+  100% {
+    opacity: 0;
+  }
+}
+
+.hero-awoo {
+  position: absolute;
+  left: 46%;
+  top: -18px;
+  transform: rotate(-16deg);
+  z-index: 2;
+}
+
+@media (max-width: 800px) {
+  .hero-art {
+    max-width: 360px;
+    min-height: 400px;
+  }
+  /* One column: the headline fills the top, so the sun/moon tucks into the top-right corner
+     (overriding the clock position set inline) and only the bottom cloud stays. */
+  .sky-body {
+    left: 88% !important;
+    top: 3% !important;
+    width: 56px;
+    height: 56px;
+    margin: -28px 0 0 -28px;
+    transition: none;
+  }
+  .cloud-1,
+  .cloud-3 {
+    display: none;
+  }
+}
+
+/* ---------- Last howl (LastHowl.tsx) ---------- */
+
+.last-howl-wrap {
+  display: grid;
+  grid-template-columns: 0.9fr 1.1fr;
+  gap: 40px;
+  align-items: center;
+}
+
+.side-note {
+  font-size: 1.5rem;
+  color: var(--accent);
+  transform: rotate(-3deg);
+  display: inline-block;
+}
+
+.howl-card {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 20px;
+  padding: 12px;
+  box-shadow: 8px 8px 0 0 var(--accent);
+  transform: rotate(1deg);
+  max-width: 420px;
+  justify-self: center;
+  width: 100%;
+}
+
+.howl-media {
+  position: relative;
+  aspect-ratio: 9 / 12;
+  width: 100%;
+  border-radius: 12px;
+  overflow: hidden;
+  background: #111;
+}
+
+.howl-media iframe {
+  width: 100%;
+  height: 100%;
+  border: 0;
+}
+
+.howl-loading {
+  display: grid;
+  place-items: center;
+  height: 100%;
+  color: #ddd;
+}
+
+.howl-thumb {
+  all: unset;
+  cursor: pointer;
+  display: block;
+  width: 100%;
+  height: 100%;
+  position: relative;
+}
+
+.howl-thumb img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
+}
+
+.howl-play {
+  position: absolute;
+  inset: 0;
+  margin: auto;
+  width: 76px;
+  height: 76px;
+  border-radius: 50%;
+  display: grid;
+  place-items: center;
+  color: #fff;
+  background: rgba(0, 0, 0, 0.55);
+  transition: transform 0.2s ease;
+}
+
+.howl-thumb:hover .howl-play {
+  transform: scale(1.08);
+}
+
+.howl-badge {
+  position: absolute;
+  top: 12px;
+  left: 12px;
+  color: #fff;
+  font-weight: 700;
+  font-size: 0.75rem;
+  letter-spacing: 0.06em;
+  padding: 4px 10px;
+  border-radius: 999px;
+  background: rgba(0, 0, 0, 0.55);
+}
+
+.howl-meta {
+  padding: 12px 6px 4px;
+}
+
+.howl-when {
+  margin: 0;
+  font-weight: 700;
+}
+
+.howl-rating {
+  margin: 4px 0 0;
+  color: var(--muted);
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.howl-rating .hand {
+  font-size: 1.3rem;
+}
+
+.paws .paw {
+  filter: grayscale(1);
+  opacity: 0.35;
+}
+
+.paws .paw.on {
+  filter: none;
+  opacity: 1;
+}
+
+@media (max-width: 800px) {
+  .last-howl-wrap {
+    grid-template-columns: 1fr;
+  }
+}
+
+/* ---------- Story scene (StoryScene.tsx): one 12 s loop ---------- */
+
+.scene-frame {
+  border-radius: 22px;
+  overflow: hidden;
+  border: 1px solid var(--border);
+  box-shadow: var(--shadow);
+  margin-top: 24px;
+}
+
+.scene {
+  display: block;
+  width: 100%;
+  height: auto;
+}
+
+.scene-dog-track {
+  animation: scene-walk 12s linear infinite;
+}
+
+@keyframes scene-walk {
+  0% {
+    transform: translateX(-110px);
+  }
+  28% {
+    transform: translateX(120px);
+  }
+  74% {
+    transform: translateX(120px);
+  }
+  100% {
+    transform: translateX(420px);
+  }
+}
+
+.scene-leg {
+  transform-box: fill-box;
+  transform-origin: 50% 0;
+  animation: scene-step 12s linear infinite;
+}
+
+.scene-leg-b {
+  animation-name: scene-step-b;
+}
+
+@keyframes scene-step {
+  0%, 4%, 8%, 12%, 16%, 20%, 24% {
+    transform: rotate(18deg);
+  }
+  2%, 6%, 10%, 14%, 18%, 22%, 26% {
+    transform: rotate(-18deg);
+  }
+  28%, 74% {
+    transform: rotate(0);
+  }
+  76%, 80%, 84%, 88%, 92%, 96% {
+    transform: rotate(18deg);
+  }
+  78%, 82%, 86%, 90%, 94%, 98% {
+    transform: rotate(-18deg);
+  }
+  100% {
+    transform: rotate(0);
+  }
+}
+
+@keyframes scene-step-b {
+  0%, 4%, 8%, 12%, 16%, 20%, 24% {
+    transform: rotate(-18deg);
+  }
+  2%, 6%, 10%, 14%, 18%, 22%, 26% {
+    transform: rotate(18deg);
+  }
+  28%, 74% {
+    transform: rotate(0);
+  }
+  76%, 80%, 84%, 88%, 92%, 96% {
+    transform: rotate(-18deg);
+  }
+  78%, 82%, 86%, 90%, 94%, 98% {
+    transform: rotate(18deg);
+  }
+  100% {
+    transform: rotate(0);
+  }
+}
+
+.scene-tail {
+  transform-box: fill-box;
+  transform-origin: 80% 100%;
+  animation: scene-wag 0.5s ease-in-out infinite alternate;
+}
+
+@keyframes scene-wag {
+  from {
+    transform: rotate(-8deg);
+  }
+  to {
+    transform: rotate(8deg);
+  }
+}
+
+.scene-head {
+  transform-box: fill-box;
+  transform-origin: 20% 90%;
+  animation: scene-howl 12s ease-in-out infinite;
+}
+
+@keyframes scene-howl {
+  0%, 40% {
+    transform: rotate(0);
+  }
+  44%, 66% {
+    transform: rotate(-34deg);
+  }
+  70%, 100% {
+    transform: rotate(0);
+  }
+}
+
+.scene-mouth {
+  opacity: 0;
+  animation: scene-mouth 12s linear infinite;
+}
+
+@keyframes scene-mouth {
+  0%, 44% {
+    opacity: 0;
+  }
+  46%, 64% {
+    opacity: 1;
+  }
+  66%, 100% {
+    opacity: 0;
+  }
+}
+
+.scene-awoo {
+  font-family: var(--font-hand), cursive;
+  font-size: 40px;
+  font-weight: 700;
+  fill: #e8743a;
+}
+
+.scene-awoo-l {
+  opacity: 0;
+  animation: 12s linear infinite;
+}
+
+.scene-awoo-0 { animation-name: scene-l0; }
+.scene-awoo-1 { animation-name: scene-l1; }
+.scene-awoo-2 { animation-name: scene-l2; }
+.scene-awoo-3 { animation-name: scene-l3; }
+.scene-awoo-4 { animation-name: scene-l4; }
+.scene-awoo-5 { animation-name: scene-l5; }
+
+@keyframes scene-l0 { 0%, 46% { opacity: 0; } 47%, 66% { opacity: 1; } 68%, 100% { opacity: 0; } }
+@keyframes scene-l1 { 0%, 49% { opacity: 0; } 50%, 66% { opacity: 1; } 68%, 100% { opacity: 0; } }
+@keyframes scene-l2 { 0%, 52% { opacity: 0; } 53%, 66% { opacity: 1; } 68%, 100% { opacity: 0; } }
+@keyframes scene-l3 { 0%, 55% { opacity: 0; } 56%, 66% { opacity: 1; } 68%, 100% { opacity: 0; } }
+@keyframes scene-l4 { 0%, 58% { opacity: 0; } 59%, 66% { opacity: 1; } 68%, 100% { opacity: 0; } }
+@keyframes scene-l5 { 0%, 61% { opacity: 0; } 62%, 66% { opacity: 1; } 68%, 100% { opacity: 0; } }
+
+.scene-bell {
+  transform-box: fill-box;
+  transform-origin: 50% 0;
+  animation: scene-bell 12s ease-in-out infinite;
+}
+
+@keyframes scene-bell {
+  0%, 30% { transform: rotate(0); }
+  32% { transform: rotate(26deg); }
+  35% { transform: rotate(-22deg); }
+  38% { transform: rotate(14deg); }
+  41% { transform: rotate(-8deg); }
+  44%, 100% { transform: rotate(0); }
+}
+
+.scene-ding {
+  opacity: 0;
+  animation: scene-ding 12s linear infinite;
+}
+
+.scene-ding-2 {
+  animation-name: scene-ding-2;
+}
+
+@keyframes scene-ding { 0%, 31% { opacity: 0; } 32% { opacity: 1; } 40%, 100% { opacity: 0; } }
+@keyframes scene-ding-2 { 0%, 35% { opacity: 0; } 36% { opacity: 1; } 44%, 100% { opacity: 0; } }
+
+.scene-bird {
+  transform-box: fill-box;
+  transform-origin: center;
+  animation: scene-flap 1.2s ease-in-out infinite alternate;
+}
+
+.scene-bird-2 {
+  animation-duration: 1.5s;
+}
+
+@keyframes scene-flap {
+  from { transform: scaleY(1); }
+  to { transform: scaleY(0.5) translateY(-2px); }
+}
+
+/* ---------- Features, screens, scrapbook cards ---------- */
+
+.feature-icon {
+  font-size: 1.8rem;
+  display: inline-block;
+  margin-bottom: 6px;
+}
+
+.features li {
+  transition: transform 0.2s ease;
+}
+
+.features li:hover {
+  transform: translateY(-3px) rotate(-0.5deg);
+}
+
+.screen-strip {
+  list-style: none;
+  margin: 28px 0 0;
+  padding: 0;
+  display: flex;
+  justify-content: center;
+  gap: 28px;
+  flex-wrap: wrap;
+}
+
+.screen-card {
+  width: 230px;
+  background: #fff;
+  padding: 8px 8px 6px;
+  border-radius: 8px;
+  box-shadow: 0 12px 26px rgba(0, 0, 0, 0.16);
+  text-align: center;
+  transition: transform 0.25s ease;
+}
+
+.screen-card img {
+  display: block;
+  width: 100%;
+  border-radius: 4px;
+  aspect-ratio: 9 / 16;
+  object-fit: cover;
+}
+
+.screen-card .hand {
+  display: block;
+  color: #5a3a24;
+  font-size: 1.35rem;
+  padding-top: 4px;
+}
+
+.tilt-0 { transform: rotate(-3deg); }
+.tilt-1 { transform: rotate(2deg) translateY(10px); }
+.tilt-2 { transform: rotate(-1.5deg); }
+
+.screen-card:hover,
+.post-card:hover {
+  transform: rotate(0) translateY(-4px);
+}
+
+.section-head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 16px;
+}
+
+/* ---------- Blog ---------- */
+
+.post-grid {
+  list-style: none;
+  margin: 28px 0 0;
+  padding: 0;
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
+  gap: 28px;
+}
+
+.post-card {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 16px;
+  overflow: hidden;
+  transition: transform 0.25s ease;
+}
+
+.post-card a {
+  display: block;
+  text-decoration: none;
+  color: inherit;
+  padding-bottom: 16px;
+}
+
+.post-card img {
+  display: block;
+  width: 100%;
+  aspect-ratio: 4 / 3;
+  object-fit: cover;
+}
+
+.post-card .post-date {
+  display: block;
+  padding: 12px 16px 0;
+}
+
+.post-card h2,
+.post-card h3 {
+  font-family: var(--font-display), Impact, sans-serif;
+  text-transform: uppercase;
+  font-weight: 400;
+  font-size: 1.4rem;
+  margin: 4px 16px 6px;
+}
+
+.post-card p {
+  margin: 0 16px;
+  color: var(--muted);
+}
+
+.post-date {
+  font-family: var(--font-mono), monospace;
+  font-size: 0.8rem;
+  color: var(--muted);
+  letter-spacing: 0.04em;
+}
+
+.blog-title,
+.post-title {
+  font-size: clamp(2.4rem, 6vw, 4rem);
+}
+
+.blog-hand,
+.post-summary {
+  font-size: 1.6rem;
+  color: var(--accent);
+  margin: 8px 0 0;
+}
+
+.post-wrap {
+  max-width: 720px;
+}
+
+.post-wrap .post-date {
+  display: block;
+  margin-top: 26px;
+}
+
+.post-body {
+  margin-top: 26px;
+  font-size: 1.1rem;
+}
+
+.post-body h2 {
+  font-family: var(--font-display), Impact, sans-serif;
+  text-transform: uppercase;
+  font-weight: 400;
+  font-size: 1.6rem;
+  margin: 34px 0 6px;
+}
+
+.post-body a {
+  color: var(--accent);
+  font-weight: 600;
+}
+
+.post-video,
+.post-figure {
+  margin: 30px auto;
+  text-align: center;
+}
+
+.post-video video {
+  width: min(100%, 380px);
+  border-radius: 6px;
+  background: #fff;
+  padding: 10px;
+  box-shadow: 0 14px 30px rgba(0, 0, 0, 0.18);
+  transform: rotate(-2deg);
+}
+
+.post-figure img {
+  max-width: 100%;
+  height: auto;
+  border: 6px solid #1e1612;
+  border-radius: 24px;
+  transform: rotate(2deg);
+}
+
+.post-video figcaption,
+.post-figure figcaption {
+  font-size: 1.4rem;
+  color: var(--muted);
+  margin-top: 12px;
+}
+
+.post-sign {
+  font-size: 1.6rem;
+  color: var(--accent);
+  margin-top: 36px;
+}
+
+.post-more {
+  margin-top: 64px;
+}
+
+/* ---------- Get it ---------- */
+
+.get-it-bruno {
+  width: 150px;
+  height: auto;
+  animation: bob 5s ease-in-out infinite;
+}
+
+/* ---------- Respect reduced motion ---------- */
+
+@media (prefers-reduced-motion: reduce) {
+  .sun-spin,
+  .cloud,
+  .leaf,
+  .polaroid,
+  .hero-phone,
+  .awoo span,
+  .get-it-bruno,
+  .scene-dog-track,
+  .scene-leg,
+  .scene-tail,
+  .scene-head,
+  .scene-bell,
+  .scene-bird,
+  .scene-ding,
+  .scene-mouth,
+  .scene-awoo-l {
+    animation: none !important;
+  }
+  .awoo span,
+  .scene-awoo-l,
+  .scene-mouth {
+    opacity: 1;
+  }
+  .scene-dog-track {
+    transform: translateX(120px);
+  }
+  .sky-body {
+    transition: none;
+  }
+}

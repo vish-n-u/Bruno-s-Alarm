@@ -11,8 +11,8 @@ export function SiteHeader() {
           <span className="brand-word">Bruno&rsquo;s Alarm</span>
         </Link>
         <nav className="site-nav" aria-label="Site">
-          <Link href="/privacy">Privacy</Link>
-          <Link href="/terms">Terms</Link>
+          <Link href="/#last-howl">Last howl</Link>
+          <Link href="/blog">Blog</Link>
           <Link href="/#get-it" className="nav-cta">
             Get the app
           </Link>
@@ -31,6 +31,7 @@ export function SiteFooter() {
           <p className="footer-hand">Made by one person and one very loud dog.</p>
         </div>
         <nav className="footer-links" aria-label="Legal and contact">
+          <Link href="/blog">Blog</Link>
           <Link href="/privacy">Privacy Policy</Link>
           <Link href="/terms">Terms of Service</Link>
           <a href={`mailto:${CONTACT_EMAIL}`}>{CONTACT_EMAIL}</a>

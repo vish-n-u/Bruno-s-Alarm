@@ -3,6 +3,7 @@ import { Anton, Bricolage_Grotesque, Caveat, Courier_Prime } from "next/font/goo
 import PhaseSync from "./_components/PhaseSync";
 import { SITE_URL } from "./site";
 import "./globals.css";
+import "./fun.css";
 
 // Same four faces as the app (mobile/lib/theme.ts): Anton for the flyer-style headline,
 // Bricolage Grotesque for everything you read, Courier Prime only for actual numerals,

@@ -15,6 +15,10 @@ export type CloudflareVideoSummary = {
   created: string;
   duration?: number;
   status?: { state?: string };
+  /** Cloudflare's own thumbnail image URL for the recording. */
+  thumbnail?: string;
+  /** Cloudflare's watch-page URL (customer subdomain); /watch → /iframe gives the embed player. */
+  preview?: string;
 };
 
 /** Owner's rule: the alarm loops the clip, and a clip under 30 s loops too quickly. */

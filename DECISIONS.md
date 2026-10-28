@@ -93,6 +93,13 @@ sunrise glow (owner's pick, 7 Oct). The About screen is always morning orange li
 **D16. Onboarding asks for nothing** (no permissions, no name) and its last button just goes Home
 (12 Oct; it used to open the new-alarm sheet).
 
+**D16a. The website has the app's energy and stays honest** (owner, 28 Oct). Same fonts, same
+time-of-day colours (all seven phases), living hero sky, Bruno's real howl clip and real app
+screenshots, "His last howl" (from /api/last-howl, with the app's paw-rating average), the line-art
+morning story scene (always morning orange, like the app's About), and a blog. Blog posts state only
+true facts; add new posts when the owner shares more about Bruno instead of guessing. Copy must
+match the shipped app (e.g. no live-chat claims while D17a has it off).
+
 ## Chat
 
 **D17. Chat writes only via the `sendChatMessage` Cloud Function** (rate limit, profanity filter,

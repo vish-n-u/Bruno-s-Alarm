@@ -462,6 +462,13 @@ the owner hasn't decided yet whether to switch them (Play shows the policy's add
 - The site follows the visitor's clock with the app's seven palettes (`app/layout.tsx` inline
   script + `app/_components/PhaseSync.tsx`) and shows a schedule board in the visitor's
   timezone (`app/_components/DepartureBoard.tsx`).
+- **Fun pass (28 Oct):** `app/fun.css` + `_components/HeroSky.tsx` (sun/moon on the visitor's clock,
+  clouds, a leaf), `LastHowl.tsx` (newest session from `/api/last-howl` — which now also returns
+  `thumbnail` + `embedUrl` — played via Cloudflare's iframe, with the rating average read from
+  Firestore `howlRatings` REST), `StoryScene.tsx` (SVG + CSS port of the app's About scene; note a
+  CSS transform replaces an SVG `transform` attribute, so animated parts sit inside a positioned
+  `<g>`). Media in `public/media/` (howl loop ~1 MB, screenshots ~150 KB). Blog: `app/blog/posts.tsx`
+  (facts only), `/blog`, `/blog/[slug]`.
 - `/privacy` is the **official privacy policy URL** (Play Console + app Settings);
   `/privacy#delete-your-data` is the data-deletion URL; `/terms` is the Terms. Keep
   `mobile/privacy-policy.txt/.html` and `mobile/terms-of-service.txt/.html` in sync with them.

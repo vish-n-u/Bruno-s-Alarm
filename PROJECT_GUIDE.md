@@ -674,6 +674,15 @@ Personal account → closed test (≥ 12 testers, 14 days) before production. Se
     production. Feedback form script: `mobile/docs/tester-feedback-form.gs`.
 12. **Contact email in legal pages/site** still `vishnuna26@gmail.com` (app uses
     `contact@brunos-alarm.com`) — owner to decide; make sure the new inbox receives mail.
+15. **Play Console warnings on release 47 (28 Oct), plan: v49 after launch.**
+    (a) **DEX obfuscation 2%, fix by Feb 2027**: enable R8 (`android.enableMinifyInReleaseBuilds`)
+    with keep rules for react-native-alarmageddon, Firebase, expo-video; full on-device alarm retest
+    (locked, silent, snooze, live alert) before shipping — R8 broke release builds here before.
+    (b) **Deprecated edge-to-edge APIs (Android 15)**: generated `styles.xml` sets
+    `statusBarColor`/`navigationBarColor`; remove via a config plugin. Some calls come from libraries
+    and clear with Expo/RN updates. No visible effect (edge-to-edge is already on).
+    (c) **Orientation/resizability (Android 16 large screens)**: app is portrait-locked; Android 16
+    ignores that on tablets/foldables. Keep portrait for phones; later test a tablet in landscape.
 13. Later / optional: turn on R8 code shrinking (Play flags "DEX optimization: Low"; needs a
     full re-test, R8 has broken release builds here before); remove the ~20 harmless launcher
     "badge" permissions; delete the legacy website routes (`app/api/{cron,subscribe,status}`) and

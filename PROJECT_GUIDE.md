@@ -9,7 +9,7 @@ anything newer.
 
 ## 0. Where we are (snapshot, 5 Oct 2026)
 
-**App version:** `versionCode` **48** (Android, 24 Oct). Built locally; the newest .aab is at
+**App version:** `versionCode` **49** (Android, 28 Oct, production release). Built locally; the newest .aab is at
 `mobile/android/app/build/outputs/bundle/release/app-release.aab`.
 
 **Phones:** OPPO CPH2737 (owner's main test phone, on v31) and Samsung Galaxy A35 SM-A356E
@@ -531,7 +531,7 @@ cd mobile/android && ./gradlew bundleRelease
 
 Releasing a new Play build:
 1. Bump **`versionCode` in BOTH `mobile/app.json` and `mobile/android/app/build.gradle`**
-   (the android folder isn't regenerated automatically). Current: **48**. Play rejects a
+   (the android folder isn't regenerated automatically). Current: **49**. Play rejects a
    versionCode it has already seen.
 2. **Build clean**, or Gradle may reuse a cached JS bundle (Play v39 shipped app.json from v38 —
    its Settings said "(38)"): delete `app/build/generated/res/react`, `app/build/generated/assets/react`,
@@ -674,7 +674,7 @@ Personal account → closed test (≥ 12 testers, 14 days) before production. Se
     production. Feedback form script: `mobile/docs/tester-feedback-form.gs`.
 12. **Contact email in legal pages/site** still `vishnuna26@gmail.com` (app uses
     `contact@brunos-alarm.com`) — owner to decide; make sure the new inbox receives mail.
-15. **Play Console warnings on release 47 (28 Oct), plan: v49 after launch.**
+15. **Play Console warnings on release 47 (28 Oct), plan: v50 after launch.**
     (a) **DEX obfuscation 2%, fix by Feb 2027**: enable R8 (`android.enableMinifyInReleaseBuilds`)
     with keep rules for react-native-alarmageddon, Firebase, expo-video; full on-device alarm retest
     (locked, silent, snooze, live alert) before shipping — R8 broke release builds here before.

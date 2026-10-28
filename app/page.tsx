@@ -48,14 +48,13 @@ function Awoo({ className = "" }: { className?: string }) {
 }
 
 // Everything here is true of the shipped app (live chat is switched off for now: DECISIONS.md D17a).
+// Kept to the three things the app does (owner, 28 Oct: the long list was confusing for a
+// simple app). Silent mode and offline are answered in the FAQ.
 const FEATURES = [
-  { icon: "🐕", title: "Wake up to a real howl", body: "Your alarm plays a real recording of Bruno howling." },
-  { icon: "🔕", title: "Rings on silent", body: "Just like your phone's normal alarm, it rings even when the phone is on silent." },
-  { icon: "⏰", title: "Your times, your days", body: "Set as many alarms as you want. Once, every day, weekdays, or the days you pick." },
-  { icon: "📶", title: "No internet needed", body: "His howl is saved on your phone, so the alarm works offline." },
-  { icon: "📺", title: "Watch him live", body: "Twice a day, around 6 AM and 6 PM India time. The app can ring you when he starts." },
-  { icon: "🐾", title: "Rate his howls", body: "Missed it? Watch his last howl and give it 1 to 5 paws." },
-]
+  { icon: "⏰", title: "Wake up to Bruno", body: "Set an alarm. Bruno's howl wakes you up." },
+  { icon: "📺", title: "Watch him live", body: "Twice a day, at 6 AM and 6 PM India time." },
+  { icon: "🐾", title: "Rate his howls", body: "Missed it? Watch the last one and rate it." },
+];
 
 const FAQ: { q: string; a: React.ReactNode; text?: string }[] = [
   { q: "Is Bruno real?", a: "Very. Everything you see and hear in the app is him, recorded at his actual sessions." },

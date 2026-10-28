@@ -622,14 +622,6 @@
   margin-bottom: 6px;
 }
 
-.features li {
-  transition: transform 0.2s ease;
-}
-
-.features li:hover {
-  transform: translateY(-3px) rotate(-0.5deg);
-}
-
 .screen-strip {
   list-style: none;
   margin: 28px 0 0;

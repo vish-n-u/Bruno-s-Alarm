@@ -20,7 +20,8 @@ CAVEAT = os.path.join(FONTS, "caveat", "700Bold", "Caveat_700Bold.ttf")
 BRICO = os.path.join(FONTS, "bricolage-grotesque", "600SemiBold", "BricolageGrotesque_600SemiBold.ttf")
 
 CLIP = r"C:\Users\vishn\Downloads\default (1).mp4"
-RECORDING = "https://media.brunos-alarm.com/alarm-recordings/fcb75474e43874a40da00284263c244a.mp4"
+# a local copy is much faster (and reliable) than streaming it from R2
+RECORDING = os.environ.get("RECORDING", "https://media.brunos-alarm.com/alarm-recordings/fcb75474e43874a40da00284263c244a.mp4")
 RINGING = os.environ.get("RINGING_SHOT", os.path.join(SCRATCH, "q2.png"))  # real ringing screen once captured
 LIVE = os.path.join(SCRATCH, "q3.png")
 
@@ -263,6 +264,87 @@ def end_shot(out, dur, audio_start, volume=0.15):
            ["-ss", str(audio_start), "-t", str(dur + 0.2), "-i", CLIP], volume, out)
 
 
+def live_badge(path, x, y):
+    """The Live tab's red LIVE pill, top-left."""
+    img = layer()
+    d = ImageDraw.Draw(img)
+    d.rounded_rectangle((x, y, x + 190, y + 70), 35, fill=(229, 72, 47, 255))
+    d.ellipse((x + 26, y + 26, x + 44, y + 44), fill=(255, 255, 255, 255))
+    d.text((x + 58, y + 12), "LIVE", font=ImageFont.truetype(BRICO, 40), fill=(255, 255, 255, 255))
+    img.save(path)
+
+
+def line_scene_shot(out, frames, dur, howl_xy, audio_start, volume=1.0):
+    """The About screen's line-art story (frames from render_line_scene.js): Bruno walks in,
+    the far bell rings, he howls. Captions tell it; the sound is the real quiet morning."""
+    g = Graph("b0", dur)
+    g.parts.append("[0:v]fps=30,setsar=1[b0]")
+    gone = "fade=t=out:st=5.0:d=0.3:alpha=1,"
+    text_layer("ls1.png", "Twice a day,", ImageFont.truetype(ANTON, 104), INK, 200, shadow=False)
+    g.overlay("ls1.png", 0.3, y=rise(0.3), pre=gone)
+    text_layer("ls2.png", "a far-off church bell rings...", ImageFont.truetype(CAVEAT, 80), ORANGE, 345, shadow=False)
+    g.overlay("ls2.png", 3.8, y=rise(3.8), pre=gone)
+    text_layer("ls3.png", "...and Bruno answers.", ImageFont.truetype(ANTON, 104), INK, 200, shadow=False)
+    g.overlay("ls3.png", 5.4, y=rise(5.4))
+    x0, y0 = howl_xy
+    for k, p in enumerate(awoo_layers("law", x0 - 20, y0 + 40, size=96, color=ORANGE)):
+        g.overlay(p, 5.55 + k * 0.25, y=rise(5.55 + k * 0.25, 0.3, 24), fade=0.15)
+    encode(g, ["-framerate", "30", "-i", os.path.join(frames, "f%04d.png")], dur,
+           ["-ss", str(audio_start), "-t", str(dur + 0.2), "-i", CLIP], volume, out)
+
+
+def live_shot(out, src, start, dur, volume=0.8):
+    """Real footage of Bruno with the Live tab's LIVE badge on it. The stream camera frames him
+    near the top, so the captions sit at the bottom here."""
+    live_badge("badge.png", 60, 120)
+    g = Graph("b0", dur)
+    g.parts.append(push_in())
+    top_shade("shade.png")
+    Image.open("shade.png").transpose(Image.FLIP_TOP_BOTTOM).save("shade_bottom.png")
+    g.overlay("shade_bottom.png", 0.0, fade=0.3)
+    text_layer("lv1.png", "Watch him live.", ImageFont.truetype(ANTON, 96), (255, 255, 255), 1520)
+    g.overlay("lv1.png", 0.25, y=rise(0.25))
+    text_layer("lv2.png", "every day at 6:00 and 18:00 IST", ImageFont.truetype(CAVEAT, 70), CREAM, 1650)
+    g.overlay("lv2.png", 0.75, y=rise(0.75))
+    g.overlay("badge.png", 1.1, fade=0.2)
+    encode(g, ["-ss", str(start), "-t", str(dur + 0.2), "-i", src], dur,
+           ["-ss", str(start), "-t", str(dur + 0.2), "-i", src], volume, out)
+
+
+def to_landscape(src, out):
+    run(["ffmpeg", "-y", "-i", src, "-filter_complex",
+         "[0:v]scale=1920:1080:force_original_aspect_ratio=increase,crop=1920:1080,gblur=sigma=30,eq=brightness=-0.08[bg];"
+         "[0:v]scale=-2:1080[fg];[bg][fg]overlay=(W-w)/2:0,format=yuv420p[o]",
+         "-map", "[o]", "-map", "0:a", "-c:v", "libx264", "-crf", "20", "-preset", "medium", "-c:a", "copy",
+         "-movflags", "+faststart", out])
+
+
+def story():
+    """The story cut: line-art morning → the bell → line-art Bruno howls → the real Bruno howling
+    (real sound, loud) → ringing screen → live → end card. Needs the line-art frames first:
+    node render_line_scene.js <frames_dir> 7.4   (prints howlText; pass it as HOWL_XY="x,y")."""
+    os.chdir(HERE)
+    frames = os.environ["SCENE_FRAMES"]
+    howl_xy = tuple(int(v) for v in os.environ.get("HOWL_XY", "598,1147").split(","))
+    ringing = os.path.join(HERE, "ringing_screen_cropped.png")
+    # drop the phone's own status bar and navigation bar from the real screenshot
+    Image.open(os.path.join(HERE, "ringing_screen_raw.png")).crop((0, 125, 1080, 2240)).save(ringing)
+    segs = [("st1.mp4", 7.4), ("st2.mp4", 4.2), ("st3.mp4", 3.6), ("st4.mp4", 3.6), ("st5.mp4", 3.4)]
+    if not keep("st1.mp4"):
+        line_scene_shot("st1.mp4", frames, 7.4, howl_xy, 12.5)
+    if not keep("st2.mp4"):
+        video_shot("st2.mp4", CLIP, 0.0, 4.2, "This is the real Bruno.", volume=1.0)
+    if not keep("st3.mp4"):
+        phone_shot("st3.mp4", ringing, "Now he's your alarm.", "rings even on silent", 3.6, 4.6, volume=0.6)
+    if not keep("st4.mp4"):
+        live_shot("st4.mp4", RECORDING, 0.8, 3.6)
+    if not keep("st5.mp4"):
+        end_shot("st5.mp4", 3.4, 31.0, volume=0.3)
+    join(segs, "promo_story_vertical.mp4")
+    to_landscape("promo_story_vertical.mp4", "promo_story_landscape.mp4")
+    print("done")
+
+
 def join(segments, out):
     """xfade/acrossfade the segments together with a different transition at each join."""
     transitions = ["smoothleft", "circleopen", "slideup", "smoothleft", "fade"]
@@ -304,17 +386,14 @@ def main():
     if not keep("s4.mp4"):
         phone_shot("s4.mp4", RINGING, "Now he's your alarm.", "rings even on silent", 3.6, 28.0)
     if not keep("s5.mp4"):
-        phone_shot("s5.mp4", LIVE, "Watch him live.", "and chat with everyone watching", 3.4, 31.0)
+        phone_shot("s5.mp4", LIVE, "Watch him live.", "every day at 6:00 and 18:00 IST", 3.4, 31.0)
     if not keep("s6.mp4"):
         end_shot("s6.mp4", 3.4, 4.0)
     join(segs, "promo_vertical.mp4")
-    run(["ffmpeg", "-y", "-i", "promo_vertical.mp4", "-filter_complex",
-         "[0:v]scale=1920:1080:force_original_aspect_ratio=increase,crop=1920:1080,gblur=sigma=30,eq=brightness=-0.08[bg];"
-         "[0:v]scale=-2:1080[fg];[bg][fg]overlay=(W-w)/2:0,format=yuv420p[o]",
-         "-map", "[o]", "-map", "0:a", "-c:v", "libx264", "-crf", "20", "-preset", "medium", "-c:a", "copy",
-         "-movflags", "+faststart", "promo_landscape.mp4"])
+    to_landscape("promo_vertical.mp4", "promo_landscape.mp4")
     print("done")
 
 
 if __name__ == "__main__":
-    main()
+    import sys
+    story() if sys.argv[1:] == ["story"] else main()

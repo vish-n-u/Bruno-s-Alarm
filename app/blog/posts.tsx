@@ -1,5 +1,6 @@
 import type { ReactNode } from "react";
 import Link from "next/link";
+import { MORE_POSTS } from "./morePosts";
 
 // Blog posts. Facts only: everything here is true of Bruno and of the app as shipped. When the
 // owner shares more about Bruno (where, his age, how it started), add a post rather than
@@ -122,6 +123,8 @@ export const POSTS: Post[] = [
     ),
   },
 ];
+
+POSTS.push(...MORE_POSTS);
 
 export function getPost(slug: string): Post | undefined {
   return POSTS.find((p) => p.slug === slug);

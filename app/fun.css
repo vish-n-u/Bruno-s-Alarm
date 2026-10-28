@@ -779,6 +779,54 @@
   font-weight: 600;
 }
 
+.post-body ul {
+  padding-left: 1.2em;
+}
+
+.post-body li {
+  margin: 6px 0;
+}
+
+.post-table {
+  width: 100%;
+  border-collapse: collapse;
+  margin: 18px 0 6px;
+  font-size: 0.95rem;
+}
+
+.post-table th,
+.post-table td {
+  text-align: left;
+  padding: 8px 6px;
+  border-bottom: 1px dashed var(--border);
+}
+
+.post-table th {
+  font-family: var(--font-display), Impact, sans-serif;
+  font-weight: 400;
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+}
+
+.post-table td:not(:first-child) {
+  font-family: var(--font-mono), monospace;
+}
+
+@media (max-width: 480px) {
+  .post-table {
+    font-size: 0.85rem;
+  }
+  .post-table th,
+  .post-table td {
+    padding: 7px 4px;
+  }
+}
+
+.post-note {
+  font-size: 0.9rem;
+  color: var(--muted);
+}
+
 .post-video,
 .post-figure {
   margin: 30px auto;

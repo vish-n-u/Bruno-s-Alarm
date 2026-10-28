@@ -30,11 +30,11 @@ export const metadata: Metadata = {
     siteName: "Bruno's Alarm",
     title: "Bruno's Howl Alarm",
     description: "A real dog, live twice a day. Wake up to Bruno's howl. Free on Android.",
-    images: [{ url: "/bruno.jpg", width: 800, height: 800, alt: "Bruno mid-howl" }],
+    images: [{ url: "/og.jpg", width: 1200, height: 630, alt: "Bruno with his head tipped back, howling" }],
     type: "website",
     locale: "en_IN",
   },
-  twitter: { card: "summary" },
+  twitter: { card: "summary_large_image" },
 };
 
 export const viewport: Viewport = {

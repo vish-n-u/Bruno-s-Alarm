@@ -6,7 +6,8 @@ import HeroSky from "./_components/HeroSky";
 import LastHowl from "./_components/LastHowl";
 import StoryScene from "./_components/StoryScene";
 import { SiteFooter, SiteHeader } from "./_components/SiteChrome";
-import { POSTS, formatDate } from "./blog/posts";
+import PostCard from "./_components/PostCard";
+import { POSTS } from "./blog/posts";
 import { CONTACT_EMAIL, PLAY_STORE_LIVE, PLAY_STORE_URL, SITE_URL } from "./site";
 
 function PlayButton({ large = false }: { large?: boolean }) {
@@ -48,37 +49,13 @@ function Awoo({ className = "" }: { className?: string }) {
 
 // Everything here is true of the shipped app (live chat is switched off for now: DECISIONS.md D17a).
 const FEATURES = [
-  {
-    icon: "🔔",
-    title: "A real alarm, not a notification",
-    body: "It rings on your phone's alarm channel, so it gets through silent mode and Do Not Disturb and takes over the lock screen like a proper alarm clock.",
-  },
-  {
-    icon: "⏰",
-    title: "Your times, your days",
-    body: "Set as many alarms as you like: once, every day, weekdays, or any days you pick. Snooze is there if you must.",
-  },
-  {
-    icon: "🐕",
-    title: "His howl, kept fresh",
-    body: "Every alarm plays a real recording of Bruno, refreshed as new howls come in, and saved on your phone so it never needs a connection.",
-  },
-  {
-    icon: "📺",
-    title: "Live when he's live",
-    body: "Watch him around his morning and evening, or flip on \"Ring when Bruno goes live\" and your phone rings the moment he's on camera.",
-  },
-  {
-    icon: "🐾",
-    title: "Rate his howls",
-    body: "Missed it? Watch his last howl and rate it out of 5 paws. Everyone sees the average.",
-  },
-  {
-    icon: "🌅",
-    title: "A sky that keeps time",
-    body: "The app changes with your day, from a sunrise glow at dawn to stars at night. This website does too.",
-  },
-];
+  { icon: "🐕", title: "Wake up to a real howl", body: "Your alarm plays a real recording of Bruno howling." },
+  { icon: "🔕", title: "Rings on silent", body: "Just like your phone's normal alarm, it rings even when the phone is on silent." },
+  { icon: "⏰", title: "Your times, your days", body: "Set as many alarms as you want. Once, every day, weekdays, or the days you pick." },
+  { icon: "📶", title: "No internet needed", body: "His howl is saved on your phone, so the alarm works offline." },
+  { icon: "📺", title: "Watch him live", body: "Twice a day, around 6 AM and 6 PM India time. The app can ring you when he starts." },
+  { icon: "🐾", title: "Rate his howls", body: "Missed it? Watch his last howl and give it 1 to 5 paws." },
+]
 
 const FAQ: { q: string; a: React.ReactNode; text?: string }[] = [
   { q: "Is Bruno real?", a: "Very. Everything you see and hear in the app is him, recorded at his actual sessions." },
@@ -86,7 +63,7 @@ const FAQ: { q: string; a: React.ReactNode; text?: string }[] = [
   { q: "iPhone?", a: "Android only for now." },
   {
     q: "Does it ring on silent?",
-    a: "Yes. It uses your phone's alarm channel, like the built-in clock, so silent mode and Do Not Disturb don't stop it.",
+    a: "Yes. It rings like your phone's normal alarm, even on silent or Do Not Disturb.",
   },
   {
     q: "What if he doesn't howl?",
@@ -105,9 +82,9 @@ const FAQ: { q: string; a: React.ReactNode; text?: string }[] = [
 ];
 
 const SCREENS = [
-  { src: "/media/ringing.jpg", alt: "The ringing screen: Bruno howling with Stop and Snooze buttons", note: "6:00 am, sorted" },
-  { src: "/media/last-howl.jpg", alt: "Watch his last howl in the app", note: "missed it? replay it" },
-  { src: "/media/live-frame.jpg", alt: "Bruno mid-howl on a live stream", note: "live, twice a day" },
+  { src: "/media/ringing.jpg", w: 810, h: 1586, alt: "The ringing screen: Bruno howling with Stop and Snooze buttons", note: "6:00 am, sorted" },
+  { src: "/media/last-howl.jpg", w: 540, h: 996, alt: "Watch his last howl in the app", note: "missed it? replay it" },
+  { src: "/media/live-frame.jpg", w: 720, h: 1280, alt: "Bruno mid-howl", note: "live, twice a day" },
 ];
 
 export const metadata: Metadata = { alternates: { canonical: "/" } };
@@ -204,7 +181,7 @@ export default function Home() {
               </figure>
               <Awoo className="hero-awoo" />
               <div className="phone hero-phone">
-                <Image src="/media/ringing.jpg" alt="The app's ringing screen" width={540} height={1056} sizes="200px" priority />
+                <Image src="/media/ringing.jpg" alt="The app's ringing screen" width={810} height={1586} sizes="200px" priority />
               </div>
             </div>
           </div>
@@ -265,8 +242,7 @@ export default function Home() {
             <ul className="screen-strip">
               {SCREENS.map((s, i) => (
                 <li key={s.src} className={`screen-card tilt-${i % 3}`}>
-                  {/* eslint-disable-next-line @next/next/no-img-element */}
-                  <img src={s.src} alt={s.alt} loading="lazy" />
+                  <Image src={s.src} alt={s.alt} width={s.w} height={s.h} sizes="(max-width: 700px) 60vw, 260px" />
                   <span className="hand">{s.note}</span>
                 </li>
               ))}
@@ -284,15 +260,7 @@ export default function Home() {
             </div>
             <ul className="post-grid">
               {latestPosts.map((p, i) => (
-                <li key={p.slug} className={`post-card tilt-${i % 3}`}>
-                  <Link href={`/blog/${p.slug}`}>
-                    {/* eslint-disable-next-line @next/next/no-img-element */}
-                    <img src={p.cover.src} alt={p.cover.alt} loading="lazy" />
-                    <span className="post-date">{formatDate(p.date)}</span>
-                    <h3>{p.title}</h3>
-                    <p>{p.summary}</p>
-                  </Link>
-                </li>
+                <PostCard key={p.slug} post={p} index={i} />
               ))}
             </ul>
           </div>

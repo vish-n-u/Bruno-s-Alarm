@@ -109,6 +109,12 @@ aggregateRating**, because the paw ratings rate Bruno's howls, not the app. Ever
 canonical (never in the root layout, or every page would point at the home page). Keep
 public/llms.txt and the sitemap in step when posts or facts change.
 
+**D16c. Website copy uses plain, short words** (owner, 28 Oct). The app is simple, so the site
+says so simply: "rings on silent", not "alarm channel" / "exact alarm" / "full-screen intent".
+No big claims. Images are sharp: blog covers are 4:3 photos cut from the full-HD howl video
+(`public/media/covers/`), tall app screenshots are shown whole (`cover.screen`), never cropped
+and blown up.
+
 ## Chat
 
 **D17. Chat writes only via the `sendChatMessage` Cloud Function** (rate limit, profanity filter,

@@ -11,7 +11,7 @@ export type Post = {
   title: string;
   date: string; // ISO
   summary: string;
-  cover: { src: string; alt: string };
+  cover: { src: string; alt: string; screen?: boolean }; // screen: a tall app screenshot, shown whole
   body: ReactNode;
 };
 
@@ -21,7 +21,7 @@ export const POSTS: Post[] = [
     title: "Meet Bruno",
     date: "2026-10-28",
     summary: "A dog, a church bell, and the alarm clock that came out of it.",
-    cover: { src: "/media/howl-poster.jpg", alt: "Bruno with his head tipped back, mid-howl" },
+    cover: { src: "/media/covers/howl-close.jpg", alt: "Bruno with his head tipped back, mid-howl" },
     body: (
       <>
         <p>
@@ -52,43 +52,35 @@ export const POSTS: Post[] = [
     slug: "how-his-howl-becomes-your-alarm",
     title: "How Bruno's howl becomes your alarm",
     date: "2026-10-28",
-    summary: "From a church bell to your lock screen, and why it still rings on silent.",
-    cover: { src: "/media/ringing.jpg", alt: "The app's ringing screen: Bruno howling, with Stop and Snooze buttons" },
+    summary: "From a church bell to your phone, in four simple steps.",
+    cover: { src: "/media/ringing.jpg", alt: "The app's ringing screen: Bruno howling, with Stop and Snooze buttons", screen: true },
     body: (
       <>
-        <p>People ask how a dog ends up inside their alarm. Here&rsquo;s the whole trip.</p>
-        <h2>1. The bell rings, the camera streams</h2>
+        <p>People ask how a dog ends up inside their alarm. It&rsquo;s pretty simple.</p>
+        <h2>1. The bell rings</h2>
+        <p>Twice a day the church bell rings, Bruno howls, and a camera records him.</p>
+        <h2>2. A good howl is picked</h2>
         <p>
-          When the church bell rings, a phone camera streams Bruno live. Every stream is recorded,
-          which is how the app always has a fresh howl to work with.
+          Short or broken recordings are skipped. The alarm only uses a howl that&rsquo;s at least
+          30 seconds long, so it doesn&rsquo;t cut out.
         </p>
-        <h2>2. The best recent howl is picked</h2>
+        <h2>3. It&rsquo;s saved on your phone</h2>
         <p>
-          Not every recording makes the cut. Test streams and camera blips are ignored, and the
-          alarm only uses a session that&rsquo;s at least 30 seconds long, so the looping alarm
-          sound never feels choppy.
-        </p>
-        <h2>3. It&rsquo;s saved on your phone ahead of time</h2>
-        <p>
-          Your phone quietly downloads that howl in advance. When your alarm goes off, it plays from
-          your phone, so it rings with or without internet, and with or without Bruno turning up.
-          If nothing has downloaded yet, there&rsquo;s a built-in howl as a backup.
+          The app downloads the howl ahead of time. So your alarm works without internet, even if
+          Bruno skips a day. There&rsquo;s also a howl built into the app as a backup.
         </p>
         <figure className="post-figure">
           {/* eslint-disable-next-line @next/next/no-img-element */}
-          <img src="/media/ringing.jpg" alt="The ringing screen over the lock screen" width={270} />
+          <img src="/media/ringing.jpg" alt="The ringing screen" width={270} />
           <figcaption className="hand">What it looks like at 6 in the morning.</figcaption>
         </figure>
-        <h2>4. It rings like a real alarm</h2>
+        <h2>4. It rings</h2>
         <p>
-          The sound plays on your phone&rsquo;s alarm channel, the same one the built-in clock app
-          uses. That&rsquo;s why it gets through silent mode and Do Not Disturb, and why it shows
-          over your lock screen with a big Stop button and a 10-minute snooze.
+          At your time, Bruno fills your screen, howling. It rings even if your phone is on
+          silent. Tap Stop, or Snooze for 10 minutes.
         </p>
-        <h2>5. And the newest one is always there to watch</h2>
         <p>
-          Missed the live session? &ldquo;Watch his last howl&rdquo; in the app streams the newest
-          one straight away, even if it was short. You can watch it on <Link href="/#last-howl">this page</Link> too.
+          Missed him live? You can watch his <Link href="/#last-howl">last howl</Link> any time.
         </p>
       </>
     ),
@@ -98,7 +90,7 @@ export const POSTS: Post[] = [
     title: "New: rate Bruno's howls",
     date: "2026-10-20",
     summary: "Some howls are better than others. Now you can say so, out of 5 paws.",
-    cover: { src: "/media/last-howl.jpg", alt: "Bruno's last howl playing in the app" },
+    cover: { src: "/media/covers/howl-full.jpg", alt: "Bruno howling, tail up" },
     body: (
       <>
         <p>

@@ -707,11 +707,26 @@
   padding-bottom: 16px;
 }
 
-.post-card img {
+.post-cover {
+  position: relative;
   display: block;
   width: 100%;
   aspect-ratio: 4 / 3;
+  overflow: hidden;
+}
+
+.post-cover img {
   object-fit: cover;
+}
+
+.post-cover-screen {
+  background: linear-gradient(160deg, #f6c58f, #e8743a);
+}
+
+.post-cover-screen img {
+  object-fit: contain;
+  padding: 14px 0;
+  filter: drop-shadow(0 8px 14px rgba(0, 0, 0, 0.3));
 }
 
 .post-card .post-date {

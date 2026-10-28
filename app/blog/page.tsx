@@ -1,7 +1,7 @@
 import type { Metadata } from "next";
-import Link from "next/link";
 import { SiteFooter, SiteHeader } from "../_components/SiteChrome";
-import { POSTS, formatDate } from "./posts";
+import PostCard from "../_components/PostCard";
+import { POSTS } from "./posts";
 
 export const metadata: Metadata = {
   title: "Blog",
@@ -21,15 +21,7 @@ export default function BlogIndex() {
           <p className="hand blog-hand">Mostly about one dog. Occasionally about the app.</p>
           <ul className="post-grid">
             {posts.map((p, i) => (
-              <li key={p.slug} className={`post-card tilt-${i % 3}`}>
-                <Link href={`/blog/${p.slug}`}>
-                  {/* eslint-disable-next-line @next/next/no-img-element */}
-                  <img src={p.cover.src} alt={p.cover.alt} />
-                  <span className="post-date">{formatDate(p.date)}</span>
-                  <h2>{p.title}</h2>
-                  <p>{p.summary}</p>
-                </Link>
-              </li>
+              <PostCard key={p.slug} post={p} index={i} heading="h2" />
             ))}
           </ul>
         </div>

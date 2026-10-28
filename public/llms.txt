@@ -6,12 +6,11 @@ Key facts:
 
 - Platform: Android only (Google Play). No iPhone version yet.
 - Price: free. No ads, no sign-up, no account.
-- The alarm rings on the phone's alarm channel, so it works on silent and Do Not Disturb, and shows full screen on the lock screen.
+- It rings like the phone's normal alarm, even on silent or Do Not Disturb, and shows Bruno full screen.
 - Any number of alarms: once, every day, weekdays, or chosen days. Snooze is available.
 - The howl recording is saved on the phone, so alarms ring without an internet connection and even if Bruno skips a session.
 - Live: watch Bruno around 06:00 and 18:00 IST, or turn on "Ring when Bruno goes live" to be alerted when he's on camera.
 - "Watch his last howl" replays his newest session; users rate each howl from 1 to 5 paws and see the shared average.
-- The app's look changes with the time of day (dawn, morning, afternoon, golden hour, evening, dusk, night).
 - Made by one independent developer (Bruno's owner). Publisher name on Google Play: Treepie.
 
 ## Pages

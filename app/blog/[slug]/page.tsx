@@ -3,6 +3,7 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import { SiteFooter, SiteHeader } from "../../_components/SiteChrome";
 import { SITE_URL } from "../../site";
+import PostCard from "../../_components/PostCard";
 import { POSTS, formatDate, getPost } from "../posts";
 
 export function generateStaticParams() {
@@ -56,15 +57,7 @@ export default async function PostPage({ params }: { params: Promise<{ slug: str
             <h2 className="section-title">More from the porch</h2>
             <ul className="post-grid">
               {others.map((p, i) => (
-                <li key={p.slug} className={`post-card tilt-${i % 3}`}>
-                  <Link href={`/blog/${p.slug}`}>
-                    {/* eslint-disable-next-line @next/next/no-img-element */}
-                    <img src={p.cover.src} alt={p.cover.alt} />
-                    <span className="post-date">{formatDate(p.date)}</span>
-                    <h3>{p.title}</h3>
-                    <p>{p.summary}</p>
-                  </Link>
-                </li>
+                <PostCard key={p.slug} post={p} index={i} />
               ))}
             </ul>
           </div>

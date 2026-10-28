@@ -3,6 +3,7 @@ import LegalPage from "../_components/LegalPage";
 import { CONTACT_EMAIL, PACKAGE_NAME, PRIVACY_EFFECTIVE } from "../site";
 
 export const metadata: Metadata = {
+  alternates: { canonical: "/privacy" },
   title: "Privacy Policy",
   description: "What Bruno's Alarm does and doesn't do with your data.",
 };

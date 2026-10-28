@@ -6,6 +6,7 @@ import { POSTS, formatDate } from "./posts";
 export const metadata: Metadata = {
   title: "Blog",
   description: "Notes from Bruno's world: the dog, the church bell, and the alarm clock.",
+  alternates: { canonical: "/blog" },
 };
 
 export default function BlogIndex() {

@@ -3,6 +3,7 @@ import LegalPage from "../_components/LegalPage";
 import { CONTACT_EMAIL, TERMS_EFFECTIVE } from "../site";
 
 export const metadata: Metadata = {
+  alternates: { canonical: "/terms" },
   title: "Terms of Service",
   description: "The rules for using Bruno's Alarm and its live chat.",
 };

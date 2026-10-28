@@ -4,6 +4,9 @@ import { YOUTUBE_LIVE_MODE } from "@/lib/youtube";
 
 export const dynamic = "force-dynamic";
 
+// Legacy secret page: never in search results.
+export const metadata = { robots: { index: false, follow: false } };
+
 function Row({ label, value }: { label: string; value: React.ReactNode }) {
   return (
     <div style={{ display: "flex", justifyContent: "space-between", gap: "1rem", padding: "0.4rem 0", borderBottom: "1px solid var(--border)" }}>

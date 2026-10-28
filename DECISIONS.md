@@ -100,6 +100,15 @@ morning story scene (always morning orange, like the app's About), and a blog. B
 true facts; add new posts when the owner shares more about Bruno instead of guessing. Copy must
 match the shipped app (e.g. no live-chat claims while D17a has it off).
 
+**D16b. Website is built to be found by search engines and AI assistants** (28 Oct). Page titles
+say "Bruno's Howl Alarm" (the Play listing name, and the words people search) while the brand on
+the page stays "Bruno's Alarm". robots.txt welcomes AI crawlers (GPTBot, ClaudeBot, PerplexityBot,
+Google-Extended…): being quoted by assistants is cheap discovery for a niche app. Structured data
+(MobileApplication, FAQPage, BlogPosting) and /llms.txt state only true facts; **no
+aggregateRating**, because the paw ratings rate Bruno's howls, not the app. Every page sets its own
+canonical (never in the root layout, or every page would point at the home page). Keep
+public/llms.txt and the sitemap in step when posts or facts change.
+
 ## Chat
 
 **D17. Chat writes only via the `sendChatMessage` Cloud Function** (rate limit, profanity filter,

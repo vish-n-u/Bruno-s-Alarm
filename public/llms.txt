@@ -1,0 +1,25 @@
+# Bruno's Alarm (Bruno's Howl Alarm)
+
+> A free Android alarm clock that wakes you up with a real dog's howl. Bruno is a real dog who howls at a church bell near his home twice a day, at 06:00 and 18:00 India time (IST). A camera streams him live, and his latest recorded howl becomes your alarm sound.
+
+Key facts:
+
+- Platform: Android only (Google Play). No iPhone version yet.
+- Price: free. No ads, no sign-up, no account.
+- The alarm rings on the phone's alarm channel, so it works on silent and Do Not Disturb, and shows full screen on the lock screen.
+- Any number of alarms: once, every day, weekdays, or chosen days. Snooze is available.
+- The howl recording is saved on the phone, so alarms ring without an internet connection and even if Bruno skips a session.
+- Live: watch Bruno around 06:00 and 18:00 IST, or turn on "Ring when Bruno goes live" to be alerted when he's on camera.
+- "Watch his last howl" replays his newest session; users rate each howl from 1 to 5 paws and see the shared average.
+- The app's look changes with the time of day (dawn, morning, afternoon, golden hour, evening, dusk, night).
+- Made by one independent developer (Bruno's owner). Publisher name on Google Play: Treepie.
+
+## Pages
+
+- [Home](https://bruno-s-alarm.vercel.app/): what the app does, Bruno's last howl, FAQ
+- [Get it on Google Play](https://play.google.com/store/apps/details?id=com.brunosalarm.app)
+- [Meet Bruno](https://bruno-s-alarm.vercel.app/blog/meet-bruno): the dog and how the app started
+- [How Bruno's howl becomes your alarm](https://bruno-s-alarm.vercel.app/blog/how-his-howl-becomes-your-alarm)
+- [Rate Bruno's howls](https://bruno-s-alarm.vercel.app/blog/rate-his-howls)
+- [Privacy Policy](https://bruno-s-alarm.vercel.app/privacy)
+- [Terms of Service](https://bruno-s-alarm.vercel.app/terms)

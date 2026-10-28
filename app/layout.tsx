@@ -16,18 +16,25 @@ const caveat = Caveat({ weight: "600", subsets: ["latin"], variable: "--font-han
 
 export const metadata: Metadata = {
   metadataBase: new URL(SITE_URL),
+  // "Howl alarm" / "dog alarm clock" are what people actually search; the Play listing is
+  // "Bruno's Howl Alarm", so the site uses the same words (one name everywhere helps search and AI
+  // assistants recognise it as one thing).
   title: {
-    default: "Bruno's Alarm",
-    template: "%s · Bruno's Alarm",
+    default: "Bruno's Howl Alarm: wake up to a real dog howling",
+    template: "%s · Bruno's Howl Alarm",
   },
   description:
-    "A real dog howls at a church bell at 6AM and 6PM IST. This Android app wakes you up with it: live when he's on, recorded when he isn't.",
+    "A free Android alarm clock that wakes you with a real dog's howl. Bruno howls at a church bell at 6 AM and 6 PM IST: watch him live, or wake up to his latest howl. Rings on silent.",
+  applicationName: "Bruno's Alarm",
   openGraph: {
-    title: "Bruno's Alarm",
-    description: "A real dog, live twice a day. Wake up to Bruno's howl.",
+    siteName: "Bruno's Alarm",
+    title: "Bruno's Howl Alarm",
+    description: "A real dog, live twice a day. Wake up to Bruno's howl. Free on Android.",
     images: [{ url: "/bruno.jpg", width: 800, height: 800, alt: "Bruno mid-howl" }],
     type: "website",
+    locale: "en_IN",
   },
+  twitter: { card: "summary" },
 };
 
 export const viewport: Viewport = {

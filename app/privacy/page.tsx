@@ -154,12 +154,25 @@ export default function PrivacyPage() {
       </dl>
       <p>The app does not ask for your microphone, contacts, photos, files, or location.</p>
 
-      <h2><span className="num">6</span>This website</h2>
+      <h2 id="website"><span className="num">6</span>This website</h2>
       <p>
-        This site has no analytics, no cookies, and no trackers. Its fonts are served from the
-        site itself, not from Google. The only thing it works out about you is your timezone,
-        in your own browser, to show Bruno&rsquo;s schedule in your local time. That never leaves
-        your device.
+        This site uses <strong>Google Analytics</strong> to count visits and see which pages
+        people read: the pages you view, roughly where you are (country or city, from your IP
+        address), your device and browser type, and the site that sent you here. It sets Google
+        Analytics cookies to tell repeat visits apart. It isn&rsquo;t used for ads, and we
+        don&rsquo;t send Google your name, email, or anything you type.
+      </p>
+      <p>
+        Every visitor is asked once. If you&rsquo;re in the EU, the UK, or Switzerland, no
+        analytics cookies are set unless you say OK. Anywhere else, analytics is on unless you
+        say no thanks. You can change your answer at any time with &ldquo;Cookie choices&rdquo;
+        at the bottom of every page. See{" "}
+        <a href="https://policies.google.com/technologies/partner-sites" rel="noopener">how Google uses this data</a>.
+      </p>
+      <p>
+        The site&rsquo;s fonts are served from the site itself, not from Google. It also works
+        out your timezone, in your own browser, to show Bruno&rsquo;s schedule in your local
+        time. That never leaves your device.
       </p>
 
       <h2 id="delete-your-data"><span className="num">7</span>Deleting your data</h2>

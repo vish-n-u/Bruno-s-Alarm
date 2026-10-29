@@ -1,5 +1,5 @@
 BRUNO'S ALARM — PRIVACY POLICY
-Effective October 20, 2026
+Effective October 29, 2026
 Package: com.brunosalarm.app
 
 Bruno's Alarm wakes you up with a real dog's twice-daily howl, and lets you chat with

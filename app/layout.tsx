@@ -1,7 +1,9 @@
 import type { Metadata, Viewport } from "next";
 import { Anton, Bricolage_Grotesque, Caveat, Courier_Prime } from "next/font/google";
+import Analytics from "./_components/Analytics";
+import { CONSENT_DEFAULT_SCRIPT } from "./_components/consent";
 import PhaseSync from "./_components/PhaseSync";
-import { SITE_URL } from "./site";
+import { ANALYTICS_ON, SITE_URL } from "./site";
 import "./globals.css";
 import "./fun.css";
 
@@ -54,10 +56,12 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
     >
       <head>
         <script dangerouslySetInnerHTML={{ __html: phaseScript }} />
+        {ANALYTICS_ON && <script dangerouslySetInnerHTML={{ __html: CONSENT_DEFAULT_SCRIPT }} />}
       </head>
       <body>
         <PhaseSync />
         {children}
+        {ANALYTICS_ON && <Analytics />}
       </body>
     </html>
   );

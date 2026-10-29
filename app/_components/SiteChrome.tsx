@@ -1,6 +1,7 @@
 import Image from "next/image";
 import Link from "next/link";
-import { CONTACT_EMAIL } from "../site";
+import { ANALYTICS_ON, CONTACT_EMAIL } from "../site";
+import { CookieChoicesLink } from "./Analytics";
 
 export function SiteHeader() {
   return (
@@ -34,6 +35,7 @@ export function SiteFooter() {
           <Link href="/blog">Blog</Link>
           <Link href="/privacy">Privacy Policy</Link>
           <Link href="/terms">Terms of Service</Link>
+          {ANALYTICS_ON && <CookieChoicesLink />}
           <a href={`mailto:${CONTACT_EMAIL}`}>{CONTACT_EMAIL}</a>
         </nav>
       </div>

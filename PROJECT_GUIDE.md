@@ -390,6 +390,9 @@ the owner hasn't decided yet whether to switch them (Play shows the policy's add
   Firebase console → Analytics (Explore → funnel/path explorations for "what did they do before
   uninstalling"). Firebase adds first_open, session_start, user_engagement (time on screen),
   app_remove (uninstall, Android) on its own. Nothing personal is sent (no names, chat text, ids).
+- Website analytics (separate): GA4 property "Bruno's Alarm website" `G-2THHFCRC7Y`, with a
+  consent banner (`app/_components/Analytics.tsx`, `consent.ts`; DECISIONS D23). Production
+  builds only, so check it with `next build && next start`, not `npm run dev`.
   - Screens: `screen_view` for every navigator screen (App.tsx `onStateChange`) plus
     `Onboarding` and `AlarmRinging`.
   - `onboarding_complete` {set_first_alarm}; `daily_alarm_on|off` {source: settings|home_card};

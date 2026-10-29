@@ -146,3 +146,14 @@ redirected.** *Why:* installed apps (v49 and earlier) call `/api/latest-recordin
 privacy/terms on the vercel.app host, so redirecting or removing it would break them. The root is
 a Cloudflare CNAME to Vercel with the proxy off (Vercel issues the certificate). It used to be an
 unused, access-disabled R2 custom domain, which was removed; R2 stays on `media.`. · 28 Oct.
+
+**D23. The website uses Google Analytics 4, with a consent banner; this replaces the old "no
+analytics, no cookies" promise** (owner chose GA4 over cookieless Vercel/Cloudflare analytics, 29
+Oct). *Why:* the owner wants the fuller reports (sources, pages, Search Console link). Property
+"Bruno's Alarm website" `G-2THHFCRC7Y`, separate from the app's Firebase property so web visits
+don't mix into app numbers. Consent Mode: analytics denied by default in EEA/UK/CH until the
+visitor says OK, granted elsewhere unless they say no; ad storage denied everywhere (no ads, D20).
+Every visitor sees the banner once; footer "Cookie choices" reopens it; the choice is in
+localStorage `ga-consent` and is applied in `<head>` before gtag loads. Production builds only.
+Privacy policy §6 says all this; keep them in step. Search Console is verified for the
+`brunos-alarm.com` domain (Cloudflare TXT record; don't delete it). Bing Webmaster Tools: not yet.
